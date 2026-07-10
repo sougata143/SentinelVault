@@ -5,6 +5,7 @@ import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../theme/theme.dart';
 import '../../app_shell.dart';
+import '../settings/settings_screen.dart';
 
 class UnlockScreen extends StatefulWidget {
   final String email;
@@ -40,10 +41,29 @@ class _UnlockScreenState extends State<UnlockScreen> {
   int _lockoutSecondsRemaining = 0;
   Timer? _lockoutTimer;
 
+  String? _biometricInvalidatedMessage;
+
   @override
   void initState() {
     super.initState();
     _fetchKeys();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    if (AppSettings.biometricEnabled && VaultLockManager.instance.hasBiometricCache) {
+      final enrollmentChanged = await BiometricAuthService.instance.wasEnrollmentChanged();
+      if (enrollmentChanged) {
+        VaultLockManager.instance.invalidateBiometricCache();
+        AppSettings.biometricEnabled = false;
+        if (mounted) {
+          setState(() {
+            _biometricInvalidatedMessage = 'Biometric configuration changed. Please enter Master Password.';
+          });
+        }
+        BiometricAuthService.instance.resetEnrollmentStatus();
+      }
+    }
   }
 
   @override
@@ -189,6 +209,49 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
   }
 
+  Future<void> _handleBiometricUnlock() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await BiometricAuthService.instance.authenticate();
+      if (success) {
+        final unlocked = VaultLockManager.instance.unlockWithBiometrics(true);
+        if (unlocked) {
+          final vaultKey = VaultLockManager.instance.vaultKey!;
+          final db = SqliteVaultDatabase.inMemory();
+          db.open(vaultKey);
+
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+              ),
+              (route) => false,
+            );
+          }
+          return;
+        }
+      }
+      
+      setState(() {
+        _errorMessage = 'Biometric authentication failed';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Biometric unlock error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isButtonsDisabled = _isFetchingKeys || _isLoading || _lockoutSecondsRemaining > 0;
@@ -276,6 +339,27 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           child: const Text('Retry'),
                         ),
                       ] else ...[
+                        if (_biometricInvalidatedMessage != null) ...[
+                          Container(
+                            key: const Key('biometric-invalidated-banner'),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              _biometricInvalidatedMessage!,
+                              style: const TextStyle(
+                                color: Colors.orange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         if (_errorMessage != null) ...[
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -347,6 +431,19 @@ class _UnlockScreenState extends State<UnlockScreen> {
                                 )
                               : const Text('Decrypt & Unlock Vault'),
                         ),
+                        if (AppSettings.biometricEnabled && VaultLockManager.instance.hasBiometricCache) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            key: const Key('biometric-unlock-button'),
+                            onPressed: isButtonsDisabled ? null : _handleBiometricUnlock,
+                            icon: const Icon(Icons.fingerprint),
+                            label: const Text('Unlock with Biometrics'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primaryColor,
+                              side: const BorderSide(color: AppTheme.primaryColor),
+                            ),
+                          ),
+                        ],
                       ],
                     ],
                   ),

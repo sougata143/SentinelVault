@@ -61,5 +61,43 @@ void main() {
       expect(lockManager.isLocked, true);
       expect(lockManager.isLoggedIn, false);
     });
+
+    test('4. biometric quick-unlock wraps keys and restores them successfully', () {
+      final masterKey = List<int>.generate(32, (i) => i + 1);
+      final vaultKey = List<int>.generate(32, (i) => i + 10);
+
+      lockManager.unlock(masterKey, vaultKey);
+      lockManager.enableBiometrics(masterKey, vaultKey);
+
+      expect(lockManager.hasBiometricCache, true);
+      expect(lockManager.isBiometricEnabled, true);
+
+      // Lock
+      lockManager.lock();
+      expect(lockManager.isLocked, true);
+      expect(lockManager.hasBiometricCache, true);
+
+      // Biometric unlock success
+      final success = lockManager.unlockWithBiometrics(true);
+      expect(success, true);
+      expect(lockManager.isLocked, false);
+      expect(lockManager.masterKey, masterKey);
+      expect(lockManager.vaultKey, vaultKey);
+    });
+
+    test('5. biometric quick-unlock invalidation clears cache', () {
+      final masterKey = List<int>.generate(32, (i) => i + 1);
+      final vaultKey = List<int>.generate(32, (i) => i + 10);
+
+      lockManager.unlock(masterKey, vaultKey);
+      lockManager.enableBiometrics(masterKey, vaultKey);
+
+      // Invalidate cache
+      lockManager.invalidateBiometricCache();
+      expect(lockManager.hasBiometricCache, false);
+
+      final success = lockManager.unlockWithBiometrics(true);
+      expect(success, false);
+    });
   });
 }

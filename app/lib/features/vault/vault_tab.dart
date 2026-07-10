@@ -235,17 +235,20 @@ class _VaultTabState extends State<VaultTab> {
       child: Column(
         children: [
           // Logo or Header
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Row(
-              children: [
-                Icon(Icons.shield_outlined, color: AppTheme.primaryColor, size: 28),
-                SizedBox(width: 10),
-                Text(
-                  'SentinelVault',
-                  style: TextStyle(fontFamily: 'Outfit', fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                children: [
+                  const Icon(Icons.shield_outlined, color: AppTheme.primaryColor, size: 28),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'SentinelVault',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
             ),
           ),
           Expanded(child: _buildSidebarList()),

@@ -6,6 +6,7 @@ class AppSettings {
   static int clipboardTimeoutSeconds = 30;
   static bool autoLockEnabled = true;
   static int autoLockTimeoutMinutes = 5;
+  static bool biometricEnabled = false;
 }
 
 class SettingsScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _clipboardTimeout;
   late bool _autoLock;
   late int _autoLockTimeout;
+  late bool _biometricEnabled;
 
   @override
   void initState() {
@@ -33,12 +35,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _clipboardTimeout = AppSettings.clipboardTimeoutSeconds;
     _autoLock = AppSettings.autoLockEnabled;
     _autoLockTimeout = AppSettings.autoLockTimeoutMinutes;
+    _biometricEnabled = AppSettings.biometricEnabled;
   }
 
   void _saveSettings() {
     AppSettings.clipboardTimeoutSeconds = _clipboardTimeout;
     AppSettings.autoLockEnabled = _autoLock;
     AppSettings.autoLockTimeoutMinutes = _autoLockTimeout;
+    AppSettings.biometricEnabled = _biometricEnabled;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved successfully')),
     );
@@ -140,6 +144,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   ],
+                  const Divider(color: Colors.white10),
+                  SwitchListTile(
+                    key: const Key('settings-biometric-switch'),
+                    title: const Text('Biometric Quick-Unlock'),
+                    subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
+                    value: _biometricEnabled,
+                    activeColor: AppTheme.primaryColor,
+                    onChanged: (val) async {
+                      if (val) {
+                        final supported = await BiometricAuthService.instance.isBiometricsSupported();
+                        if (!supported) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Biometrics not supported on this device')),
+                            );
+                          }
+                          return;
+                        }
+
+                        final success = await BiometricAuthService.instance.authenticate();
+                        if (success) {
+                          setState(() {
+                            _biometricEnabled = true;
+                          });
+                          _saveSettings();
+                          if (VaultLockManager.instance.masterKey != null &&
+                              VaultLockManager.instance.vaultKey != null) {
+                            VaultLockManager.instance.enableBiometrics(
+                              VaultLockManager.instance.masterKey!,
+                              VaultLockManager.instance.vaultKey!,
+                            );
+                          }
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Biometric authentication failed')),
+                            );
+                          }
+                        }
+                      } else {
+                        setState(() {
+                          _biometricEnabled = false;
+                        });
+                        _saveSettings();
+                        VaultLockManager.instance.disableBiometrics();
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
