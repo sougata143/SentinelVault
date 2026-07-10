@@ -1,0 +1,594 @@
+import 'package:flutter/material.dart';
+import 'package:core/core.dart';
+import '../../../theme/theme.dart';
+
+/// Converts a [ParsedItem] into a [VaultItem], encrypts it under [vaultKey],
+/// and writes it to [db]. Automatically handles all six item types.
+Future<void> encryptAndSave(
+  ParsedItem item,
+  List<int> vaultKey,
+  VaultDatabase db,
+  VaultCrypto crypto,
+) async {
+  final now = DateTime.now().toUtc();
+  final id = '${now.millisecondsSinceEpoch}_${item.title.hashCode.abs()}';
+
+  VaultItemFields fields;
+  VaultItemType type;
+
+  switch (item.type) {
+    case 'credit_card':
+      type = VaultItemType.creditCard;
+      fields = CreditCardFields(
+        cardholderName: item.cardholderName ?? '',
+        cardNumber: ConcealedValue.plain(item.cardNumber ?? ''),
+        brand: item.cardBrand ?? 'other',
+        expiryMonth: item.cardExpiryMonth ?? 1,
+        expiryYear: item.cardExpiryYear ?? DateTime.now().year,
+        cvv: ConcealedValue.plain(item.cardCvv ?? ''),
+        pin: ConcealedValue.plain(item.cardPin ?? ''),
+      );
+      break;
+
+    case 'identity':
+      type = VaultItemType.identity;
+      fields = IdentityFields(
+        firstName: item.firstName ?? '',
+        lastName: item.lastName ?? '',
+        birthdate: item.birthdate,
+        gender: item.gender,
+        address: IdentityAddress(
+          street: item.street ?? '',
+          city: item.city ?? '',
+          state: item.state ?? '',
+          zip: item.zip ?? '',
+          country: item.country ?? '',
+        ),
+        emails: const [],
+        phoneNumbers: const [],
+      );
+      break;
+
+    case 'secure_note':
+      type = VaultItemType.secureNote;
+      fields = SecureNoteFields(
+        content: ConcealedValue.plain(item.noteContent ?? ''),
+      );
+      break;
+
+    case 'bank_account':
+      type = VaultItemType.bankAccount;
+      fields = BankAccountFields(
+        bankName: item.bankName ?? '',
+        accountType: item.bankAccountType ?? 'checking',
+        accountNumber: ConcealedValue.plain(item.bankAccountNumber ?? ''),
+        routingNumber: ConcealedValue.plain(item.bankRoutingNumber ?? ''),
+        iban: item.bankIban,
+        swift: item.bankSwift,
+      );
+      break;
+
+    case 'password':
+      type = VaultItemType.password;
+      fields = PasswordFields(
+        password: ConcealedValue.plain(item.standalonePassword ?? ''),
+      );
+      break;
+
+    case 'login':
+    default:
+      type = VaultItemType.login;
+      fields = LoginFields(
+        username: item.username ?? '',
+        password: ConcealedValue.plain(item.password ?? ''),
+        urls: item.urls,
+        otpSecret: ConcealedValue.plain(item.totpSecret ?? ''),
+        passwordHistory: const [],
+      );
+  }
+
+  final vaultItem = VaultItem(
+    id: id,
+    type: type,
+    title: item.title,
+    tags: item.tags,
+    favorite: item.favorite,
+    vaultId: '',
+    createdAt: now,
+    updatedAt: now,
+    fields: fields,
+    customFields: const [],
+    notes: ConcealedValue.plain(item.notes ?? ''),
+  );
+
+  final encrypted = await vaultItem.encrypt(vaultKey, crypto);
+  db.insertItem(encrypted);
+}
+
+/// Multi-step vault import flow.
+///
+/// Step 1: Format picker
+/// Step 2: File content paste / file picker result
+/// Step 3: Preview (counts by type + errors)
+/// Step 4: Confirm → encrypt each item → write ciphertext → clear plaintext
+///
+/// Security invariants (from vault-import-export skill + AGENTS.md Rule 7):
+/// - Parsed plaintext never leaves this screen's memory.
+/// - The import file content is not stored anywhere after parsing.
+/// - After saving, [_parsedItems] is set to [] to release all references.
+class ImportScreen extends StatefulWidget {
+  final List<int> vaultKey;
+  final VaultDatabase db;
+
+  const ImportScreen({
+    super.key,
+    required this.vaultKey,
+    required this.db,
+  });
+
+  @override
+  State<ImportScreen> createState() => _ImportScreenState();
+}
+
+class _ImportScreenState extends State<ImportScreen> {
+  int _step = 0;
+  String _selectedFormat = '';
+  String _fileContent = '';
+  final _fileContentController = TextEditingController();
+
+  // Generic CSV column mapping
+  final _titleColCtrl = TextEditingController(text: 'title');
+  final _userColCtrl = TextEditingController(text: 'username');
+  final _passColCtrl = TextEditingController(text: 'password');
+  final _urlColCtrl = TextEditingController(text: 'url');
+  final _notesColCtrl = TextEditingController(text: 'notes');
+
+  ImportResult? _importResult;
+  List<ParsedItem> _parsedItems = [];
+  bool _isSaving = false;
+  int _savedCount = 0;
+  final _crypto = VaultCrypto();
+
+  @override
+  void dispose() {
+    _fileContentController.dispose();
+    _titleColCtrl.dispose();
+    _userColCtrl.dispose();
+    _passColCtrl.dispose();
+    _urlColCtrl.dispose();
+    _notesColCtrl.dispose();
+    super.dispose();
+  }
+
+  void _parseContent() {
+    final content = _fileContentController.text.trim();
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please paste or enter the export file content first.')),
+      );
+      return;
+    }
+    _fileContent = content;
+    ImportResult result;
+    try {
+      switch (_selectedFormat) {
+        case 'bitwarden':
+          result = BitwardenParser().parse(content);
+          break;
+        case '1password':
+          result = OnePasswordParser().parse(content);
+          break;
+        case 'lastpass':
+          result = LastPassParser().parse(content);
+          break;
+        case 'generic_csv':
+          result = GenericCsvParser(columnMapping: {
+            'title': _titleColCtrl.text,
+            'username': _userColCtrl.text,
+            'password': _passColCtrl.text,
+            'url': _urlColCtrl.text,
+            'notes': _notesColCtrl.text,
+          }).parse(content);
+          break;
+        default:
+          result = ImportResult(items: [], errors: [
+            const ParsedError(sourceRef: 'format', reason: 'Unknown format selected.')
+          ]);
+      }
+    } catch (e) {
+      result = ImportResult(items: [], errors: [
+        ParsedError(sourceRef: 'parse', reason: 'Critical parse error: $e')
+      ]);
+    }
+
+    setState(() {
+      _importResult = result;
+      _parsedItems = result.items;
+      _step = 2; // Move to preview
+    });
+  }
+
+  Future<void> _confirmAndImport() async {
+    if (_parsedItems.isEmpty) return;
+    setState(() => _isSaving = true);
+    int count = 0;
+
+    final toProcess = List<ParsedItem>.from(_parsedItems);
+    // Clear the reference immediately — security invariant
+    _parsedItems = [];
+    _fileContent = '';
+
+    for (final item in toProcess) {
+      try {
+        await encryptAndSave(item, widget.vaultKey, widget.db, _crypto);
+        count++;
+      } catch (_) {
+        // Skip items that fail to encrypt — they will not appear in the vault
+      }
+    }
+
+    // Explicitly clear the toProcess list to allow GC of plaintext
+    toProcess.clear();
+    // Clear the paste area
+    _fileContentController.clear();
+
+    setState(() {
+      _isSaving = false;
+      _savedCount = count;
+      _step = 3; // Success screen
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Import Vault Items'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_step) {
+      case 0:
+        return _buildFormatPicker();
+      case 1:
+        return _buildFileInput();
+      case 2:
+        return _buildPreview();
+      case 3:
+        return _buildSuccess();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildFormatPicker() {
+    final formats = [
+      ('bitwarden', 'Bitwarden', 'JSON export from Bitwarden', Icons.shield_outlined, Colors.blueAccent),
+      ('1password', '1Password', 'export.data from .1pux archive', Icons.security_outlined, Colors.deepOrangeAccent),
+      ('lastpass', 'LastPass', 'CSV export from LastPass', Icons.lock_outline, Colors.redAccent),
+      ('generic_csv', 'Generic CSV', 'Any CSV with custom column mapping', Icons.table_chart_outlined, Colors.tealAccent),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Text(
+          'Select Source Format',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'All parsing happens offline, in memory only. The file content is never uploaded.',
+          style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        ...formats.map((f) => Card(
+              color: AppTheme.surfaceColor,
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: f.$5.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(f.$4, color: f.$5),
+                ),
+                title: Text(f.$2, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(f.$3, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondaryColor)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  setState(() {
+                    _selectedFormat = f.$1;
+                    _step = 1;
+                  });
+                },
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildFileInput() {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _step = 0),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatLabel(_selectedFormat),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.warningColor.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.security, color: AppTheme.warningColor, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Paste the file content below. It will be parsed in memory only — never saved to disk or sent anywhere.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Generic CSV extra: column mapping UI
+        if (_selectedFormat == 'generic_csv') ...[
+          const SizedBox(height: 20),
+          const Text(
+            'COLUMN MAPPING',
+            style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 8),
+          _colMapRow('Title column', _titleColCtrl),
+          _colMapRow('Username column', _userColCtrl),
+          _colMapRow('Password column', _passColCtrl),
+          _colMapRow('URL column', _urlColCtrl),
+          _colMapRow('Notes column', _notesColCtrl),
+        ],
+
+        const SizedBox(height: 20),
+        const Text(
+          'FILE CONTENT',
+          style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _fileContentController,
+          maxLines: 12,
+          decoration: const InputDecoration(
+            hintText: 'Paste the export file content here...',
+            alignLabelWithHint: true,
+          ),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: const Icon(Icons.preview_outlined),
+          label: const Text('Parse & Preview'),
+          onPressed: _parseContent,
+        ),
+      ],
+    );
+  }
+
+  Widget _colMapRow(String label, TextEditingController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondaryColor)),
+          ),
+          Expanded(
+            child: TextFormField(
+              controller: ctrl,
+              decoration: const InputDecoration(isDense: true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreview() {
+    final result = _importResult!;
+    final counts = result.countsByType;
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _step = 1),
+            ),
+            const SizedBox(width: 8),
+            const Text('Import Preview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Summary counts by type
+        if (counts.isNotEmpty) ...[
+          const Text(
+            'ITEMS TO IMPORT',
+            style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 8),
+          ...counts.entries.map((e) => ListTile(
+                dense: true,
+                leading: const Icon(Icons.check_circle_outline, color: AppTheme.primaryColor, size: 18),
+                title: Text(_typeLabel(e.key)),
+                trailing: Text('${e.value}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                contentPadding: EdgeInsets.zero,
+              )),
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.summarize_outlined, color: AppTheme.textSecondaryColor, size: 18),
+            title: const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+            trailing: Text('${result.items.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ] else
+          const Text('No items could be parsed from this file.'),
+
+        // Errors
+        if (result.errors.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'PARSE WARNINGS / ERRORS',
+            style: TextStyle(color: AppTheme.warningColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 8),
+          ...result.errors.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: AppTheme.warningColor, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(e.sourceRef, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondaryColor)),
+                          Text(e.reason, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+
+        const SizedBox(height: 24),
+
+        if (result.items.isNotEmpty)
+          ElevatedButton.icon(
+            key: const Key('confirm-import-button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.lock_outlined),
+            label: Text('Encrypt & Import ${result.items.length} Items'),
+            onPressed: _isSaving ? null : _confirmAndImport,
+          ),
+
+        if (_isSaving) ...[
+          const SizedBox(height: 16),
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          const Text('Encrypting items...', textAlign: TextAlign.center),
+        ],
+
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuccess() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_outline, color: AppTheme.primaryColor, size: 56),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Import Complete',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$_savedCount items encrypted and saved to your vault.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textSecondaryColor),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The import file content has been cleared from memory.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+
+  String _formatLabel(String fmt) {
+    switch (fmt) {
+      case 'bitwarden': return 'Bitwarden Import';
+      case '1password': return '1Password Import';
+      case 'lastpass': return 'LastPass Import';
+      case 'generic_csv': return 'Generic CSV Import';
+      default: return 'Import';
+    }
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'login': return 'Logins';
+      case 'credit_card': return 'Credit Cards';
+      case 'identity': return 'Identities';
+      case 'secure_note': return 'Secure Notes';
+      case 'bank_account': return 'Bank Accounts';
+      case 'password': return 'Passwords';
+      default: return type;
+    }
+  }
+}

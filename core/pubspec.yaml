@@ -1,0 +1,20 @@
+name: core
+description: Shared core package for SentinelVault containing crypto, data models, and sync logic.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  meta: ^1.11.0
+  cryptography: ^2.5.0
+  sqlite3: ^2.3.0
+  path: ^1.9.0
+  zxcvbnm: ^1.1.1
+  http: ^1.2.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0

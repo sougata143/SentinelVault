@@ -1,0 +1,87 @@
+name: SentinelVault CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # ── FLUTTER FRONTEND & CORE JOB ──────────────────────────────────────────
+  flutter-test:
+    name: Flutter Core and App Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter installation
+        run: flutter doctor -v
+
+      # Analyze & Test Core Package
+      - name: Core — Install Dependencies
+        run: flutter pub get
+        working-directory: core
+
+      - name: Core — Static Analysis
+        run: flutter analyze
+        working-directory: core
+
+      - name: Core — Run Tests
+        run: flutter test
+        working-directory: core
+
+      # Analyze & Test App Package
+      - name: App — Install Dependencies
+        run: flutter pub get
+        working-directory: app
+
+      - name: App — Static Analysis
+        run: flutter analyze
+        working-directory: app
+
+      - name: App — Run Tests
+        run: flutter test
+        working-directory: app
+
+  # ── NODE.js BACKEND SERVICES JOB ──────────────────────────────────────────
+  backend-test:
+    name: Node.js Backend Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, security-analysis-service, sync-api]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+        working-directory: backend/${{ matrix.service }}
+
+      - name: TypeScript Compile Check
+        run: npm run build
+        working-directory: backend/${{ matrix.service }}
+
+      - name: Run Jest Tests
+        run: npm run test
+        working-directory: backend/${{ matrix.service }}
