@@ -21,4 +21,6 @@ export 'src/import/parsers/generic_csv_parser.dart';
 export 'src/export/export_service.dart';
 export 'src/export/security_activity_log.dart';
 export 'src/security/ai_insights_client.dart';
+export 'src/auth/auth_client.dart';
+
 
