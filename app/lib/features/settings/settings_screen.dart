@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:core/core.dart';
 import '../../theme/theme.dart';
 
 class AppSettings {
@@ -8,7 +9,14 @@ class AppSettings {
 }
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final VoidCallback? onLock;
+  final VoidCallback? onLogout;
+
+  const SettingsScreen({
+    super.key,
+    this.onLock,
+    this.onLogout,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -158,6 +166,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   title: Text('Data Location'),
                   trailing: Text('Encrypted SQLite (Zero-Knowledge)'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Session Actions
+          _buildSectionHeader('Session Actions'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('settings-lock-tile'),
+                  leading: const Icon(Icons.lock_outline, color: Colors.orange),
+                  title: const Text('Lock Vault Now'),
+                  subtitle: const Text('Clears key material from memory. Session remains active.'),
+                  onTap: () {
+                    if (widget.onLock != null) {
+                      widget.onLock!();
+                    } else {
+                      VaultLockManager.instance.lock();
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                ListTile(
+                  key: const Key('settings-logout-tile'),
+                  leading: const Icon(Icons.exit_to_app, color: AppTheme.errorColor),
+                  title: const Text('Log Out'),
+                  subtitle: const Text('Clears session token and locks vault. Full login required next access.'),
+                  onTap: () {
+                    if (widget.onLogout != null) {
+                      widget.onLogout!();
+                    } else {
+                      VaultLockManager.instance.logout();
+                      Navigator.of(context).pop();
+                    }
+                  },
                 ),
               ],
             ),

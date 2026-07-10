@@ -22,6 +22,7 @@ export 'src/export/export_service.dart';
 export 'src/export/security_activity_log.dart';
 export 'src/security/ai_insights_client.dart';
 export 'src/auth/auth_client.dart';
+export 'src/auth/vault_lock_manager.dart';
 export 'src/sync/http_sync_api_client.dart';
 
 
