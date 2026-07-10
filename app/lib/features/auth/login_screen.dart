@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import 'sign_up_screen.dart';
+import 'unlock_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthClient authClient;
@@ -37,16 +38,39 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    // Simulate login for now or handle OPAQUE login flow in a later task
-    await Future.delayed(const Duration(milliseconds: 1000));
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Login not fully implemented yet - please sign up.';
-      });
+    try {
+      final token = await widget.authClient.login(email, password);
+
+      if (mounted) {
+        _passwordController.clear();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => UnlockScreen(
+              email: email,
+              authClient: widget.authClient,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _passwordController.clear();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

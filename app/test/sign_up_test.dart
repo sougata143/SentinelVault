@@ -30,6 +30,14 @@ class FakeAuthClient implements AuthClient {
     registeredEmail = email;
     registeredPassword = password;
   }
+
+  @override
+  Future<String> login(String email, String password) async {
+    return 'mock-session-token';
+  }
+
+  @override
+  List<int> hexToBytes(String hex) => [];
 }
 
 void main() {
