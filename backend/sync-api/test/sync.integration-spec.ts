@@ -181,4 +181,31 @@ describe('SyncService Integration Tests (Version Conflicts & Pull/Push)', () => 
     expect(res.body.conflicts.length).toBe(1);
     expect(res.body.conflicts[0].encryptedBlob).toBe(item1.encryptedBlob);
   });
+
+  it('POST /sync/vault-key and GET /sync/vault-key - saves and retrieves wrapped vault key and salt', async () => {
+    const salt = 'dummysalthex';
+    const wrappedKey = 'dummywrappedkeyhex';
+
+    // 1. Get before saving should return 404
+    await request(app.getHttpServer())
+      .get('/sync/vault-key')
+      .set('x-user-id', userId)
+      .expect(HttpStatus.NOT_FOUND);
+
+    // 2. Save vault key
+    await request(app.getHttpServer())
+      .post('/sync/vault-key')
+      .set('x-user-id', userId)
+      .send({ salt, wrappedKey })
+      .expect(HttpStatus.OK);
+
+    // 3. Retrieve vault key and check fields
+    const res = await request(app.getHttpServer())
+      .get('/sync/vault-key')
+      .set('x-user-id', userId)
+      .expect(HttpStatus.OK);
+
+    expect(res.body).toEqual({ salt, wrappedKey });
+  });
 });
+

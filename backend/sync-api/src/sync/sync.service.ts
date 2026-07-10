@@ -13,6 +13,9 @@ export interface EncryptedVaultItemDto {
 export class SyncService {
   // Map of userId -> Map of itemId -> EncryptedVaultItemDto
   private readonly store: Map<string, Map<string, EncryptedVaultItemDto>> = new Map();
+  // Map of userId -> { salt: string, wrappedKey: string }
+  private readonly vaultKeys: Map<string, { salt: string; wrappedKey: string }> = new Map();
+
 
   /**
    * Retrieves all encrypted vault items for a specific user.
@@ -75,10 +78,21 @@ export class SyncService {
     return null;
   }
 
+  public async saveVaultKey(userId: string, salt: string, wrappedKey: string): Promise<void> {
+    this.vaultKeys.set(userId.toLowerCase(), { salt, wrappedKey });
+  }
+
+  public async getVaultKey(userId: string): Promise<{ salt: string; wrappedKey: string } | null> {
+    const data = this.vaultKeys.get(userId.toLowerCase());
+    return data ? { ...data } : null;
+  }
+
   /**
    * Clears the database. Mainly used for tests.
    */
   public async clear(): Promise<void> {
     this.store.clear();
+    this.vaultKeys.clear();
   }
+
 }

@@ -50,4 +50,33 @@ export class SyncController {
 
     return { success: true };
   }
+
+  @Post('vault-key')
+  @HttpCode(HttpStatus.OK)
+  async saveVaultKey(
+    @Headers('x-user-id') userId: string | undefined,
+    @Body() body: { salt: string; wrappedKey: string },
+  ) {
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id header');
+    }
+    if (!body.salt || !body.wrappedKey) {
+      throw new BadRequestException('Missing salt or wrappedKey in body');
+    }
+    await this.syncService.saveVaultKey(userId, body.salt, body.wrappedKey);
+    return { success: true };
+  }
+
+  @Get('vault-key')
+  async getVaultKey(@Headers('x-user-id') userId?: string) {
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id header');
+    }
+    const data = await this.syncService.getVaultKey(userId);
+    if (!data) {
+      throw new HttpException('Vault key not set', HttpStatus.NOT_FOUND);
+    }
+    return data;
+  }
 }
+
