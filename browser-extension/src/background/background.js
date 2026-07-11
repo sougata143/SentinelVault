@@ -1,6 +1,29 @@
 // Background service worker for SentinelVault Extension
 
+let lastCapturedCredential = null;
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "captured_credential") {
+    lastCapturedCredential = {
+      origin: request.origin,
+      username: request.username,
+      password: request.password
+    };
+    sendResponse({ success: true });
+    return;
+  }
+
+  if (request.action === "get_captured_credential") {
+    sendResponse(lastCapturedCredential);
+    return;
+  }
+
+  if (request.action === "clear_captured_credential") {
+    lastCapturedCredential = null;
+    sendResponse({ success: true });
+    return;
+  }
+
   if (request.action === "get_status") {
     chrome.runtime.sendNativeMessage("com.example.sentinel_vault", { type: "STATUS" }, (response) => {
       if (chrome.runtime.lastError) {

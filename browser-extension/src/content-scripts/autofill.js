@@ -58,3 +58,45 @@ function performAutofill(username, password) {
 
   return true;
 }
+
+// Credential Capture: Listen to form submissions and clicks on submit buttons
+function captureSubmittedCredentials(container) {
+  if (!container) return;
+
+  const passwordInput = container.querySelector('input[type="password"]');
+  if (!passwordInput) return;
+
+  const password = passwordInput.value;
+  if (!password) return;
+
+  const usernameInput = container.querySelector('input[type="text"], input[type="email"], input:not([type])');
+  const username = usernameInput ? usernameInput.value : '';
+
+  // Get current origin
+  const origin = window.location.origin;
+
+  // Send captured credentials to background via extension messaging API (isolated from page JS context)
+  chrome.runtime.sendMessage({
+    action: "captured_credential",
+    origin: origin,
+    username: username,
+    password: password
+  });
+}
+
+document.addEventListener('submit', (event) => {
+  captureSubmittedCredentials(event.target);
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('button, input[type="submit"]');
+  if (!button) return;
+
+  const form = button.form || button.closest('form');
+  if (form) {
+    captureSubmittedCredentials(form);
+  } else {
+    captureSubmittedCredentials(button.parentElement);
+  }
+});
+

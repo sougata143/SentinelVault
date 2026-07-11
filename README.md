@@ -151,10 +151,11 @@ cd app
 flutter test
 ```
 
-Run all browser extension integration tests (tests the native messaging host and loopback HTTP server):
+Run all browser extension tests (native messaging host integration tests + isolated content-script tests):
 ```bash
 cd browser-extension
 dart test
+node test/autofill_test.js
 ```
 
 ### Running Backend Tests
