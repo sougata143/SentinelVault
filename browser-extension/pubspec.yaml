@@ -1,0 +1,14 @@
+name: browser_extension
+description: SentinelVault browser extension workspace integration tests.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  core:
+    path: ../core
+
+dev_dependencies:
+  test: ^1.24.0

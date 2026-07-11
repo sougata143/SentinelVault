@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "SentinelVault Extension",
+  "version": "1.0",
+  "description": "Thin, paired browser extension for SentinelVault password manager.",
+  "permissions": [
+    "nativeMessaging",
+    "activeTab",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-scripts/autofill.js"],
+      "run_at": "document_end"
+    }
+  ]
+}

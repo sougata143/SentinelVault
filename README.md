@@ -78,6 +78,10 @@ A platform-agnostic Dart package managing local databases (SQLite), cryptography
 │   ├── lib/
 │   │   └── src/                  # Crypto, DB, Models, Security, Import/Export
 │   └── test/                     # Core units and crypto round-trip tests
+├── browser-extension/            # Browser extension (Chrome, Firefox, Safari)
+│   ├── src/                      # Extension popup, content-scripts, native messaging host
+│   ├── core-bundle/              # Compiled shared Dart core JS bundles
+│   └── test/                     # Integration tests for native messaging host
 ├── backend/                      # NestJS cloud microservices
 │   ├── auth-service/             # Authentication & user directory microservice
 │   └── security-analysis-service/ # Security reputation, breach, and AI service
@@ -147,6 +151,12 @@ cd app
 flutter test
 ```
 
+Run all browser extension integration tests (tests the native messaging host and loopback HTTP server):
+```bash
+cd browser-extension
+dart test
+```
+
 ### Running Backend Tests
 Run NestJS unit and integration test suites:
 ```bash
@@ -168,10 +178,12 @@ npm run test
 - **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
 - **FIDO2/WebAuthn Passkey Authentication (Feature A)**: Standard WebAuthn primary registration and login ceremonies. Supports both platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (e.g. YubiKeys via USB/NFC/BLE) alongside OPAQUE Account Password flow, including username-less/discoverable credentials.
 - **Hardware Key Vault-Unlock (Feature B)**: Secure local vault-unlock option using the FIDO2 CTAP2 `hmac-secret` extension to wrap an additional copy of the Vault Key. Operates as an opt-in additional envelope, ensuring Master Password fallback if the key is lost or removed.
+- **Thin Web Extensions (Chrome, Firefox, Safari)**: Paired-mode extension architecture that communicates with the already-running native/desktop app via a native messaging host. Features exact origin matching, blocks cross-origin iframe fills, and reflects locks triggered in the native app within one interaction without holding any Vault Key material inside browser storage. Runs compiled JS bundles compiled directly from the Dart core package.
 
 ---
 
 ## 🔮 Future Scope
 
-1. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
+1. **Peer-to-Peer Syncing**: Implement zero-knowledge direct local syncing via WebRTC/local network broadcasts.
+
 

@@ -3,6 +3,7 @@ import 'package:core/core.dart';
 import 'app_shell.dart';
 import 'theme/theme.dart';
 import 'features/auth/flutter_secure_storage_impl.dart';
+import 'features/native_messaging/local_messaging_server.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,8 @@ class _VaultHomeScreenState extends State<VaultHomeScreen> {
     _db.open(_vaultKey);
 
     _prepopulateMockData();
+    LocalMessagingServer.db = _db;
+    LocalMessagingServer.start();
   }
 
   void _prepopulateMockData() {
@@ -102,6 +105,7 @@ class _VaultHomeScreenState extends State<VaultHomeScreen> {
 
   @override
   void dispose() {
+    LocalMessagingServer.stop();
     _db.close();
     super.dispose();
   }

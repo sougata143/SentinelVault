@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #06b6d4;
+    }
+    .status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 500;
+    }
+    .status-unlocked {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+    .status-locked {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+    .content-area {
+      min-height: 100px;
+    }
+    .lock-message {
+      text-align: center;
+      padding: 24px 0;
+      color: #94a3b8;
+    }
+    .lock-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .credential-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .credential-item {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cred-info {
+      display: flex;
+      flex-direction: column;
+      max-width: 200px;
+    }
+    .cred-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #f1f5f9;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cred-user {
+      font-size: 12px;
+      color: #94a3b8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn-autofill {
+      background-color: #06b6d4;
+      color: #0f172a;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-autofill:hover {
+      background-color: #22d3ee;
+    }
+    .no-items {
+      text-align: center;
+      padding: 24px 0;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="title">SentinelVault</span>
+    <span id="status-badge" class="status-badge status-locked">Checking...</span>
+  </div>
+
+  <div class="content-area">
+    <div id="locked-view" style="display: none;">
+      <div class="lock-message">
+        <div class="lock-icon">🔒</div>
+        <p>Vault is locked or the desktop app is not running.</p>
+        <p style="font-size: 11px;">Please open and unlock SentinelVault on your computer.</p>
+      </div>
+    </div>
+
+    <div id="unlocked-view" style="display: none;">
+      <ul id="credential-list" class="credential-list"></ul>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

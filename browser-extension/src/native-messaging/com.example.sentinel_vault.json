@@ -1,0 +1,10 @@
+{
+  "name": "com.example.sentinel_vault",
+  "description": "SentinelVault Native Messaging Host",
+  "path": "/Users/sougataroy/Downloads/Kaggle Antigravity/SentinelVault/browser-extension/src/native-messaging/host.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://cjhbpdgdcehblkmjgmdcbgcfodclndph/",
+    "chrome-extension://hgoifnbphbgpeebcdcfadmdcbgcfodcl/"
+  ]
+}
