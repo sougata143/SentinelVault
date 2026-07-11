@@ -162,7 +162,7 @@ npm run test
 - **Secure Remote Password (SRP-6a)**: Zero-knowledge client-server login handshakes preventing plaintext password transmission over the network.
 - **Local Unlock & Brute-Force Lockouts**: Screen-lock client protecting the master key in memory with client-side exponential backoff delays on repeated failed attempts.
 - **Independent Lock vs. Logout**: Separates memory key zero-out (Lock) from token session invalidation (Logout) for maximum security and usability.
-- **Biometric Quick-Unlock**: Hardware-enclave/keystore key wrapping simulation in-memory, automatically invalidated if new Face ID/Fingerprints are enrolled on the device.
+- **Biometric Quick-Unlock & OS-Backed Secure Storage**: Uses `flutter_secure_storage` for session tokens. The biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS with `kSecAccessControlBiometryCurrentSet`, and Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Automatically detects devices/emulators lacking hardware-backed secure storage to disable insecure quick-unlock. Any new biometric enrollment invalidates the cached key and falls back to manual Master Password entry.
 - **Emergency Kit Recovery Key**: Offline-first recovery system using Dual Key-Wrapping (Candidate 1). Generates a 32-character Base32 recovery key client-side, derives a KDF key via Argon2id, wraps the active Vault Key using AES-256-GCM, and persists it via sync API envelopes. Past recovery keys are invalidated on regeneration.
 - **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
 - **Import/Export Suite**: Local parsers for 1Password, Bitwarden, LastPass, and custom CSV imports. Safe exports requiring Master Password re-entry.
@@ -171,8 +171,6 @@ npm run test
 
 ## 🔮 Future Scope
 
-1. **Native Secure Enclave & Keystore Integration**: Transition from simulated platform key wrapping to native OS keychains (`flutter_secure_storage` and hardware key binding).
-2. **FIDO2 / WebAuthn MFA**: Implement passkey and hardware key (e.g. YubiKey) authentication as primary login and unlock options.
-3. **P2P Encrypted Syncing**: Add decentralized peer-to-peer sync protocols using WebRTC to synchronize vaults without intermediary cloud databases.
-4. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
+1. **FIDO2 / WebAuthn MFA**: Implement passkey and hardware key (e.g. YubiKey) authentication as primary login and unlock options.
+2. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
 

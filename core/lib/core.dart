@@ -24,7 +24,9 @@ export 'src/security/ai_insights_client.dart';
 export 'src/auth/auth_client.dart';
 export 'src/auth/vault_lock_manager.dart';
 export 'src/auth/biometric_auth_service.dart';
+export 'src/platform/secure_storage.dart';
 export 'src/sync/http_sync_api_client.dart';
+
 
 
 

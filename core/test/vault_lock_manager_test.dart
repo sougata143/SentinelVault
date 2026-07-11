@@ -62,12 +62,12 @@ void main() {
       expect(lockManager.isLoggedIn, false);
     });
 
-    test('4. biometric quick-unlock wraps keys and restores them successfully', () {
+    test('4. biometric quick-unlock wraps keys and restores them successfully', () async {
       final masterKey = List<int>.generate(32, (i) => i + 1);
       final vaultKey = List<int>.generate(32, (i) => i + 10);
 
       lockManager.unlock(masterKey, vaultKey);
-      lockManager.enableBiometrics(masterKey, vaultKey);
+      await lockManager.enableBiometrics(masterKey, vaultKey);
 
       expect(lockManager.hasBiometricCache, true);
       expect(lockManager.isBiometricEnabled, true);
@@ -78,25 +78,25 @@ void main() {
       expect(lockManager.hasBiometricCache, true);
 
       // Biometric unlock success
-      final success = lockManager.unlockWithBiometrics(true);
+      final success = await lockManager.unlockWithBiometrics(true);
       expect(success, true);
       expect(lockManager.isLocked, false);
       expect(lockManager.masterKey, masterKey);
       expect(lockManager.vaultKey, vaultKey);
     });
 
-    test('5. biometric quick-unlock invalidation clears cache', () {
+    test('5. biometric quick-unlock invalidation clears cache', () async {
       final masterKey = List<int>.generate(32, (i) => i + 1);
       final vaultKey = List<int>.generate(32, (i) => i + 10);
 
       lockManager.unlock(masterKey, vaultKey);
-      lockManager.enableBiometrics(masterKey, vaultKey);
+      await lockManager.enableBiometrics(masterKey, vaultKey);
 
       // Invalidate cache
       lockManager.invalidateBiometricCache();
       expect(lockManager.hasBiometricCache, false);
 
-      final success = lockManager.unlockWithBiometrics(true);
+      final success = await lockManager.unlockWithBiometrics(true);
       expect(success, false);
     });
   });

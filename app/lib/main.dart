@@ -2,8 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'app_shell.dart';
 import 'theme/theme.dart';
+import 'features/auth/flutter_secure_storage_impl.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Register real platform-backed secure storage
+  SecureStorage.instance = FlutterPlatformSecureStorage();
+  
+  // Clear any cached biometric keys from secure storage on startup
+  // to enforce the restart policy (biometric cache is only valid for in-app locks).
+  await SecureStorage.instance.deleteBiometricWrappedVaultKey();
+  
+  // Load session from secure storage
+  await VaultLockManager.instance.loadSession();
+
   runApp(const MyApp());
 }
 

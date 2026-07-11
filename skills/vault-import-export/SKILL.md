@@ -24,6 +24,25 @@ unnecessary plaintext-on-disk exposure window.
 5. Do not retain a copy of the original import file within app storage
    after import completes.
 
+## Expanded source support
+- **Browser native exports** (Chrome, Firefox, Safari): these are just
+  known CSV column layouts. Add each as a named preset on top of the
+  existing generic CSV mapper rather than writing new parsers from scratch.
+- **Additional competitor formats** (Dashlane, Keeper, NordPass, Proton
+  Pass, RoboForm): each exports to CSV or JSON with its own field names —
+  add a mapping table per source into the normalized schema, following the
+  same pattern as the existing Bitwarden/LastPass parsers.
+- **KeePass (`.kdbx`)**: different from the others — it's an encrypted
+  container (KDBX3/KDBX4 format), not a plaintext export. Requires a kdbx
+  parsing library and the user must supply the KeePass database's own
+  password and/or key file locally to decrypt it first. This still fits
+  the same rule set above (parse in memory, preview, encrypt on commit,
+  never persist the intermediate plaintext or the original file) — it just
+  has an extra "unlock the source file" step before parsing begins. Also
+  ensure the KeePass database's own password, once used to decrypt the
+  file locally, is cleared from memory immediately after parsing and never
+  logged or transmitted.
+
 ## Export — two tiers, do not blur them together
 - **Encrypted native export (`.svault`)**: repackages existing ciphertext
   for backup/device migration. Low friction is fine here — it's still

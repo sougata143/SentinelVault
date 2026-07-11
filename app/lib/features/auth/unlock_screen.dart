@@ -180,6 +180,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _failedAttempts = 0;
       });
 
+      // Set VaultLockManager session and unlock state
+      VaultLockManager.instance.unlock(masterKey, vaultKey);
+
+      // Re-enable biometrics if configured (restores cache on manual unlock)
+      if (AppSettings.biometricEnabled) {
+        await VaultLockManager.instance.enableBiometrics(masterKey, vaultKey);
+      }
+
       // Initialize database and open it
       final db = SqliteVaultDatabase.inMemory();
       db.open(vaultKey);
@@ -230,7 +238,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     try {
       final success = await BiometricAuthService.instance.authenticate();
       if (success) {
-        final unlocked = VaultLockManager.instance.unlockWithBiometrics(true);
+        final unlocked = await VaultLockManager.instance.unlockWithBiometrics(true);
         if (unlocked) {
           final vaultKey = VaultLockManager.instance.vaultKey!;
           final db = SqliteVaultDatabase.inMemory();

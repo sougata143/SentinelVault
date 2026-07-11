@@ -376,7 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _saveSettings();
                           if (VaultLockManager.instance.masterKey != null &&
                               VaultLockManager.instance.vaultKey != null) {
-                            VaultLockManager.instance.enableBiometrics(
+                            await VaultLockManager.instance.enableBiometrics(
                               VaultLockManager.instance.masterKey!,
                               VaultLockManager.instance.vaultKey!,
                             );

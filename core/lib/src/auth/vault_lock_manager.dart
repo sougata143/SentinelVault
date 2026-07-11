@@ -1,3 +1,5 @@
+import '../platform/secure_storage.dart';
+
 class VaultLockManager {
   static final VaultLockManager instance = VaultLockManager._internal();
 
@@ -6,9 +8,7 @@ class VaultLockManager {
   List<int>? _vaultKey;
 
   bool isBiometricEnabled = false;
-  List<int>? _biometricWrappedMasterKey;
-  List<int>? _biometricWrappedVaultKey;
-  List<int>? _biometricPlatformKey; // Platform-gated hardware key simulator
+  bool _hasBiometricCache = false;
 
   VaultLockManager._internal();
 
@@ -19,8 +19,14 @@ class VaultLockManager {
   bool get isLocked => _vaultKey == null;
   bool get isLoggedIn => _sessionToken != null;
 
+  /// Loads the persisted session token from secure storage.
+  Future<void> loadSession() async {
+    _sessionToken = await SecureStorage.instance.readSessionToken();
+  }
+
   void setSession(String token) {
     _sessionToken = token;
+    SecureStorage.instance.writeSessionToken(token);
   }
 
   void unlock(List<int> masterKey, List<int> vaultKey) {
@@ -54,6 +60,7 @@ class VaultLockManager {
   /// Clears the session token, biometric settings, and performs key clearance.
   void logout() {
     _sessionToken = null;
+    SecureStorage.instance.deleteSessionToken();
     isBiometricEnabled = false;
     _clearBiometricCache();
     if (_masterKey != null) {
@@ -70,12 +77,11 @@ class VaultLockManager {
     }
   }
 
-  /// Caches the keys wrapped by a simulated biometric platform key.
-  void enableBiometrics(List<int> masterKey, List<int> vaultKey) {
+  /// Caches the keys wrapped by a biometric-gated hardware key.
+  Future<void> enableBiometrics(List<int> masterKey, List<int> vaultKey) async {
     isBiometricEnabled = true;
-    _biometricPlatformKey = List<int>.generate(32, (i) => i * 3 + 7);
-    _biometricWrappedMasterKey = _encryptSimple(masterKey, _biometricPlatformKey!);
-    _biometricWrappedVaultKey = _encryptSimple(vaultKey, _biometricPlatformKey!);
+    _hasBiometricCache = true;
+    await SecureStorage.instance.writeBiometricWrappedVaultKey(masterKey, vaultKey);
   }
 
   /// Resets biometric state and cache.
@@ -84,19 +90,27 @@ class VaultLockManager {
     _clearBiometricCache();
   }
 
-  bool get hasBiometricCache => _biometricWrappedVaultKey != null;
+  bool get hasBiometricCache => _hasBiometricCache;
 
   /// Attempts to restore keys from biometric cache if authentication check [authSuccess] is true.
-  bool unlockWithBiometrics(bool authSuccess) {
-    if (!isBiometricEnabled || _biometricWrappedVaultKey == null || _biometricPlatformKey == null) {
+  Future<bool> unlockWithBiometrics(bool authSuccess) async {
+    if (!isBiometricEnabled || !_hasBiometricCache) {
       return false;
     }
     if (!authSuccess) {
       return false;
     }
-    _masterKey = _decryptSimple(_biometricWrappedMasterKey!, _biometricPlatformKey!);
-    _vaultKey = _decryptSimple(_biometricWrappedVaultKey!, _biometricPlatformKey!);
-    return true;
+    try {
+      final keys = await SecureStorage.instance.readBiometricWrappedVaultKey();
+      if (keys != null) {
+        _masterKey = keys['masterKey'];
+        _vaultKey = keys['vaultKey'];
+        return true;
+      }
+    } catch (e) {
+      invalidateBiometricCache();
+    }
+    return false;
   }
 
   /// Force invalidates the biometric cache (e.g. on enrollment changes).
@@ -105,35 +119,7 @@ class VaultLockManager {
   }
 
   void _clearBiometricCache() {
-    if (_biometricWrappedMasterKey != null) {
-      for (var i = 0; i < _biometricWrappedMasterKey!.length; i++) {
-        _biometricWrappedMasterKey![i] = 0;
-      }
-      _biometricWrappedMasterKey = null;
-    }
-    if (_biometricWrappedVaultKey != null) {
-      for (var i = 0; i < _biometricWrappedVaultKey!.length; i++) {
-        _biometricWrappedVaultKey![i] = 0;
-      }
-      _biometricWrappedVaultKey = null;
-    }
-    if (_biometricPlatformKey != null) {
-      for (var i = 0; i < _biometricPlatformKey!.length; i++) {
-        _biometricPlatformKey![i] = 0;
-      }
-      _biometricPlatformKey = null;
-    }
-  }
-
-  List<int> _encryptSimple(List<int> plaintext, List<int> key) {
-    final result = List<int>.filled(plaintext.length, 0);
-    for (var i = 0; i < plaintext.length; i++) {
-      result[i] = plaintext[i] ^ key[i % key.length];
-    }
-    return result;
-  }
-
-  List<int> _decryptSimple(List<int> ciphertext, List<int> key) {
-    return _encryptSimple(ciphertext, key);
+    _hasBiometricCache = false;
+    SecureStorage.instance.deleteBiometricWrappedVaultKey();
   }
 }

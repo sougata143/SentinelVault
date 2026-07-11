@@ -35,6 +35,24 @@ models.
    plaintext export requires master-password re-entry and an explicit
    warning before it's produced. See the `vault-import-export` skill before
    touching any of this code.
+8. There are two entirely separate secrets: the **Account Password**
+   (identity/session, handled by `auth-service`'s OPAQUE flow) and the
+   **Master Password** (vault unlock, feeds Argon2id → Master Key → Vault
+   Key, never transmitted to the server in any form). Never derive one
+   from the other, never let a UI flow substitute one for the other, and
+   never let a successful account login alone unlock the vault dashboard —
+   the Unlock step (Master Password) is always required separately. See
+   `docs/AUTH_AND_UNLOCK_FLOW.md` before touching auth or unlock code.
+9. Any new *additional* unlock factor (hardware-key `hmac-secret`, a future
+   Recovery Key, etc.) must be implemented as an extra wrapping layer on
+   the Vault Key, never as a shortcut that bypasses deriving/using a real
+   secret. Each such factor requires its own reviewed design doc before
+   implementation — see `fido2-webauthn-auth` and `emergency-kit-recovery`
+   skills for the pattern to follow.
+10. The browser extension must not hold an independent copy of the Vault
+    Key by default — it operates paired to the native/desktop app via
+    native messaging (see `browser-extension-core` skill) unless a
+    standalone mode is explicitly scoped and reviewed separately.
 
 ## Coding standards
 - Dart: follow `effective_dart` lint rules; run `dart analyze` and
