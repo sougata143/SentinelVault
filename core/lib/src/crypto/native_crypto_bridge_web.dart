@@ -173,7 +173,6 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     try {
       final res = wasm_shamir_split(_toJSArray(secret), m.toJS, n.toJS);
       final flatBytes = _toDartList(res);
-      // Parse length-prefixed wire format
       final shares = <Uint8List>[];
       var cursor = 0;
       while (cursor + 4 <= flatBytes.length) {
@@ -198,7 +197,6 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   @override
   Uint8List shamirCombine({required List<Uint8List> shares}) {
     try {
-      // Re-assemble length-prefixed wire format
       var flatLen = 0;
       for (final s in shares) {
         flatLen += 4 + s.length;
@@ -221,4 +219,36 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       throw ArgumentError('Wasm shamirCombine failed: $e — shares may be invalid or insufficient');
     }
   }
+
+  @override
+  Future<PqcKeyBundle> pqcGenerateKeypairs() => throw UnimplementedError();
+
+  @override
+  Future<PqcWrappedKey> pqcHybridWrap({
+    required Uint8List recipientX25519Pub,
+    required Uint8List recipientMlkemEk,
+    required Uint8List folderKey,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Uint8List> pqcHybridUnwrap({
+    required Uint8List recipientX25519Priv,
+    required Uint8List recipientMlkemDk,
+    required PqcWrappedKey wrappedKey,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PqcSignatureBundle> pqcSignInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Priv,
+    required Uint8List mldsaSeed,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<bool> pqcVerifyInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Pub,
+    required Uint8List mldsaVk,
+    required PqcSignatureBundle signatures,
+  }) => throw UnimplementedError();
 }

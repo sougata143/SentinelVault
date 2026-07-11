@@ -40,14 +40,15 @@ SentinelVault is organized into three primary components:
                           │    ┌────────────────┐   ┌────────────────────────┐     │
                           │    │ Auth Service   │   │ Security Analysis      │     │
                           │    │ ( SRP / MFA /  │   │ Service (NestJS)       │     │
-                          │    │  Passkeys)     │   │ - URL Scanner          │     │
-                          │    └───────┬────────┘   │ - Email Scanner        │     │
-                          │            │            │ - File Security        │     │
-                          │            ▼            │ - Breach Monitor       │     │
-                          │       ┌──────────┐      │ - AI Insights (Gemini) │     │
+                          │    │  Passkeys)     │   └────────────────────────┘     │
+                          │    └───────┬────────┘   ┌────────────────────────┐     │
+                          │            │            │ Sharing Service        │     │
+                          │            ▼            │ (PQC Key Directory /   │     │
+                          │       ┌──────────┐      │  Share Invites / REST) │     │
                           │       │ Postgres │      └────────────────────────┘     │
                           │       └──────────┘                                     │
                           └────────────────────────────────────────────────────────┘
+
 ```
 
 ### 1. Unified Frontend Client (`app/`)
@@ -62,6 +63,8 @@ A platform-agnostic Dart package managing local databases (SQLite), cryptography
 ### 3. Backend Services (`backend/`)
 - **auth-service**: Restricts authentication using passwordless passkeys (WebAuthn/FIDO2), secure SRP, rate-limiting, and TOTP MFA.
 - **security-analysis-service**: Handles URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, HIBP cron synchronizations, and allow-listed AI insights generation using Gemini.
+- **sharing-service**: Microservice key directory publishing classical/post-quantum public key bundles, and managing per-recipient wrapped (ciphertext) Folder Keys, securely handling share invitations.
+
 
 ---
 
@@ -78,15 +81,21 @@ A platform-agnostic Dart package managing local databases (SQLite), cryptography
 │   ├── lib/
 │   │   └── src/                  # Crypto, DB, Models, Security, Import/Export
 │   └── test/                     # Core units and crypto round-trip tests
+├── native/                        # Native FFI Crypto Core (Rust)
+│   ├── crypto_core/
+│   │   ├── src/algorithms/pqc_hybrid.rs # Classical + PQC hybrid math
+│   │   └── Cargo.toml
 ├── browser-extension/            # Browser extension (Chrome, Firefox, Safari)
 │   ├── src/                      # Extension popup, content-scripts, native messaging host
 │   ├── core-bundle/              # Compiled shared Dart core JS bundles
 │   └── test/                     # Integration tests for native messaging host
 ├── backend/                      # NestJS cloud microservices
 │   ├── auth-service/             # Authentication & user directory microservice
-│   └── security-analysis-service/ # Security reputation, breach, and AI service
+│   ├── security-analysis-service/# Security reputation, breach, and AI service
+│   └── sharing-service/          # Key Directory & sharing microservice
 ├── infra/                        # Cloud Run, Postgres, Redis Terraform templates
 └── docs/                         # Architecture, schemas, and UX definitions
+
 ```
 
 ---
@@ -120,6 +129,16 @@ cd backend/auth-service
 npm install
 npm run start
 ```
+
+### 4. Key Directory & Sharing Backend
+Run the sharing service:
+```bash
+cd backend/sharing-service
+npm install --legacy-peer-deps
+npm run start
+```
+*Note: Service runs on port `3002`.*
+
 
 ### 4. Running the Flutter App
 Run the client application:
@@ -161,9 +180,15 @@ node test/autofill_test.js
 ### Running Backend Tests
 Run NestJS unit and integration test suites:
 ```bash
+# Security Reputation, Breach, and AI Service
 cd backend/security-analysis-service
 npm run test
+
+# Key Directory and Sharing Service
+cd backend/sharing-service
+npm run test
 ```
+
 
 ---
 
@@ -182,6 +207,8 @@ npm run test
 - **Thin Web Extensions (Chrome, Firefox, Safari)**: Paired-mode extension architecture that communicates with the already-running native/desktop app via a native messaging host. Features exact origin matching, blocks cross-origin iframe fills, and reflects locks triggered in the native app within one interaction without holding any Vault Key material inside browser storage. Runs compiled JS bundles compiled directly from the Dart core package.
 - **Shamir's Secret Sharing Recovery (M-of-N)**: Cryptographic recovery key splitting into $N$ unique Base32 packet strings (range 3–10) with adjustable threshold $M$. Standard GF(256) sharks SSS library runs in the native Rust crypto core. Supports local reconstruction and offline invalidation through UUIDv4 epoch management.
 - **Duress / Decoy Vault (Dual-Vault)**: Dual-vault architecture with Vault Alpha (real) and Vault Beta (decoy, configured in Settings). Visually and timing-indistinguishable unlock flow. Decrypting the decoy vault automatically fires a native cache-wipe hook to clear the biometric cache of the real vault without touching its encrypted database. Includes explicit in-app limitations disclosure for plausible deniability.
+- **PQC Hybrid Folder Sharing**: Zero-knowledge hybrid classical + post-quantum folder key sharing using X25519 + ML-KEM-768 for envelope key-wrapping, combined via HKDF-SHA256 and AES-256-GCM. Employs Ed25519 + ML-DSA-65 dual signatures for invite payloads, protecting against server-side key substitution via mandatory out-of-band key fingerprint verification. Enforces revocation via Folder Key rotation and re-wrapping for current recipients.
+
 
 ---
 

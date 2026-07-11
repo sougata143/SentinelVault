@@ -485,3 +485,237 @@ pub extern "C" fn shamir_combine(
         Err(_) => -3,
     }
 }
+
+// ==========================================================================
+// 9. PQC Hybrid — Generate Keypairs
+// ==========================================================================
+//
+// Generates classical (X25519/Ed25519) + post-quantum (ML-KEM-768/ML-DSA-65)
+// keypairs and writes them into a caller-provided output buffer.
+//
+// Wire layout (all contiguous):
+//   [32]  x25519_pub
+//   [32]  x25519_priv
+//   [32]  ed25519_pub
+//   [32]  ed25519_priv (seed)
+//   [4 LE u32] mlkem_ek_len  + [bytes] mlkem_ek   (1184 bytes)
+//   [4 LE u32] mlkem_dk_len  + [bytes] mlkem_dk   (2400 bytes)
+//   [4 LE u32] mldsa_vk_len  + [bytes] mldsa_vk   (1952 bytes)
+//   [4 LE u32] mldsa_seed_len + [bytes] mldsa_seed (32 bytes)
+//
+// Pre-allocate >= 5728 bytes. Returns 0 on success, -1 null, -2 too small.
+#[no_mangle]
+pub extern "C" fn pqc_generate_keypairs(
+    output_ptr:      *mut u8,
+    output_capacity: usize,
+    written_ptr:     *mut usize,
+) -> i32 {
+    if output_ptr.is_null() || written_ptr.is_null() { return -1; }
+
+    let (x_pub, x_priv, ed_pub, ed_priv, kem_ek, kem_dk, dsa_vk, dsa_seed) =
+        algorithms::pqc_hybrid::generate_keypairs();
+
+    let mut buf: Vec<u8> = Vec::with_capacity(5728);
+    buf.extend_from_slice(&x_pub);
+    buf.extend_from_slice(&x_priv);
+    buf.extend_from_slice(&ed_pub);
+    buf.extend_from_slice(&ed_priv);
+    for chunk in [&kem_ek, &kem_dk, &dsa_vk, &dsa_seed] {
+        buf.extend_from_slice(&(chunk.len() as u32).to_le_bytes());
+        buf.extend_from_slice(chunk);
+    }
+    if buf.len() > output_capacity { return -2; }
+    unsafe {
+        std::ptr::copy_nonoverlapping(buf.as_ptr(), output_ptr, buf.len());
+        *written_ptr = buf.len();
+    }
+    0
+}
+
+// ==========================================================================
+// 10. PQC Hybrid — Wrap (Encapsulate) Folder Key
+// ==========================================================================
+//
+// Output wire layout:
+//   [32]  ephemeral X25519 pub key
+//   [4 LE u32] kem_ct_len + [bytes] ML-KEM ciphertext  (1088 bytes)
+//   [12]  AES-GCM nonce
+//   [4 LE u32] wrapped_len + [bytes] AES-GCM ciphertext+tag (48 bytes)
+//
+// Returns 0 on success, -1 null, -2 buffer too small, -3 crypto error.
+#[no_mangle]
+pub extern "C" fn pqc_hybrid_wrap(
+    recipient_x25519_pub_ptr: *const u8,
+    recipient_mlkem_ek_ptr:   *const u8,
+    recipient_mlkem_ek_len:   usize,
+    folder_key_ptr:           *const u8,
+    output_ptr:               *mut u8,
+    output_capacity:          usize,
+    written_ptr:              *mut usize,
+) -> i32 {
+    if recipient_x25519_pub_ptr.is_null() || recipient_mlkem_ek_ptr.is_null()
+        || folder_key_ptr.is_null() || output_ptr.is_null() || written_ptr.is_null()
+    { return -1; }
+
+    let x25519_pub: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(recipient_x25519_pub_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -1 };
+    let mlkem_ek = unsafe { std::slice::from_raw_parts(recipient_mlkem_ek_ptr, recipient_mlkem_ek_len) };
+    let folder_key: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(folder_key_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -1 };
+
+    match algorithms::pqc_hybrid::hybrid_encapsulate(x25519_pub, mlkem_ek, folder_key) {
+        Ok((ephem_pub, kem_ct, nonce, wrapped)) => {
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(&ephem_pub);
+            buf.extend_from_slice(&(kem_ct.len() as u32).to_le_bytes());
+            buf.extend_from_slice(&kem_ct);
+            buf.extend_from_slice(&nonce);
+            buf.extend_from_slice(&(wrapped.len() as u32).to_le_bytes());
+            buf.extend_from_slice(&wrapped);
+            if buf.len() > output_capacity { return -2; }
+            unsafe {
+                std::ptr::copy_nonoverlapping(buf.as_ptr(), output_ptr, buf.len());
+                *written_ptr = buf.len();
+            }
+            0
+        }
+        Err(_) => -3,
+    }
+}
+
+// ==========================================================================
+// 11. PQC Hybrid — Unwrap (Decapsulate) Folder Key
+// ==========================================================================
+//
+// Returns 0 on success writing 32 plaintext Folder Key bytes to output_ptr.
+// Returns -1 null, -2 bad argument size, -3 crypto/AEAD failure.
+#[no_mangle]
+pub extern "C" fn pqc_hybrid_unwrap(
+    recipient_x25519_priv_ptr: *const u8,
+    recipient_mlkem_dk_ptr:    *const u8,
+    recipient_mlkem_dk_len:    usize,
+    ephem_x25519_pub_ptr:      *const u8,
+    mlkem_ct_ptr:              *const u8,
+    mlkem_ct_len:              usize,
+    aes_nonce_ptr:             *const u8,
+    wrapped_fk_ptr:            *const u8,
+    wrapped_fk_len:            usize,
+    output_ptr:                *mut u8,
+) -> i32 {
+    if recipient_x25519_priv_ptr.is_null() || recipient_mlkem_dk_ptr.is_null()
+        || ephem_x25519_pub_ptr.is_null() || mlkem_ct_ptr.is_null()
+        || aes_nonce_ptr.is_null() || wrapped_fk_ptr.is_null() || output_ptr.is_null()
+    { return -1; }
+
+    let x25519_priv: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(recipient_x25519_priv_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -2 };
+    let mlkem_dk = unsafe { std::slice::from_raw_parts(recipient_mlkem_dk_ptr, recipient_mlkem_dk_len) };
+    let ephem_pub: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(ephem_x25519_pub_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -2 };
+    let mlkem_ct = unsafe { std::slice::from_raw_parts(mlkem_ct_ptr, mlkem_ct_len) };
+    let aes_nonce: &[u8; 12] = match unsafe {
+        std::slice::from_raw_parts(aes_nonce_ptr, 12)
+    }.try_into() { Ok(a) => a, Err(_) => return -2 };
+    let wrapped_fk = unsafe { std::slice::from_raw_parts(wrapped_fk_ptr, wrapped_fk_len) };
+
+    match algorithms::pqc_hybrid::hybrid_decapsulate(
+        x25519_priv, mlkem_dk, ephem_pub, mlkem_ct, aes_nonce, wrapped_fk,
+    ) {
+        Ok(fk) => {
+            unsafe { std::ptr::copy_nonoverlapping(fk.as_ptr(), output_ptr, 32) };
+            0
+        }
+        Err(_) => -3,
+    }
+}
+
+// ==========================================================================
+// 12. PQC Hybrid — Sign Invitation
+// ==========================================================================
+//
+// Output wire layout:
+//   [4 LE u32] ed_sig_len  + [bytes] Ed25519 signature   (64 bytes)
+//   [4 LE u32] dsa_sig_len + [bytes] ML-DSA-65 signature (3309 bytes)
+//
+// Returns 0 on success, -1 null, -2 buffer too small, -3 crypto error.
+#[no_mangle]
+pub extern "C" fn pqc_sign_invitation(
+    payload_ptr:      *const u8,
+    payload_len:      usize,
+    ed25519_priv_ptr: *const u8,
+    mldsa_seed_ptr:   *const u8,
+    output_ptr:       *mut u8,
+    output_capacity:  usize,
+    written_ptr:      *mut usize,
+) -> i32 {
+    if payload_ptr.is_null() || ed25519_priv_ptr.is_null()
+        || mldsa_seed_ptr.is_null() || output_ptr.is_null() || written_ptr.is_null()
+    { return -1; }
+
+    let payload = unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
+    let ed25519_priv: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(ed25519_priv_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -1 };
+    let mldsa_seed = unsafe { std::slice::from_raw_parts(mldsa_seed_ptr, 32) };
+
+    match algorithms::pqc_hybrid::sign_invitation(payload, ed25519_priv, mldsa_seed) {
+        Ok((ed_sig, dsa_sig)) => {
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(&(ed_sig.len() as u32).to_le_bytes());
+            buf.extend_from_slice(&ed_sig);
+            buf.extend_from_slice(&(dsa_sig.len() as u32).to_le_bytes());
+            buf.extend_from_slice(&dsa_sig);
+            if buf.len() > output_capacity { return -2; }
+            unsafe {
+                std::ptr::copy_nonoverlapping(buf.as_ptr(), output_ptr, buf.len());
+                *written_ptr = buf.len();
+            }
+            0
+        }
+        Err(_) => -3,
+    }
+}
+
+// ==========================================================================
+// 13. PQC Hybrid — Verify Invitation
+// ==========================================================================
+//
+// Returns 1 if both signatures verify, 0 if either fails,
+// -1 on null pointer, -3 on parsing/crypto error.
+#[no_mangle]
+pub extern "C" fn pqc_verify_invitation(
+    payload_ptr:     *const u8,
+    payload_len:     usize,
+    ed25519_pub_ptr: *const u8,
+    mldsa_vk_ptr:    *const u8,
+    mldsa_vk_len:    usize,
+    ed25519_sig_ptr: *const u8,
+    mldsa_sig_ptr:   *const u8,
+    mldsa_sig_len:   usize,
+) -> i32 {
+    if payload_ptr.is_null() || ed25519_pub_ptr.is_null()
+        || mldsa_vk_ptr.is_null() || ed25519_sig_ptr.is_null() || mldsa_sig_ptr.is_null()
+    { return -1; }
+
+    let payload = unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
+    let ed25519_pub: &[u8; 32] = match unsafe {
+        std::slice::from_raw_parts(ed25519_pub_ptr, 32)
+    }.try_into() { Ok(a) => a, Err(_) => return -1 };
+    let mldsa_vk  = unsafe { std::slice::from_raw_parts(mldsa_vk_ptr, mldsa_vk_len) };
+    let ed25519_sig: &[u8; 64] = match unsafe {
+        std::slice::from_raw_parts(ed25519_sig_ptr, 64)
+    }.try_into() { Ok(a) => a, Err(_) => return -1 };
+    let mldsa_sig = unsafe { std::slice::from_raw_parts(mldsa_sig_ptr, mldsa_sig_len) };
+
+    match algorithms::pqc_hybrid::verify_invitation(
+        payload, ed25519_pub, mldsa_vk, ed25519_sig, mldsa_sig,
+    ) {
+        Ok(true)  => 1,
+        Ok(false) => 0,
+        Err(_)    => -3,
+    }
+}

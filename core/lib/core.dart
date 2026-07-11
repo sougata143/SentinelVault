@@ -36,6 +36,9 @@ export 'src/crypto/hardware_key_unlock.dart';
 export 'src/crypto/shamir_recovery.dart';
 export 'src/platform/duress_wipe_hook.dart';
 export 'src/vault/dual_vault_manager.dart';
+export 'src/crypto/pqc_sharing.dart';
+export 'src/crypto/native_crypto_bridge.dart' show PqcKeyBundle, PqcWrappedKey, PqcSignatureBundle;
+
 
 
 

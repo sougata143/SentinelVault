@@ -139,6 +139,103 @@ typedef _ShamirCombineDart = int Function(
   Pointer<IntPtr> writtenPtr,
 );
 
+// --- PQC FFI Function Types ---
+
+typedef _PqcGenerateKeypairsC = Int32 Function(
+  Pointer<Uint8> outputPtr,
+  IntPtr outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+typedef _PqcGenerateKeypairsDart = int Function(
+  Pointer<Uint8> outputPtr,
+  int outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+
+typedef _PqcHybridWrapC = Int32 Function(
+  Pointer<Uint8> recipientX25519PubPtr,
+  Pointer<Uint8> recipientMlkemEkPtr,
+  IntPtr recipientMlkemEkLen,
+  Pointer<Uint8> folderKeyPtr,
+  Pointer<Uint8> outputPtr,
+  IntPtr outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+typedef _PqcHybridWrapDart = int Function(
+  Pointer<Uint8> recipientX25519PubPtr,
+  Pointer<Uint8> recipientMlkemEkPtr,
+  int recipientMlkemEkLen,
+  Pointer<Uint8> folderKeyPtr,
+  Pointer<Uint8> outputPtr,
+  int outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+
+typedef _PqcHybridUnwrapC = Int32 Function(
+  Pointer<Uint8> recipientX25519PrivPtr,
+  Pointer<Uint8> recipientMlkemDkPtr,
+  IntPtr recipientMlkemDkLen,
+  Pointer<Uint8> ephemX25519PubPtr,
+  Pointer<Uint8> mlkemCtPtr,
+  IntPtr mlkemCtLen,
+  Pointer<Uint8> aesNoncePtr,
+  Pointer<Uint8> wrappedFkPtr,
+  IntPtr wrappedFkLen,
+  Pointer<Uint8> outputPtr,
+);
+typedef _PqcHybridUnwrapDart = int Function(
+  Pointer<Uint8> recipientX25519PrivPtr,
+  Pointer<Uint8> recipientMlkemDkPtr,
+  int recipientMlkemDkLen,
+  Pointer<Uint8> ephemX25519PubPtr,
+  Pointer<Uint8> mlkemCtPtr,
+  int mlkemCtLen,
+  Pointer<Uint8> aesNoncePtr,
+  Pointer<Uint8> wrappedFkPtr,
+  int wrappedFkLen,
+  Pointer<Uint8> outputPtr,
+);
+
+typedef _PqcSignInvitationC = Int32 Function(
+  Pointer<Uint8> payloadPtr,
+  IntPtr payloadLen,
+  Pointer<Uint8> ed25519PrivPtr,
+  Pointer<Uint8> mldsaSeedPtr,
+  Pointer<Uint8> outputPtr,
+  IntPtr outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+typedef _PqcSignInvitationDart = int Function(
+  Pointer<Uint8> payloadPtr,
+  int payloadLen,
+  Pointer<Uint8> ed25519PrivPtr,
+  Pointer<Uint8> mldsaSeedPtr,
+  Pointer<Uint8> outputPtr,
+  int outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+
+typedef _PqcVerifyInvitationC = Int32 Function(
+  Pointer<Uint8> payloadPtr,
+  IntPtr payloadLen,
+  Pointer<Uint8> ed25519PubPtr,
+  Pointer<Uint8> mldsaVkPtr,
+  IntPtr mldsaVkLen,
+  Pointer<Uint8> ed25519SigPtr,
+  Pointer<Uint8> mldsaSigPtr,
+  IntPtr mldsaSigLen,
+);
+typedef _PqcVerifyInvitationDart = int Function(
+  Pointer<Uint8> payloadPtr,
+  int payloadLen,
+  Pointer<Uint8> ed25519PubPtr,
+  Pointer<Uint8> mldsaVkPtr,
+  int mldsaVkLen,
+  Pointer<Uint8> ed25519SigPtr,
+  Pointer<Uint8> mldsaSigPtr,
+  int mldsaSigLen,
+);
+
 // --- Library Loader ---
 
 DynamicLibrary _loadLibrary() {
@@ -194,6 +291,13 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   late final _ShamirSplitDart _shamirSplitFn;
   late final _ShamirCombineDart _shamirCombineFn;
 
+  // PQC Functions
+  late final _PqcGenerateKeypairsDart _pqcGenerateKeypairsFn;
+  late final _PqcHybridWrapDart _pqcHybridWrapFn;
+  late final _PqcHybridUnwrapDart _pqcHybridUnwrapFn;
+  late final _PqcSignInvitationDart _pqcSignInvitationFn;
+  late final _PqcVerifyInvitationDart _pqcVerifyInvitationFn;
+
   NativeCryptoBridgeImpl() {
     _lib = _loadLibrary();
     _deriveMasterKeyFn = _lib.lookupFunction<_DeriveMasterKeyC, _DeriveMasterKeyDart>('derive_master_key');
@@ -205,6 +309,13 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     _srpCalculateClientSessionFn = _lib.lookupFunction<_SrpCalculateClientSessionC, _SrpCalculateClientSessionDart>('srp_calculate_client_session');
     _shamirSplitFn = _lib.lookupFunction<_ShamirSplitC, _ShamirSplitDart>('shamir_split');
     _shamirCombineFn = _lib.lookupFunction<_ShamirCombineC, _ShamirCombineDart>('shamir_combine');
+
+    // PQC Lookups
+    _pqcGenerateKeypairsFn = _lib.lookupFunction<_PqcGenerateKeypairsC, _PqcGenerateKeypairsDart>('pqc_generate_keypairs');
+    _pqcHybridWrapFn = _lib.lookupFunction<_PqcHybridWrapC, _PqcHybridWrapDart>('pqc_hybrid_wrap');
+    _pqcHybridUnwrapFn = _lib.lookupFunction<_PqcHybridUnwrapC, _PqcHybridUnwrapDart>('pqc_hybrid_unwrap');
+    _pqcSignInvitationFn = _lib.lookupFunction<_PqcSignInvitationC, _PqcSignInvitationDart>('pqc_sign_invitation');
+    _pqcVerifyInvitationFn = _lib.lookupFunction<_PqcVerifyInvitationC, _PqcVerifyInvitationDart>('pqc_verify_invitation');
   }
 
   @override
@@ -232,10 +343,6 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       final outBytes = outputPtr.asTypedList(32);
       return Uint8List.fromList(outBytes);
     });
-    // The using scope handles the allocation cleanup.
-    // However, since dart Futures are asynchronous, we return directly synchronously.
-    // Wait! Let's make sure the returned Uint8List is fully copied before the Arena is released!
-    // Yes, Uint8List.fromList creates a deep copy of the bytes, so it is safe to release the pointer immediately.
   }
 
   @override
@@ -248,9 +355,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       final keyPtr = key.toPointer(arena);
       final noncePtr = nonce.toPointer(arena);
       final plaintextPtr = plaintext.toPointer(arena);
-      
-      final outLen = plaintext.length + 16;
-      final outputPtr = arena<Uint8>(outLen);
+      final outputPtr = arena<Uint8>(plaintext.length + 16);
 
       final res = _encryptAesGcmFn(
         keyPtr,
@@ -263,10 +368,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native AES-256-GCM encryption failed: $res');
+        throw Exception('Native AES encrypt failed: $res');
       }
 
-      final outBytes = outputPtr.asTypedList(outLen);
+      final outBytes = outputPtr.asTypedList(plaintext.length + 16);
       return Uint8List.fromList(outBytes);
     });
   }
@@ -281,9 +386,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       final keyPtr = key.toPointer(arena);
       final noncePtr = nonce.toPointer(arena);
       final ciphertextPtr = ciphertextAndMac.toPointer(arena);
-      
-      final outLen = ciphertextAndMac.length - 16;
-      final outputPtr = arena<Uint8>(outLen);
+      final outputPtr = arena<Uint8>(ciphertextAndMac.length - 16);
 
       final res = _decryptAesGcmFn(
         keyPtr,
@@ -296,10 +399,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw SecretBoxAuthenticationError();
+        throw Exception('Native AES decrypt failed: $res');
       }
 
-      final outBytes = outputPtr.asTypedList(outLen);
+      final outBytes = outputPtr.asTypedList(ciphertextAndMac.length - 16);
       return Uint8List.fromList(outBytes);
     });
   }
@@ -318,7 +421,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
       final res = _srpCalculateXFn(
         usernamePtr,
-        utf8.encode(username).length,
+        username.length,
         masterKeyPtr,
         masterKey.length,
         saltPtr,
@@ -327,11 +430,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native SRP calculate_x failed: $res');
+        throw Exception('SRP calculate_x failed: $res');
       }
 
-      final outBytes = outputPtr.asTypedList(32);
-      return Uint8List.fromList(outBytes);
+      return Uint8List.fromList(outputPtr.asTypedList(32));
     });
   }
 
@@ -349,7 +451,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
       final res = _srpCalculateVerifierFn(
         usernamePtr,
-        utf8.encode(username).length,
+        username.length,
         masterKeyPtr,
         masterKey.length,
         saltPtr,
@@ -358,11 +460,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native SRP calculate_verifier failed: $res');
+        throw Exception('SRP calculate_verifier failed: $res');
       }
 
-      final outBytes = outputPtr.asTypedList(256);
-      return Uint8List.fromList(outBytes);
+      return Uint8List.fromList(outputPtr.asTypedList(256));
     });
   }
 
@@ -383,15 +484,12 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native SRP generate_client_ephemeral failed: $res');
+        throw Exception('SRP generate_client_ephemeral failed: $res');
       }
 
-      final secretBytes = secretOutputPtr.asTypedList(256);
-      final publicBytes = publicOutputPtr.asTypedList(256);
-      
       return [
-        Uint8List.fromList(secretBytes),
-        Uint8List.fromList(publicBytes),
+        Uint8List.fromList(secretOutputPtr.asTypedList(256)),
+        Uint8List.fromList(publicOutputPtr.asTypedList(256)),
       ];
     });
   }
@@ -408,19 +506,18 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     return using((Arena arena) {
       final usernamePtr = username.toPointer(arena);
       final saltPtr = salt.toPointer(arena);
-      
       final aPtr = a.toPointer(arena);
       final aPubPtr = A.toPointer(arena);
       final bPubPtr = B.toPointer(arena);
       final masterKeyPtr = masterKey.toPointer(arena);
-      
+
       final sessionKeyOut = arena<Uint8>(32);
       final clientEvidenceOut = arena<Uint8>(32);
       final serverEvidenceOut = arena<Uint8>(32);
 
       final res = _srpCalculateClientSessionFn(
         usernamePtr,
-        utf8.encode(username).length,
+        username.length,
         saltPtr,
         salt.length,
         aPtr,
@@ -434,17 +531,13 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native SRP calculate_client_session failed: $res');
+        throw Exception('SRP calculate_client_session failed: $res');
       }
 
-      final sessionKey = sessionKeyOut.asTypedList(32);
-      final clientEvidence = clientEvidenceOut.asTypedList(32);
-      final serverEvidence = serverEvidenceOut.asTypedList(32);
-
       return [
-        Uint8List.fromList(sessionKey),
-        Uint8List.fromList(clientEvidence),
-        Uint8List.fromList(serverEvidence),
+        Uint8List.fromList(sessionKeyOut.asTypedList(32)),
+        Uint8List.fromList(clientEvidenceOut.asTypedList(32)),
+        Uint8List.fromList(serverEvidenceOut.asTypedList(32)),
       ];
     });
   }
@@ -455,13 +548,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required int m,
     required int n,
   }) {
-    // Capacity: n shares × (4 byte length prefix + secret.length + 1 byte x-coord)
-    final outputCapacity = n * (4 + secret.length + 2);
+    final cap = n * (4 + secret.length + 1);
     return using((Arena arena) {
-      final secretPtr = arena<Uint8>(secret.length);
-      secretPtr.asTypedList(secret.length).setAll(0, secret);
-
-      final outputPtr = arena<Uint8>(outputCapacity);
+      final secretPtr = secret.toPointer(arena);
+      final outputPtr = arena<Uint8>(cap);
       final writtenPtr = arena<IntPtr>(1);
       writtenPtr.value = 0;
 
@@ -471,29 +561,30 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
         m,
         n,
         outputPtr,
-        outputCapacity,
+        cap,
         writtenPtr,
       );
 
       if (res != 0) {
-        throw ArgumentError('Native shamir_split failed: $res');
+        throw Exception('Native shamir_split failed: $res');
       }
 
       final totalWritten = writtenPtr.value;
-      final flatBuf = outputPtr.asTypedList(totalWritten);
+      final flat = outputPtr.asTypedList(totalWritten);
 
-      // Parse length-prefixed share blobs back into Dart list
       final shares = <Uint8List>[];
       var cursor = 0;
       while (cursor + 4 <= totalWritten) {
-        final shareLen = flatBuf[cursor] |
-            (flatBuf[cursor + 1] << 8) |
-            (flatBuf[cursor + 2] << 16) |
-            (flatBuf[cursor + 3] << 24);
+        final len = flat[cursor] |
+            (flat[cursor + 1] << 8) |
+            (flat[cursor + 2] << 16) |
+            (flat[cursor + 3] << 24);
         cursor += 4;
-        if (cursor + shareLen > totalWritten) break;
-        shares.add(Uint8List.fromList(flatBuf.sublist(cursor, cursor + shareLen)));
-        cursor += shareLen;
+        if (cursor + len > totalWritten) {
+          throw StateError('Flat split buffer corrupted: len $len overflows written bytes');
+        }
+        shares.add(Uint8List.fromList(flat.sublist(cursor, cursor + len)));
+        cursor += len;
       }
 
       if (shares.length != n) {
@@ -505,7 +596,6 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
   @override
   Uint8List shamirCombine({required List<Uint8List> shares}) {
-    // Re-assemble length-prefixed wire format for native call
     var flatLen = 0;
     for (final s in shares) {
       flatLen += 4 + s.length;
@@ -526,7 +616,6 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
         cursor += len;
       }
 
-      // Output buffer: up to 256 bytes (generous for any reasonable secret)
       const maxSecretLen = 256;
       final outputPtr = arena<Uint8>(maxSecretLen);
       final writtenPtr = arena<IntPtr>(1);
@@ -546,6 +635,244 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
       final written = writtenPtr.value;
       return Uint8List.fromList(outputPtr.asTypedList(written));
+    });
+  }
+
+  // ─── PQC Hybrid Key-Sharing ───────────────────────────────────────────────
+
+  @override
+  Future<PqcKeyBundle> pqcGenerateKeypairs() async {
+    const cap = 5728;
+    return using((Arena arena) {
+      final outputPtr = arena<Uint8>(cap);
+      final writtenPtr = arena<IntPtr>(1);
+      writtenPtr.value = 0;
+
+      final res = _pqcGenerateKeypairsFn(outputPtr, cap, writtenPtr);
+      if (res != 0) {
+        throw Exception('Native pqc_generate_keypairs failed: $res');
+      }
+
+      final flat = outputPtr.asTypedList(writtenPtr.value);
+      var offset = 0;
+
+      final x25519Pub = Uint8List.fromList(flat.sublist(offset, offset + 32));
+      offset += 32;
+      final x25519Priv = Uint8List.fromList(flat.sublist(offset, offset + 32));
+      offset += 32;
+      final ed25519Pub = Uint8List.fromList(flat.sublist(offset, offset + 32));
+      offset += 32;
+      final ed25519Priv = Uint8List.fromList(flat.sublist(offset, offset + 32));
+      offset += 32;
+
+      // Deserialise variable-size chunks
+      Uint8List readChunk() {
+        final len = flat[offset] |
+            (flat[offset + 1] << 8) |
+            (flat[offset + 2] << 16) |
+            (flat[offset + 3] << 24);
+        offset += 4;
+        final data = Uint8List.fromList(flat.sublist(offset, offset + len));
+        offset += len;
+        return data;
+      }
+
+      final mlkemEk = readChunk();
+      final mlkemDk = readChunk();
+      final mldsaVk = readChunk();
+      final mldsaSeed = readChunk();
+
+      return PqcKeyBundle(
+        x25519Pub: x25519Pub,
+        x25519Priv: x25519Priv,
+        ed25519Pub: ed25519Pub,
+        ed25519Priv: ed25519Priv,
+        mlkemEk: mlkemEk,
+        mlkemDk: mlkemDk,
+        mldsaVk: mldsaVk,
+        mldsaSeed: mldsaSeed,
+      );
+    });
+  }
+
+  @override
+  Future<PqcWrappedKey> pqcHybridWrap({
+    required Uint8List recipientX25519Pub,
+    required Uint8List recipientMlkemEk,
+    required Uint8List folderKey,
+  }) async {
+    const cap = 2000;
+    return using((Arena arena) {
+      final rxPtr = recipientX25519Pub.toPointer(arena);
+      final rkPtr = recipientMlkemEk.toPointer(arena);
+      final fkPtr = folderKey.toPointer(arena);
+      final outputPtr = arena<Uint8>(cap);
+      final writtenPtr = arena<IntPtr>(1);
+      writtenPtr.value = 0;
+
+      final res = _pqcHybridWrapFn(
+        rxPtr,
+        rkPtr,
+        recipientMlkemEk.length,
+        fkPtr,
+        outputPtr,
+        cap,
+        writtenPtr,
+      );
+
+      if (res != 0) {
+        throw Exception('Native pqc_hybrid_wrap failed: $res');
+      }
+
+      final flat = outputPtr.asTypedList(writtenPtr.value);
+      var offset = 0;
+
+      final ephemX25519Pub = Uint8List.fromList(flat.sublist(offset, offset + 32));
+      offset += 32;
+
+      Uint8List readChunk() {
+        final len = flat[offset] |
+            (flat[offset + 1] << 8) |
+            (flat[offset + 2] << 16) |
+            (flat[offset + 3] << 24);
+        offset += 4;
+        final data = Uint8List.fromList(flat.sublist(offset, offset + len));
+        offset += len;
+        return data;
+      }
+
+      final mlkemCiphertext = readChunk();
+      final aesNonce = Uint8List.fromList(flat.sublist(offset, offset + 12));
+      offset += 12;
+      final wrappedFolderKey = readChunk();
+
+      return PqcWrappedKey(
+        ephemeralX25519Pub: ephemX25519Pub,
+        mlkemCiphertext: mlkemCiphertext,
+        aesNonce: aesNonce,
+        wrappedFolderKey: wrappedFolderKey,
+      );
+    });
+  }
+
+  @override
+  Future<Uint8List> pqcHybridUnwrap({
+    required Uint8List recipientX25519Priv,
+    required Uint8List recipientMlkemDk,
+    required PqcWrappedKey wrappedKey,
+  }) async {
+    return using((Arena arena) {
+      final privPtr = recipientX25519Priv.toPointer(arena);
+      final dkPtr = recipientMlkemDk.toPointer(arena);
+      final ephemPtr = wrappedKey.ephemeralX25519Pub.toPointer(arena);
+      final ctPtr = wrappedKey.mlkemCiphertext.toPointer(arena);
+      final noncePtr = wrappedKey.aesNonce.toPointer(arena);
+      final wrapPtr = wrappedKey.wrappedFolderKey.toPointer(arena);
+      final outputPtr = arena<Uint8>(32);
+
+      final res = _pqcHybridUnwrapFn(
+        privPtr,
+        dkPtr,
+        recipientMlkemDk.length,
+        ephemPtr,
+        ctPtr,
+        wrappedKey.mlkemCiphertext.length,
+        noncePtr,
+        wrapPtr,
+        wrappedKey.wrappedFolderKey.length,
+        outputPtr,
+      );
+
+      if (res != 0) {
+        throw ArgumentError('Native pqc_hybrid_unwrap failed: $res');
+      }
+
+      return Uint8List.fromList(outputPtr.asTypedList(32));
+    });
+  }
+
+  @override
+  Future<PqcSignatureBundle> pqcSignInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Priv,
+    required Uint8List mldsaSeed,
+  }) async {
+    const cap = 4000;
+    return using((Arena arena) {
+      final payPtr = payload.toPointer(arena);
+      final edPtr = ed25519Priv.toPointer(arena);
+      final dsaPtr = mldsaSeed.toPointer(arena);
+      final outputPtr = arena<Uint8>(cap);
+      final writtenPtr = arena<IntPtr>(1);
+      writtenPtr.value = 0;
+
+      final res = _pqcSignInvitationFn(
+        payPtr,
+        payload.length,
+        edPtr,
+        dsaPtr,
+        outputPtr,
+        cap,
+        writtenPtr,
+      );
+
+      if (res != 0) {
+        throw Exception('Native pqc_sign_invitation failed: $res');
+      }
+
+      final flat = outputPtr.asTypedList(writtenPtr.value);
+      var offset = 0;
+
+      Uint8List readChunk() {
+        final len = flat[offset] |
+            (flat[offset + 1] << 8) |
+            (flat[offset + 2] << 16) |
+            (flat[offset + 3] << 24);
+        offset += 4;
+        final data = Uint8List.fromList(flat.sublist(offset, offset + len));
+        offset += len;
+        return data;
+      }
+
+      final ed25519Signature = readChunk();
+      final mldsaSignature = readChunk();
+
+      return PqcSignatureBundle(
+        ed25519Signature: ed25519Signature,
+        mldsaSignature: mldsaSignature,
+      );
+    });
+  }
+
+  @override
+  Future<bool> pqcVerifyInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Pub,
+    required Uint8List mldsaVk,
+    required PqcSignatureBundle signatures,
+  }) async {
+    return using((Arena arena) {
+      final payPtr = payload.toPointer(arena);
+      final edPubPtr = ed25519Pub.toPointer(arena);
+      final dsaVkPtr = mldsaVk.toPointer(arena);
+      final edSigPtr = signatures.ed25519Signature.toPointer(arena);
+      final dsaSigPtr = signatures.mldsaSignature.toPointer(arena);
+
+      final res = _pqcVerifyInvitationFn(
+        payPtr,
+        payload.length,
+        edPubPtr,
+        dsaVkPtr,
+        mldsaVk.length,
+        edSigPtr,
+        dsaSigPtr,
+        signatures.mldsaSignature.length,
+      );
+
+      if (res < 0) {
+        throw Exception('Native pqc_verify_invitation failed with error code: $res');
+      }
+      return res == 1;
     });
   }
 }
@@ -569,8 +896,4 @@ extension _StringToPtr on String {
     view.setAll(0, bytes);
     return ptr;
   }
-}
-
-extension _NativeCryptoBridgeIoShamir on NativeCryptoBridgeImpl {
-  // Intentionally empty — Shamir methods are inline on the class.
 }

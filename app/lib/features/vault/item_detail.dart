@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import '../settings/settings_screen.dart';
+import 'sharing/sharing_screen.dart';
+
 
 class ItemDetailPane extends StatefulWidget {
   final VaultItem? item;
@@ -99,6 +101,22 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         backgroundColor: Colors.transparent,
         title: Text(item.title, style: const TextStyle(fontFamily: 'Outfit')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined, color: Colors.teal),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => SharingScreen(
+                    folderId: item.id,
+                    folderName: item.title,
+                    currentFolderKey: Uint8List.fromList(List.generate(32, (i) => i)),
+                    senderUserId: 'current-user-alice',
+                  ),
+                ),
+              );
+            },
+            tooltip: 'Share Item',
+          ),
           if (widget.onEdit != null)
             IconButton(
               icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent),
@@ -112,6 +130,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               tooltip: 'Delete Item',
             ),
         ],
+
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),

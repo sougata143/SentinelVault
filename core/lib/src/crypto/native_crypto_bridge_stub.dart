@@ -66,4 +66,36 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   @override
   Uint8List shamirCombine({required List<Uint8List> shares}) =>
       throw UnimplementedError();
+
+  @override
+  Future<PqcKeyBundle> pqcGenerateKeypairs() => throw UnimplementedError();
+
+  @override
+  Future<PqcWrappedKey> pqcHybridWrap({
+    required Uint8List recipientX25519Pub,
+    required Uint8List recipientMlkemEk,
+    required Uint8List folderKey,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Uint8List> pqcHybridUnwrap({
+    required Uint8List recipientX25519Priv,
+    required Uint8List recipientMlkemDk,
+    required PqcWrappedKey wrappedKey,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PqcSignatureBundle> pqcSignInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Priv,
+    required Uint8List mldsaSeed,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<bool> pqcVerifyInvitation({
+    required Uint8List payload,
+    required Uint8List ed25519Pub,
+    required Uint8List mldsaVk,
+    required PqcSignatureBundle signatures,
+  }) => throw UnimplementedError();
 }

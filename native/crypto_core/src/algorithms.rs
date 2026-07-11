@@ -206,3 +206,6 @@ pub fn calculate_client_session(
 
     Ok((session_key, m1, m2))
 }
+
+pub mod pqc_hybrid;
+
