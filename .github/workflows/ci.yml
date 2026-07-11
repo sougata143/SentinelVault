@@ -121,8 +121,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ matrix.target }}-
 
+      # Android cross-compilation requires the NDK's Clang cross-linker.
+      # Without this, Cargo falls back to the host x86_64 `cc` which rejects
+      # aarch64 object files with "Relocations in generic ELF (EM: 183)".
+      # $ANDROID_NDK_ROOT is pre-installed on ubuntu-latest runners.
+      - name: Configure Android NDK Cross-Linker
+        if: matrix.target == 'aarch64-linux-android'
+        run: |
+          NDK_BIN="${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          # Verify the NDK is present and report version for debugging
+          ls "${NDK_BIN}/aarch64-linux-android21-clang" || \
+            (echo "NDK not found at ${ANDROID_NDK_ROOT}" && exit 1)
+          # Cargo reads CARGO_TARGET_<TARGET_UPPER>_LINKER to select the linker
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${NDK_BIN}/aarch64-linux-android21-clang" >> $GITHUB_ENV
+          # CC / AR are used by -sys crates and build.rs scripts
+          echo "CC_aarch64_linux_android=${NDK_BIN}/aarch64-linux-android21-clang" >> $GITHUB_ENV
+          echo "AR_aarch64_linux_android=${NDK_BIN}/llvm-ar" >> $GITHUB_ENV
+
+      # Host tests run on the native architecture only.
+      # Skip them for cross-compile-only targets (Android, iOS) because the
+      # compiled binaries cannot execute on the x86_64/aarch64-apple host.
       - name: Run Crate Correctness Tests on Host
+        if: matrix.target == 'wasm32-unknown-unknown' || matrix.target == 'aarch64-apple-ios' || matrix.os == 'macos-latest' && matrix.target == 'aarch64-apple-ios'
         run: cargo test
+        working-directory: native/crypto_core
+
+      - name: Run Crate Correctness Tests on Host (native linux)
+        if: matrix.target == 'aarch64-linux-android'
+        run: cargo test --target x86_64-unknown-linux-gnu
         working-directory: native/crypto_core
 
       - name: Cross-compile Crate for Target
