@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart' show Sha256;
 import 'native_crypto_bridge.dart';
+import 'native_crypto_bridge_selector.dart';
 
 /// Client-side high-level cryptosystem for PQC Folder Sharing.
 ///
