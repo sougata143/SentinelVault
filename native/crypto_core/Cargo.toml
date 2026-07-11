@@ -35,6 +35,14 @@ signature = "3.0"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.155"
 
+# getrandom v0.2 does not support wasm32-unknown-unknown by default.
+# The "js" feature tells it to use JS's crypto.getRandomValues() for entropy.
+# Without this, any crate that transitively depends on getrandom (rand,
+# ed25519-dalek, ml-kem, etc.) will fail to compile for the Wasm target.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [features]
 default = []
-wasm = ["wasm-bindgen"]
+# Activates wasm-bindgen exports and ensures getrandom/js is enabled.
+wasm = ["wasm-bindgen", "getrandom/js"]

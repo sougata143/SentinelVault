@@ -126,5 +126,10 @@ jobs:
         working-directory: native/crypto_core
 
       - name: Cross-compile Crate for Target
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.target }}" = "wasm32-unknown-unknown" ]; then
+            cargo build --release --target ${{ matrix.target }} --features wasm
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
         working-directory: native/crypto_core
