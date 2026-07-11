@@ -1,15 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:core/core.dart';
 import 'package:app/features/auth/master_password_setup_screen.dart';
+import 'package:app/features/settings/settings_screen.dart';
 import 'package:app/app_shell.dart';
 
 void main() {
   group('MasterPasswordSetupScreen Widget Tests', () {
     testWidgets('1. Successful setup uploads only salt and wrapped key (zero-knowledge)', (WidgetTester tester) async {
+      AppSettings.autoLockEnabled = false;
       const email = 'newuser@example.com';
       const masterPasswordInput = 'mySecureMasterPassword99!';
       var requestChecked = false;
@@ -79,7 +82,9 @@ void main() {
           checks++;
         }
       });
-      await tester.pumpAndSettle();
+      for (int i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
 
 
@@ -88,6 +93,13 @@ void main() {
       // Check that the network request occurred and passed security checks
       expect(requestChecked, isTrue);
 
+      // Tap "Do it later" on the Emergency Kit setup dialog
+      final skipBtn = find.byKey(const Key('setup-recovery-skip-button'));
+      expect(skipBtn, findsOneWidget);
+      await tester.tap(skipBtn);
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
       // Check that we successfully navigated to the dashboard shell (AppShell)
       expect(find.byType(AppShell), findsOneWidget);

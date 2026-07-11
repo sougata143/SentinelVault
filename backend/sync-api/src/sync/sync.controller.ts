@@ -55,7 +55,7 @@ export class SyncController {
   @HttpCode(HttpStatus.OK)
   async saveVaultKey(
     @Headers('x-user-id') userId: string | undefined,
-    @Body() body: { salt: string; wrappedKey: string },
+    @Body() body: { salt: string; wrappedKey: string; recoverySalt?: string; recoveryWrappedKey?: string },
   ) {
     if (!userId) {
       throw new BadRequestException('Missing x-user-id header');
@@ -63,7 +63,13 @@ export class SyncController {
     if (!body.salt || !body.wrappedKey) {
       throw new BadRequestException('Missing salt or wrappedKey in body');
     }
-    await this.syncService.saveVaultKey(userId, body.salt, body.wrappedKey);
+    await this.syncService.saveVaultKey(
+      userId,
+      body.salt,
+      body.wrappedKey,
+      body.recoverySalt,
+      body.recoveryWrappedKey,
+    );
     return { success: true };
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
+import 'package:http/http.dart' as http;
 import '../../theme/theme.dart';
 
 class AppSettings {
@@ -12,11 +13,17 @@ class AppSettings {
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onLock;
   final VoidCallback? onLogout;
+  final String currentEmail;
+  final String syncBaseUrl;
+  final http.Client? httpClient;
 
   const SettingsScreen({
     super.key,
     this.onLock,
     this.onLogout,
+    this.currentEmail = 'auditor@sentinelvault.io',
+    this.syncBaseUrl = 'http://localhost:3002',
+    this.httpClient,
   });
 
   @override
@@ -29,6 +36,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _autoLockTimeout;
   late bool _biometricEnabled;
 
+  bool _hasRecoveryKey = false;
+  bool _isCheckingRecovery = true;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +46,201 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _autoLock = AppSettings.autoLockEnabled;
     _autoLockTimeout = AppSettings.autoLockTimeoutMinutes;
     _biometricEnabled = AppSettings.biometricEnabled;
+    _checkRecoveryStatus();
+  }
+
+  Future<void> _checkRecoveryStatus() async {
+    if (!mounted) return;
+    setState(() {
+      _isCheckingRecovery = true;
+    });
+    try {
+      final syncClient = HttpSyncApiClient(
+        baseUrl: widget.syncBaseUrl,
+        userId: widget.currentEmail,
+        httpClient: widget.httpClient,
+      );
+      final keysMap = await syncClient.fetchVaultKey();
+      if (mounted) {
+        setState(() {
+          _hasRecoveryKey = keysMap.containsKey('recoverySalt') && keysMap.containsKey('recoveryWrappedKey');
+          _isCheckingRecovery = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingRecovery = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleSetupRecoveryKey() async {
+    final crypto = VaultCrypto();
+    final recoveryKey = crypto.generateRecoveryKey();
+    final printConfirmed = ValueNotifier<bool>(false);
+    bool uploadLoading = false;
+    String? uploadError;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+              ),
+              title: Text(
+                _hasRecoveryKey ? 'Regenerate Emergency Kit' : 'Set up Emergency Kit',
+                style: const TextStyle(color: AppTheme.textPrimaryColor, fontFamily: 'Outfit'),
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Your Recovery Key is generated locally. Store it offline. If you lose it, we cannot recover it.',
+                      style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: Text(
+                        recoveryKey,
+                        key: const Key('generated-recovery-key-text'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Checkbox confirming offline storage
+                    AnimatedBuilder(
+                      animation: printConfirmed,
+                      builder: (context, _) {
+                        return CheckboxListTile(
+                          key: const Key('confirm-saved-checkbox'),
+                          title: const Text(
+                            'I have written down or safely saved this Recovery Key.',
+                            style: TextStyle(color: AppTheme.textPrimaryColor, fontSize: 12),
+                          ),
+                          value: printConfirmed.value,
+                          activeColor: AppTheme.primaryColor,
+                          onChanged: (val) {
+                            setDialogState(() {
+                              printConfirmed.value = val ?? false;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                    if (uploadError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        uploadError!,
+                        style: const TextStyle(color: AppTheme.errorColor, fontSize: 13, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: uploadLoading ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
+                ),
+                ElevatedButton(
+                  key: const Key('upload-recovery-key-button'),
+                  onPressed: (uploadLoading || !printConfirmed.value)
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            uploadLoading = true;
+                            uploadError = null;
+                          });
+
+                          try {
+                            final syncClient = HttpSyncApiClient(
+                              baseUrl: widget.syncBaseUrl,
+                              userId: widget.currentEmail,
+                              httpClient: widget.httpClient,
+                            );
+
+                            // 1. Fetch current keys from server to preserve masterPassword salt and wrapped key
+                            final currentKeys = await syncClient.fetchVaultKey();
+                            final saltHex = currentKeys['salt']!;
+                            final wrappedKeyHex = currentKeys['wrappedKey']!;
+
+                            // 2. Generate recovery salt and derive KDF key
+                            final rkSalt = crypto.generateRandomBytes(16);
+                            final rkk = await crypto.deriveRecoveryKdfKey(
+                              recoveryKey: recoveryKey,
+                              salt: rkSalt,
+                            );
+
+                            // 3. Wrap current vault key with recovery KDF key
+                            final recoveryWrappedKey = await crypto.wrapVaultKey(
+                              masterKey: rkk,
+                              vaultKey: VaultLockManager.instance.vaultKey!,
+                            );
+
+                            final recoverySaltHex = rkSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+                            final recoveryWrappedKeyHex = recoveryWrappedKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+                            // 4. Upload updated bundle containing both paths
+                            await syncClient.uploadVaultKey(
+                              saltHex: saltHex,
+                              wrappedKeyHex: wrappedKeyHex,
+                              recoverySaltHex: recoverySaltHex,
+                              recoveryWrappedKeyHex: recoveryWrappedKeyHex,
+                            );
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Recovery Key successfully saved!')),
+                              );
+                              Navigator.of(dialogCtx).pop(); // Close dialog
+                            }
+                            _checkRecoveryStatus();
+                          } catch (e) {
+                            setDialogState(() {
+                              uploadLoading = false;
+                              uploadError = 'Failed to upload Recovery Key. Please try again.';
+                            });
+                          }
+                        },
+                  child: uploadLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Finish Setup'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _saveSettings() {
@@ -218,6 +423,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   title: Text('Data Location'),
                   trailing: Text('Encrypted SQLite (Zero-Knowledge)'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Emergency Kit Section
+          _buildSectionHeader('Emergency Kit'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('settings-setup-emergency-kit-tile'),
+                  leading: const Icon(Icons.key, color: AppTheme.primaryColor),
+                  title: const Text('Emergency Kit Recovery Key'),
+                  subtitle: Text(_isCheckingRecovery
+                      ? 'Checking recovery status...'
+                      : _hasRecoveryKey
+                          ? 'Recovery Key is active. Click to regenerate.'
+                          : 'Set up an offline Recovery Key to prevent permanent lockouts.'),
+                  trailing: _isCheckingRecovery
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                        )
+                      : Icon(_hasRecoveryKey ? Icons.sync : Icons.add, color: AppTheme.primaryColor),
+                  onTap: _isCheckingRecovery ? null : _handleSetupRecoveryKey,
                 ),
               ],
             ),

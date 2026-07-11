@@ -158,6 +158,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           builder: (_) => SettingsScreen(
                             onLock: _triggerLock,
                             onLogout: _triggerLogout,
+                            currentEmail: widget.currentEmail ?? 'auditor@sentinelvault.io',
+                            syncBaseUrl: widget.syncBaseUrl,
+                            httpClient: widget.httpClient,
                           ),
                         ),
                       );
@@ -194,6 +197,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     builder: (_) => SettingsScreen(
                       onLock: _triggerLock,
                       onLogout: _triggerLogout,
+                      currentEmail: widget.currentEmail ?? 'auditor@sentinelvault.io',
+                      syncBaseUrl: widget.syncBaseUrl,
+                      httpClient: widget.httpClient,
                     ),
                   ),
                 );

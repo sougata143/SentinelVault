@@ -28,6 +28,11 @@ class VaultLockManager {
     _vaultKey = List<int>.from(vaultKey);
   }
 
+  void unlockWithRecoveryKey(List<int> vaultKey) {
+    _masterKey = null;
+    _vaultKey = List<int>.from(vaultKey);
+  }
+
   /// Locks the vault.
   /// Clears the Master Key and Vault Key from memory, but keeps the account session valid.
   void lock() {

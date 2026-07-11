@@ -36,6 +36,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   List<int>? _salt;
   List<int>? _wrappedVaultKey;
+  List<int>? _recoverySalt;
+  List<int>? _recoveryWrappedKey;
 
   int _failedAttempts = 0;
   int _lockoutSecondsRemaining = 0;
@@ -93,6 +95,16 @@ class _UnlockScreenState extends State<UnlockScreen> {
       setState(() {
         _salt = _hexToBytes(saltHex);
         _wrappedVaultKey = _hexToBytes(wrappedKeyHex);
+        if (keysMap.containsKey('recoverySalt')) {
+          _recoverySalt = _hexToBytes(keysMap['recoverySalt']!);
+        } else {
+          _recoverySalt = null;
+        }
+        if (keysMap.containsKey('recoveryWrappedKey')) {
+          _recoveryWrappedKey = _hexToBytes(keysMap['recoveryWrappedKey']!);
+        } else {
+          _recoveryWrappedKey = null;
+        }
         _isFetchingKeys = false;
       });
     } catch (e) {
@@ -250,6 +262,141 @@ class _UnlockScreenState extends State<UnlockScreen> {
         });
       }
     }
+  }
+
+  Future<void> _showRecoveryDialog() async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? dialogError;
+    bool dialogLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+              ),
+              title: const Text(
+                'Recovery Key Unlock',
+                style: TextStyle(color: AppTheme.textPrimaryColor, fontFamily: 'Outfit'),
+              ),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Enter your 32-character offline Recovery Key to decrypt and unlock your vault.',
+                      style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      key: const Key('recovery-key-input-field'),
+                      controller: controller,
+                      enabled: !dialogLoading,
+                      style: const TextStyle(color: AppTheme.textPrimaryColor),
+                      decoration: const InputDecoration(
+                        labelText: 'Recovery Key',
+                        hintText: 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Recovery Key is required';
+                        }
+                        final cleaned = value.replaceAll('-', '').replaceAll(' ', '');
+                        if (cleaned.length != 32) {
+                          return 'Must be exactly 32 alphanumeric characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (dialogError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        dialogError!,
+                        style: const TextStyle(color: AppTheme.errorColor, fontSize: 13, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: dialogLoading ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
+                ),
+                ElevatedButton(
+                  key: const Key('submit-recovery-key-button'),
+                  onPressed: dialogLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          
+                          setDialogState(() {
+                            dialogLoading = true;
+                            dialogError = null;
+                          });
+
+                          try {
+                            final crypto = VaultCrypto();
+                            final enteredRK = controller.text;
+
+                            // Derive Recovery KDF Key
+                            final rkk = await crypto.deriveRecoveryKdfKey(
+                              recoveryKey: enteredRK,
+                              salt: _recoverySalt!,
+                            );
+
+                            // Decrypt the Vault Key
+                            final vaultKey = await crypto.unwrapVaultKey(
+                              wrappedVaultKey: _recoveryWrappedKey!,
+                              masterKey: rkk,
+                            );
+
+                            // Success! Zero out memory, initialize DB
+                            VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
+
+                            final db = SqliteVaultDatabase.inMemory();
+                            db.open(vaultKey);
+
+                            if (mounted) {
+                              Navigator.of(dialogCtx).pop(); // Close dialog
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              dialogLoading = false;
+                              dialogError = 'Invalid Recovery Key or decryption failed';
+                            });
+                          }
+                        },
+                  child: dialogLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Unlock'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
   }
 
   @override
@@ -441,6 +588,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.primaryColor,
                               side: const BorderSide(color: AppTheme.primaryColor),
+                            ),
+                          ),
+                        ],
+                        if (_recoverySalt != null && _recoveryWrappedKey != null) ...[
+                          const SizedBox(height: 12),
+                          TextButton(
+                            key: const Key('use-recovery-key-button'),
+                            onPressed: isButtonsDisabled ? null : _showRecoveryDialog,
+                            child: const Text(
+                              'Forgot Master Password? Use Recovery Key',
+                              style: TextStyle(color: AppTheme.primaryColor),
                             ),
                           ),
                         ],

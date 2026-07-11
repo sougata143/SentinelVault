@@ -93,16 +93,52 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
         wrappedKeyHex: wrappedKeyHex,
       );
 
-      // 6. Open in-memory DB and navigate to the dashboard shell
+      // 6. Open in-memory DB
       final db = SqliteVaultDatabase.inMemory();
       db.open(vaultKey);
 
+      // Set VaultLockManager session and unlock state
+      VaultLockManager.instance.unlock(masterKey, vaultKey);
+
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.white.withOpacity(0.05)),
+            ),
+            title: const Text(
+              'Set Up Emergency Kit?',
+              style: TextStyle(color: AppTheme.textPrimaryColor, fontFamily: 'Outfit'),
+            ),
+            content: const Text(
+              'We highly recommend generating an Emergency Kit Recovery Key. '
+              'If you forget your Master Password, this key will let you unlock your vault. '
+              'Without it, your data could be lost forever.',
+              style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+            ),
+            actions: [
+              TextButton(
+                key: const Key('setup-recovery-skip-button'),
+                onPressed: () {
+                  Navigator.of(dialogCtx).pop();
+                  _navigateToDashboard(db, vaultKey);
+                },
+                child: const Text('Do it later', style: TextStyle(color: AppTheme.textSecondaryColor)),
+              ),
+              ElevatedButton(
+                key: const Key('setup-recovery-now-button'),
+                onPressed: () {
+                  Navigator.of(dialogCtx).pop();
+                  _setupRecoveryFlowAndNavigate(vaultKey, saltHex, wrappedKeyHex, db);
+                },
+                child: const Text('Set up Now'),
+              ),
+            ],
           ),
-          (route) => false,
         );
       }
     } catch (e) {
@@ -255,6 +291,185 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _setupRecoveryFlowAndNavigate(
+    List<int> vaultKey,
+    String saltHex,
+    String wrappedKeyHex,
+    SqliteVaultDatabase db,
+  ) async {
+    final crypto = VaultCrypto();
+    final recoveryKey = crypto.generateRecoveryKey();
+    final printConfirmed = ValueNotifier<bool>(false);
+    bool uploadLoading = false;
+    String? uploadError;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+              ),
+              title: const Text(
+                'Your Recovery Key',
+                style: TextStyle(color: AppTheme.textPrimaryColor, fontFamily: 'Outfit'),
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Store this key safely offline. It will never be shown again and cannot be recovered by our team.',
+                      style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: Text(
+                        recoveryKey,
+                        key: const Key('generated-recovery-key-text'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AnimatedBuilder(
+                      animation: printConfirmed,
+                      builder: (context, _) {
+                        return CheckboxListTile(
+                          key: const Key('confirm-saved-checkbox'),
+                          title: const Text(
+                            'I have written down or safely saved this Recovery Key.',
+                            style: TextStyle(color: AppTheme.textPrimaryColor, fontSize: 12),
+                          ),
+                          value: printConfirmed.value,
+                          activeColor: AppTheme.primaryColor,
+                          onChanged: (val) {
+                            setDialogState(() {
+                              printConfirmed.value = val ?? false;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                    if (uploadError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        uploadError!,
+                        style: const TextStyle(color: AppTheme.errorColor, fontSize: 13, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: uploadLoading
+                      ? null
+                      : () {
+                          Navigator.of(dialogCtx).pop();
+                          _navigateToDashboard(db, vaultKey);
+                        },
+                  child: const Text('Skip / Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
+                ),
+                ElevatedButton(
+                  key: const Key('upload-recovery-key-button'),
+                  onPressed: (uploadLoading || !printConfirmed.value)
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            uploadLoading = true;
+                            uploadError = null;
+                          });
+
+                          try {
+                            final syncClient = HttpSyncApiClient(
+                              baseUrl: widget.syncBaseUrl,
+                              userId: widget.email,
+                              httpClient: widget.httpClient,
+                            );
+
+                            final rkSalt = crypto.generateRandomBytes(16);
+                            final rkk = await crypto.deriveRecoveryKdfKey(
+                              recoveryKey: recoveryKey,
+                              salt: rkSalt,
+                            );
+
+                            final recoveryWrappedKey = await crypto.wrapVaultKey(
+                              masterKey: rkk,
+                              vaultKey: vaultKey,
+                            );
+
+                            final recoverySaltHex = rkSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+                            final recoveryWrappedKeyHex = recoveryWrappedKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+                            await syncClient.uploadVaultKey(
+                              saltHex: saltHex,
+                              wrappedKeyHex: wrappedKeyHex,
+                              recoverySaltHex: recoverySaltHex,
+                              recoveryWrappedKeyHex: recoveryWrappedKeyHex,
+                            );
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Recovery Key successfully saved!')),
+                              );
+                              Navigator.of(dialogCtx).pop();
+                              _navigateToDashboard(db, vaultKey);
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              uploadLoading = false;
+                              uploadError = 'Failed to upload Recovery Key. Please try again.';
+                            });
+                          }
+                        },
+                  child: uploadLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Finish Setup'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToDashboard(SqliteVaultDatabase db, List<int> vaultKey) {
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+        ),
+        (route) => false,
+      );
+    }
   }
 }
 

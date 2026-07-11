@@ -92,6 +92,8 @@ class HttpSyncApiClient implements SyncApiClient {
   Future<void> uploadVaultKey({
     required String saltHex,
     required String wrappedKeyHex,
+    String? recoverySaltHex,
+    String? recoveryWrappedKeyHex,
   }) async {
     final url = Uri.parse('$baseUrl/sync/vault-key');
     final response = await _httpClient.post(
@@ -103,6 +105,8 @@ class HttpSyncApiClient implements SyncApiClient {
       body: json.encode({
         'salt': saltHex,
         'wrappedKey': wrappedKeyHex,
+        if (recoverySaltHex != null) 'recoverySalt': recoverySaltHex,
+        if (recoveryWrappedKeyHex != null) 'recoveryWrappedKey': recoveryWrappedKeyHex,
       }),
     );
 
@@ -134,6 +138,8 @@ class HttpSyncApiClient implements SyncApiClient {
     return {
       'salt': data['salt'] as String,
       'wrappedKey': data['wrappedKey'] as String,
+      if (data['recoverySalt'] != null) 'recoverySalt': data['recoverySalt'] as String,
+      if (data['recoveryWrappedKey'] != null) 'recoveryWrappedKey': data['recoveryWrappedKey'] as String,
     };
   }
 }

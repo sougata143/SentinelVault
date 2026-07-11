@@ -154,5 +154,41 @@ void main() {
       // Check that all generated nonces are unique (i.e. size of set matches count)
       expect(nonces.length, equals(count));
     });
+
+    test('Recovery Key Generation, Decoding and Round-Trip', () async {
+      final key = crypto.generateRecoveryKey();
+      
+      // Match the pattern XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (8 groups of 4 chars separated by dashes)
+      final regExp = RegExp(r'^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$');
+      expect(regExp.hasMatch(key), isTrue);
+
+      final decoded = crypto.decodeRecoveryKey(key);
+      expect(decoded.length, equals(20)); // 160 bits
+
+      // Generating a new key should be random
+      final key2 = crypto.generateRecoveryKey();
+      expect(key2, isNot(equals(key)));
+
+      // Recovery Key wrapping/unwrapping roundtrip
+      final vaultKey = crypto.generateRandomBytes(32);
+      final rkSalt = crypto.generateRandomBytes(16);
+      
+      final rkk = await crypto.deriveRecoveryKdfKey(
+        recoveryKey: key,
+        salt: rkSalt,
+      );
+      expect(rkk.length, equals(32));
+
+      final wrapped = await crypto.wrapVaultKey(
+        vaultKey: vaultKey,
+        masterKey: rkk,
+      );
+
+      final unwrapped = await crypto.unwrapVaultKey(
+        wrappedVaultKey: wrapped,
+        masterKey: rkk,
+      );
+      expect(unwrapped, equals(vaultKey));
+    });
   });
 }

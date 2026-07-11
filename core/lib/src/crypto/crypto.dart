@@ -204,6 +204,72 @@ class VaultCrypto {
     );
   }
 
+  /// Generates a high-entropy 160-bit random Recovery Key encoded as a Base32 string
+  /// formatted with hyphens: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX.
+  String generateRecoveryKey() {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    final randomBytes = generateRandomBytes(20);
+    final buffer = StringBuffer();
+    var bitBuffer = 0;
+    var bitCount = 0;
+    for (final byte in randomBytes) {
+      bitBuffer = (bitBuffer << 8) | byte;
+      bitCount += 8;
+      while (bitCount >= 5) {
+        final index = (bitBuffer >> (bitCount - 5)) & 31;
+        buffer.write(alphabet[index]);
+        bitCount -= 5;
+      }
+    }
+    final rawString = buffer.toString();
+    final formatted = StringBuffer();
+    for (var i = 0; i < rawString.length; i++) {
+      if (i > 0 && i % 4 == 0) {
+        formatted.write('-');
+      }
+      formatted.write(rawString[i]);
+    }
+    return formatted.toString();
+  }
+
+  /// Decodes a formatted Recovery Key string back into its original raw bytes.
+  List<int> decodeRecoveryKey(String keyString) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    final cleaned = keyString.replaceAll('-', '').toUpperCase();
+    if (cleaned.length != 32) {
+      throw ArgumentError('Invalid recovery key length');
+    }
+    final result = Uint8List(20);
+    var bitBuffer = 0;
+    var bitCount = 0;
+    var resultIndex = 0;
+    for (var i = 0; i < cleaned.length; i++) {
+      final index = alphabet.indexOf(cleaned[i]);
+      if (index == -1) {
+        throw ArgumentError('Invalid character in recovery key');
+      }
+      bitBuffer = (bitBuffer << 5) | index;
+      bitCount += 5;
+      if (bitCount >= 8) {
+        result[resultIndex++] = (bitBuffer >> (bitCount - 8)) & 255;
+        bitCount -= 8;
+      }
+    }
+    return result;
+  }
+
+  /// Derives the 32-byte Recovery KDF Key from the Recovery Key and a salt.
+  Future<List<int>> deriveRecoveryKdfKey({
+    required String recoveryKey,
+    required List<int> salt,
+  }) async {
+    final cleaned = recoveryKey.replaceAll('-', '').toUpperCase();
+    return deriveMasterKey(
+      masterPassword: cleaned,
+      salt: salt,
+    );
+  }
+
   /// Overwrites the sensitive byte array with zeroes.
   void _zeroOut(List<int> bytes) {
     for (var i = 0; i < bytes.length; i++) {

@@ -163,6 +163,7 @@ npm run test
 - **Local Unlock & Brute-Force Lockouts**: Screen-lock client protecting the master key in memory with client-side exponential backoff delays on repeated failed attempts.
 - **Independent Lock vs. Logout**: Separates memory key zero-out (Lock) from token session invalidation (Logout) for maximum security and usability.
 - **Biometric Quick-Unlock**: Hardware-enclave/keystore key wrapping simulation in-memory, automatically invalidated if new Face ID/Fingerprints are enrolled on the device.
+- **Emergency Kit Recovery Key**: Offline-first recovery system using Dual Key-Wrapping (Candidate 1). Generates a 32-character Base32 recovery key client-side, derives a KDF key via Argon2id, wraps the active Vault Key using AES-256-GCM, and persists it via sync API envelopes. Past recovery keys are invalidated on regeneration.
 - **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
 - **Import/Export Suite**: Local parsers for 1Password, Bitwarden, LastPass, and custom CSV imports. Safe exports requiring Master Password re-entry.
 
