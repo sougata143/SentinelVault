@@ -111,7 +111,6 @@ void main() {
     });
 
     test('Rotation wraps correctly for remaining recipients', () async {
-      final alice = await bridge.pqcGenerateKeypairs();
       final bob = await bridge.pqcGenerateKeypairs();
       final charlie = await bridge.pqcGenerateKeypairs();
 

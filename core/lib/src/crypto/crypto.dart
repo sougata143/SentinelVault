@@ -7,7 +7,6 @@ library core.crypto;
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:cryptography/cryptography.dart';
 import 'native_crypto_bridge.dart';
 import 'native_crypto_bridge_selector.dart';
 

@@ -78,7 +78,7 @@ void main() {
     test('3. Removing hardware key factor does not affect Master Password unlock', () async {
       // Simulate registration
       final hwSalt = crypto.generateRandomBytes(32);
-      final hwUnlock = await HardwareKeyUnlock.create(
+      await HardwareKeyUnlock.create(
         credentialId: 'yubikey-cred-123',
         salt: hwSalt,
         vaultKey: vaultKey,

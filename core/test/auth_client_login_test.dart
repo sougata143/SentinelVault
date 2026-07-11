@@ -4,7 +4,6 @@ import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:core/core.dart';
-import 'package:core/src/crypto/srp.dart';
 
 void main() {
   group('AuthClient Login Unit Tests', () {
@@ -14,7 +13,6 @@ void main() {
     final salt = List<int>.generate(16, (i) => i + 1);
 
     test('Successful login handshakes correctly using SRP-6a', () async {
-      final crypto = VaultCrypto();
       final verifier = await SrpClient.calculateVerifier(email, passwordBytes, salt);
 
       // Server ephemeral b
@@ -27,7 +25,6 @@ void main() {
 
       late BigInt A;
       late List<int> M1;
-      late List<int> expectedM2;
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/auth/login/step1') {
