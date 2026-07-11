@@ -35,14 +35,27 @@ signature = "3.0"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.155"
 
-# getrandom v0.2 does not support wasm32-unknown-unknown by default.
-# The "js" feature tells it to use JS's crypto.getRandomValues() for entropy.
-# Without this, any crate that transitively depends on getrandom (rand,
-# ed25519-dalek, ml-kem, etc.) will fail to compile for the Wasm target.
+# ── Wasm entropy source ───────────────────────────────────────────────────────
+# Two incompatible major versions of getrandom coexist in the dependency tree:
+#
+#   • v0.2 – pulled by: rand 0.8, rand_core 0.6, argon2, aes-gcm, sharks, …
+#             Wasm feature flag: "js"
+#
+#   • v0.4 – pulled by: ml-kem → rand_core 0.10, ml-dsa → rand_core 0.10, …
+#             Wasm feature flag renamed to: "wasm_js"
+#
+# Both versions need their respective entropy-source feature activated when
+# compiling for wasm32-unknown-unknown; without it they emit a compile_error.
+# Cargo's package-rename syntax lets us list both major versions under
+# different local names in the same [target] section so that feature
+# unification propagates to every transitive dependent of each version.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
+getrandom    = { package = "getrandom", version = "0.2", features = ["js"]      }
+getrandom-v04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 
 [features]
 default = []
-# Activates wasm-bindgen exports and ensures getrandom/js is enabled.
-wasm = ["wasm-bindgen", "getrandom/js"]
+# Activates wasm-bindgen exports and ensures both getrandom flavours have
+# their browser-entropy features enabled when building with --features wasm.
+wasm = ["wasm-bindgen", "getrandom/js", "getrandom-v04/wasm_js"]
+
