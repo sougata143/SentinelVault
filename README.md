@@ -54,7 +54,7 @@ SentinelVault is organized into three primary components:
 A cross-platform Flutter application providing:
 - **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane).
 - **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data breach feed, a weekly AI-generated digest, and quick-scan triggers.
-- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), and custom column mapping. Plaintext exports require master-password verification.
+- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
 
 ### 2. Shared Core (`core/`)
 A platform-agnostic Dart package managing local databases (SQLite), cryptography engines (Argon2id and AES-256-GCM), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`).
@@ -165,7 +165,7 @@ npm run test
 - **Biometric Quick-Unlock & OS-Backed Secure Storage**: Uses `flutter_secure_storage` for session tokens. The biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS with `kSecAccessControlBiometryCurrentSet`, and Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Automatically detects devices/emulators lacking hardware-backed secure storage to disable insecure quick-unlock. Any new biometric enrollment invalidates the cached key and falls back to manual Master Password entry.
 - **Emergency Kit Recovery Key**: Offline-first recovery system using Dual Key-Wrapping (Candidate 1). Generates a 32-character Base32 recovery key client-side, derives a KDF key via Argon2id, wraps the active Vault Key using AES-256-GCM, and persists it via sync API envelopes. Past recovery keys are invalidated on regeneration.
 - **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
-- **Import/Export Suite**: Local parsers for 1Password, Bitwarden, LastPass, and custom CSV imports. Safe exports requiring Master Password re-entry.
+- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
 
 ---
 

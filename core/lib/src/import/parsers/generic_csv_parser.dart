@@ -25,13 +25,13 @@ class GenericCsvParser {
     }
 
     final header = _parseCsvRow(lines[0]);
-    final colIndex = {for (var i = 0; i < header.length; i++) header[i].trim(): i};
+    final colIndex = {for (var i = 0; i < header.length; i++) header[i].trim().toLowerCase(): i};
 
     // Check for unmapped columns — flag but continue
     for (final col in header) {
       final c = col.trim();
       if (c.isEmpty) continue;
-      final isMapped = columnMapping.values.any((v) => v.toLowerCase() == c.toLowerCase());
+      final isMapped = columnMapping.values.any((v) => v.trim().toLowerCase() == c.toLowerCase());
       if (!isMapped) {
         errors.add(ParsedError(
           sourceRef: 'header',
@@ -43,13 +43,13 @@ class GenericCsvParser {
     // Build reverse mapping: CSV column name → target field name
     final reverseMapping = <String, String>{};
     for (final entry in columnMapping.entries) {
-      reverseMapping[entry.value.toLowerCase()] = entry.key;
+      reverseMapping[entry.value.trim().toLowerCase()] = entry.key;
     }
 
     String? getField(List<String> row, String targetField) {
       final csvCol = columnMapping[targetField];
       if (csvCol == null) return null;
-      final idx = colIndex[csvCol];
+      final idx = colIndex[csvCol.trim().toLowerCase()];
       if (idx == null || idx >= row.length) return null;
       final val = row[idx].trim();
       return val.isEmpty ? null : val;

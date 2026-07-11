@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:core/core.dart';
+import 'package:kdbx/kdbx.dart';
 
 /// Synthetic (non-real) fixture data for import parser tests.
 /// None of these contain real credentials, keys, or personal data.
@@ -351,6 +353,209 @@ void main() {
       expect(fields.password.plaintext, equals('EncryptMe!99'));
 
       db.close();
+    });
+  });
+
+  group('Expanded Import Capabilities Tests', () {
+    test('1. Parses Chrome CSV preset correctly', () {
+      const csv = 'name,url,username,password\nGoogle,https://google.com,chromeuser,chromepass\n';
+      final result = const GenericCsvParser(columnMapping: {
+        'title': 'name',
+        'url': 'url',
+        'username': 'username',
+        'password': 'password',
+      }).parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('Google'));
+      expect(item.urls, contains('https://google.com'));
+      expect(item.username, equals('chromeuser'));
+      expect(item.password, equals('chromepass'));
+    });
+
+    test('2. Parses Firefox CSV preset correctly', () {
+      const csv = 'url,username,password\nhttps://firefox.com,firefoxuser,firefoxpass\n';
+      final result = const GenericCsvParser(columnMapping: {
+        'title': 'url',
+        'url': 'url',
+        'username': 'username',
+        'password': 'password',
+      }).parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('https://firefox.com'));
+      expect(item.urls, contains('https://firefox.com'));
+      expect(item.username, equals('firefoxuser'));
+      expect(item.password, equals('firefoxpass'));
+    });
+
+    test('3. Parses Safari CSV preset correctly', () {
+      const csv = 'Title,URL,Username,Password,Notes,OTPAuth\nApple,https://apple.com,safariuser,safaripass,Safari notes,safaritotp\n';
+      final result = const GenericCsvParser(columnMapping: {
+        'title': 'Title',
+        'url': 'URL',
+        'username': 'Username',
+        'password': 'Password',
+        'notes': 'Notes',
+        'totp': 'OTPAuth',
+      }).parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('Apple'));
+      expect(item.urls, contains('https://apple.com'));
+      expect(item.username, equals('safariuser'));
+      expect(item.password, equals('safaripass'));
+      expect(item.notes, equals('Safari notes'));
+      expect(item.totpSecret, equals('safaritotp'));
+    });
+
+    test('4. Parses Dashlane CSV correctly', () {
+      const csv = 'name,url,username,password,notes,otpsecret\nDashlane Item,https://dashlane.com,dashuser,dashpass,dashnotes,dashtotp\n';
+      final result = DashlaneParser().parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('Dashlane Item'));
+      expect(item.urls, contains('https://dashlane.com'));
+      expect(item.username, equals('dashuser'));
+      expect(item.password, equals('dashpass'));
+      expect(item.notes, equals('dashnotes'));
+      expect(item.totpSecret, equals('dashtotp'));
+    });
+
+    test('5. Parses Keeper CSV correctly', () {
+      const csv = 'Title,Login,Password,Website Address,Notes\nKeeper Item,keeperuser,keeperpass,https://keeper.com,keepernotes\n';
+      final result = KeeperParser().parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('Keeper Item'));
+      expect(item.urls, contains('https://keeper.com'));
+      expect(item.username, equals('keeperuser'));
+      expect(item.password, equals('keeperpass'));
+      expect(item.notes, equals('keepernotes'));
+    });
+
+    test('6. Parses NordPass CSV correctly', () {
+      const csv = 'name,username,password,url,note\nNordPass Item,norduser,nordpass,https://nordpass.com,nordnotes\n';
+      final result = NordPassParser().parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('NordPass Item'));
+      expect(item.urls, contains('https://nordpass.com'));
+      expect(item.username, equals('norduser'));
+      expect(item.password, equals('nordpass'));
+      expect(item.notes, equals('nordnotes'));
+    });
+
+    test('7. Parses RoboForm CSV correctly', () {
+      const csv = 'name,login,pwd,url,note\nRoboForm Item,robouser,robopass,https://roboform.com,robonotes\n';
+      final result = RoboFormParser().parse(csv);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('RoboForm Item'));
+      expect(item.urls, contains('https://roboform.com'));
+      expect(item.username, equals('robouser'));
+      expect(item.password, equals('robopass'));
+      expect(item.notes, equals('robonotes'));
+    });
+
+    test('8. Parses Proton Pass JSON correctly', () {
+      const json = '''
+      {
+        "vaults": [
+          {
+            "name": "Personal",
+            "items": [
+              {
+                "data": {
+                  "metadata": {
+                    "name": "Proton Item",
+                    "note": "protonnotes"
+                  },
+                  "content": {
+                    "username": "protonuser",
+                    "password": "protonpass",
+                    "urls": ["https://proton.me"],
+                    "totpUri": "protontotp"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+      ''';
+      final result = ProtonPassParser().parse(json);
+
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('Proton Item'));
+      expect(item.urls, contains('https://proton.me'));
+      expect(item.username, equals('protonuser'));
+      expect(item.password, equals('protonpass'));
+      expect(item.notes, equals('protonnotes'));
+      expect(item.totpSecret, equals('protontotp'));
+    });
+
+    test('9. Decrypts and parses KeePass KDBX database correctly, and scrubs credentials', () async {
+      // 1. Programmatically construct a synthetic KDBX database in memory using composite credentials
+      final keyFileBytes = Uint8List.fromList([1, 2, 3, 4]);
+      final keyFileBytesForCreate = Uint8List.fromList(keyFileBytes);
+      final kdbx = KdbxFormat().create(
+        Credentials.composite(ProtectedValue.fromString('dbpassword'), keyFileBytesForCreate),
+        'Test DB',
+      );
+      final group = kdbx.body.rootGroup;
+      final entry = KdbxEntry.create(kdbx, group);
+      group.addEntry(entry);
+      entry.setString(KdbxKeyCommon.TITLE, PlainValue('KeePass Title'));
+      entry.setString(KdbxKeyCommon.USER_NAME, PlainValue('keepassuser'));
+      entry.setString(KdbxKeyCommon.PASSWORD, ProtectedValue.fromString('keepasspass'));
+      entry.setString(KdbxKeyCommon.URL, PlainValue('https://keepass.info'));
+      entry.setString(KdbxKey('Notes'), PlainValue('keepassnotes'));
+      entry.setString(KdbxKey('otp'), PlainValue('keepasstotp'));
+
+      final bytes = await KdbxFormat().save(kdbx, (bytes) async {
+        return Uint8List.fromList(bytes);
+      });
+
+      // 2. Parse it using KeePassKdbxParser
+      final result = await KeePassKdbxParser().parse(
+        bytes: bytes,
+        password: 'dbpassword',
+        keyFileBytes: keyFileBytes,
+      );
+
+      // 3. Verify items parsed correctly
+      if (result.errors.isNotEmpty) {
+        print('KeePass parse errors: ${result.errors.map((e) => "${e.sourceRef}: ${e.reason}").toList()}');
+      }
+      expect(result.items.length, equals(1));
+      expect(result.errors, isEmpty);
+      final item = result.items[0];
+      expect(item.title, equals('KeePass Title'));
+      expect(item.username, equals('keepassuser'));
+      expect(item.password, equals('keepasspass'));
+      expect(item.urls, contains('https://keepass.info'));
+      expect(item.notes, equals('keepassnotes'));
+      expect(item.totpSecret, equals('keepasstotp'));
+
+      // 4. Verify memory scrubbing: keyFileBytes should be zeroed out
+      expect(keyFileBytes, equals(Uint8List.fromList([0, 0, 0, 0])));
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import '../../../theme/theme.dart';
@@ -143,6 +144,10 @@ class _ImportScreenState extends State<ImportScreen> {
   final _urlColCtrl = TextEditingController(text: 'url');
   final _notesColCtrl = TextEditingController(text: 'notes');
 
+  // KeePass decryption credentials
+  final _keepassPasswordController = TextEditingController();
+  final _keepassKeyFileController = TextEditingController();
+
   ImportResult? _importResult;
   List<ParsedItem> _parsedItems = [];
   bool _isSaving = false;
@@ -157,10 +162,12 @@ class _ImportScreenState extends State<ImportScreen> {
     _passColCtrl.dispose();
     _urlColCtrl.dispose();
     _notesColCtrl.dispose();
+    _keepassPasswordController.dispose();
+    _keepassKeyFileController.dispose();
     super.dispose();
   }
 
-  void _parseContent() {
+  Future<void> _parseContent() async {
     final content = _fileContentController.text.trim();
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +187,65 @@ class _ImportScreenState extends State<ImportScreen> {
           break;
         case 'lastpass':
           result = LastPassParser().parse(content);
+          break;
+        case 'chrome_csv':
+          result = const GenericCsvParser(columnMapping: {
+            'title': 'name',
+            'url': 'url',
+            'username': 'username',
+            'password': 'password',
+          }).parse(content);
+          break;
+        case 'firefox_csv':
+          result = const GenericCsvParser(columnMapping: {
+            'title': 'url',
+            'url': 'url',
+            'username': 'username',
+            'password': 'password',
+          }).parse(content);
+          break;
+        case 'safari_csv':
+          result = const GenericCsvParser(columnMapping: {
+            'title': 'Title',
+            'url': 'URL',
+            'username': 'Username',
+            'password': 'Password',
+            'notes': 'Notes',
+            'totp': 'OTPAuth',
+          }).parse(content);
+          break;
+        case 'dashlane':
+          result = DashlaneParser().parse(content);
+          break;
+        case 'keeper':
+          result = KeeperParser().parse(content);
+          break;
+        case 'nordpass':
+          result = NordPassParser().parse(content);
+          break;
+        case 'roboform':
+          result = RoboFormParser().parse(content);
+          break;
+        case 'protonpass':
+          result = ProtonPassParser().parse(content);
+          break;
+        case 'keepass_kdbx':
+          final bytes = base64Decode(content);
+          final pw = _keepassPasswordController.text;
+          final keyFileContent = _keepassKeyFileController.text.trim();
+          Uint8List? keyFileBytes;
+          if (keyFileContent.isNotEmpty) {
+            try {
+              keyFileBytes = base64Decode(keyFileContent);
+            } catch (_) {
+              keyFileBytes = Uint8List.fromList(utf8.encode(keyFileContent));
+            }
+          }
+          result = await KeePassKdbxParser().parse(
+            bytes: bytes,
+            password: pw,
+            keyFileBytes: keyFileBytes,
+          );
           break;
         case 'generic_csv':
           result = GenericCsvParser(columnMapping: {
@@ -273,6 +339,15 @@ class _ImportScreenState extends State<ImportScreen> {
       ('bitwarden', 'Bitwarden', 'JSON export from Bitwarden', Icons.shield_outlined, Colors.blueAccent),
       ('1password', '1Password', 'export.data from .1pux archive', Icons.security_outlined, Colors.deepOrangeAccent),
       ('lastpass', 'LastPass', 'CSV export from LastPass', Icons.lock_outline, Colors.redAccent),
+      ('chrome_csv', 'Chrome Preset', 'CSV export from Google Chrome', Icons.chrome_reader_mode, Colors.yellowAccent),
+      ('firefox_csv', 'Firefox Preset', 'CSV export from Mozilla Firefox', Icons.web, Colors.orangeAccent),
+      ('safari_csv', 'Safari Preset', 'CSV export from Apple Safari', Icons.compass_calibration, Colors.lightBlueAccent),
+      ('dashlane', 'Dashlane', 'CSV export from Dashlane', Icons.credit_card_outlined, Colors.purpleAccent),
+      ('keeper', 'Keeper', 'CSV export from Keeper', Icons.folder_shared_outlined, Colors.greenAccent),
+      ('nordpass', 'NordPass', 'CSV export from NordPass', Icons.vpn_lock_outlined, Colors.indigoAccent),
+      ('roboform', 'RoboForm', 'CSV export from RoboForm', Icons.lock_clock, Colors.cyanAccent),
+      ('protonpass', 'Proton Pass', 'JSON export from Proton Pass', Icons.email_outlined, Colors.pinkAccent),
+      ('keepass_kdbx', 'KeePass (.kdbx)', 'Encrypted KeePass database file', Icons.key_outlined, Colors.green),
       ('generic_csv', 'Generic CSV', 'Any CSV with custom column mapping', Icons.table_chart_outlined, Colors.tealAccent),
     ];
 
@@ -371,17 +446,47 @@ class _ImportScreenState extends State<ImportScreen> {
           _colMapRow('Notes column', _notesColCtrl),
         ],
 
+        // KeePass decryption credentials UI
+        if (_selectedFormat == 'keepass_kdbx') ...[
+          const SizedBox(height: 20),
+          const Text(
+            'KEEPASS DECRYPTION CREDENTIALS',
+            style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _keepassPasswordController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              hintText: 'KeePass Database Password',
+              labelText: 'Master Password',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _keepassKeyFileController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Paste Key File content (Base64 or Plain Text XML, optional)',
+              labelText: 'Key File Content',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
+
         const SizedBox(height: 20),
-        const Text(
-          'FILE CONTENT',
-          style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+        Text(
+          _selectedFormat == 'keepass_kdbx' ? 'KDBX FILE CONTENT (BASE64)' : 'FILE CONTENT',
+          style: const TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: _fileContentController,
           maxLines: 12,
-          decoration: const InputDecoration(
-            hintText: 'Paste the export file content here...',
+          decoration: InputDecoration(
+            hintText: _selectedFormat == 'keepass_kdbx'
+                ? 'Paste the Base64-encoded KDBX file content here...'
+                : 'Paste the export file content here...',
             alignLabelWithHint: true,
           ),
         ),
@@ -575,6 +680,15 @@ class _ImportScreenState extends State<ImportScreen> {
       case 'bitwarden': return 'Bitwarden Import';
       case '1password': return '1Password Import';
       case 'lastpass': return 'LastPass Import';
+      case 'chrome_csv': return 'Chrome CSV Import';
+      case 'firefox_csv': return 'Firefox CSV Import';
+      case 'safari_csv': return 'Safari CSV Import';
+      case 'dashlane': return 'Dashlane CSV Import';
+      case 'keeper': return 'Keeper CSV Import';
+      case 'nordpass': return 'NordPass CSV Import';
+      case 'roboform': return 'RoboForm CSV Import';
+      case 'protonpass': return 'Proton Pass JSON Import';
+      case 'keepass_kdbx': return 'KeePass (.kdbx) Import';
       case 'generic_csv': return 'Generic CSV Import';
       default: return 'Import';
     }
