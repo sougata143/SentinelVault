@@ -497,4 +497,203 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
       })
       .expect(423);
   });
+
+  describe('Primary Passkey Authentication Tests', () => {
+    it('register passkey -> primary login options -> verify login successfully', async () => {
+      const saltBytes = crypto.randomBytes(16);
+      const regParams = await computeClientRegister(username, password, saltBytes);
+
+      // 1. Register User (OPAQUE)
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          username,
+          salt: regParams.saltHex,
+          verifier: regParams.verifierHex,
+        })
+        .expect(HttpStatus.CREATED);
+
+      // 2. Generate passkey registration options
+      const regOptRes = await request(app.getHttpServer())
+        .post('/auth/passkey/register/options')
+        .send({ username })
+        .expect(HttpStatus.OK);
+
+      expect(regOptRes.body.challenge).toBe('mock-reg-challenge');
+
+      // 3. Verify passkey registration
+      await request(app.getHttpServer())
+        .post('/auth/passkey/register/verify')
+        .send({
+          username,
+          response: {
+            id: 'mock-cred-id',
+            rawId: 'mock-cred-id',
+            type: 'public-key',
+            response: {},
+          },
+        })
+        .expect(HttpStatus.OK);
+
+      // 4. Generate passkey login options (username-based)
+      const loginOptRes = await request(app.getHttpServer())
+        .post('/auth/passkey/login/options')
+        .send({ username })
+        .expect(HttpStatus.OK);
+
+      expect(loginOptRes.body.challenge).toBe('mock-auth-challenge');
+      expect(loginOptRes.body.allowCredentials[0].id).toBe('mock-cred-id');
+
+      // 5. Verify passkey login
+      const verifyRes = await request(app.getHttpServer())
+        .post('/auth/passkey/login/verify')
+        .send({
+          challenge: 'mock-auth-challenge',
+          response: {
+            id: 'mock-cred-id',
+            rawId: 'mock-cred-id',
+            type: 'public-key',
+            response: {},
+          },
+        })
+        .expect(HttpStatus.OK);
+
+      expect(verifyRes.body.token).toBeDefined();
+    });
+
+    it('rejects primary passkey login when assertion is invalid/tampered', async () => {
+      const saltBytes = crypto.randomBytes(16);
+      const regParams = await computeClientRegister(username, password, saltBytes);
+
+      // 1. Register User (OPAQUE)
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          username,
+          salt: regParams.saltHex,
+          verifier: regParams.verifierHex,
+        })
+        .expect(HttpStatus.CREATED);
+
+      // 2. Register Passkey
+      await request(app.getHttpServer())
+        .post('/auth/passkey/register/options')
+        .send({ username })
+        .expect(HttpStatus.OK);
+
+      await request(app.getHttpServer())
+        .post('/auth/passkey/register/verify')
+        .send({
+          username,
+          response: {
+            id: 'mock-cred-id',
+            rawId: 'mock-cred-id',
+            type: 'public-key',
+            response: {},
+          },
+        })
+        .expect(HttpStatus.OK);
+
+      // 3. Generate passkey login options
+      await request(app.getHttpServer())
+        .post('/auth/passkey/login/options')
+        .send({ username })
+        .expect(HttpStatus.OK);
+
+      // 4. Mock verifyAuthenticationResponse to fail/reject
+      const simpleWebAuthn = require('@simplewebauthn/server');
+      const originalVerify = simpleWebAuthn.verifyAuthenticationResponse;
+      simpleWebAuthn.verifyAuthenticationResponse = jest.fn().mockResolvedValue({
+        verified: false,
+      });
+
+      try {
+        // 5. Verify passkey login -> Expect UNAUTHORIZED
+        await request(app.getHttpServer())
+          .post('/auth/passkey/login/verify')
+          .send({
+            challenge: 'mock-auth-challenge',
+            response: {
+              id: 'mock-cred-id',
+              rawId: 'mock-cred-id',
+              type: 'public-key',
+              response: {},
+            },
+          })
+          .expect(HttpStatus.UNAUTHORIZED);
+      } finally {
+        // Restore original mock
+        simpleWebAuthn.verifyAuthenticationResponse = originalVerify;
+      }
+    });
+
+    it('usernameless passkey login options and verification works', async () => {
+      const saltBytes = crypto.randomBytes(16);
+      const regParams = await computeClientRegister(username, password, saltBytes);
+
+      // 1. Register User (OPAQUE)
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          username,
+          salt: regParams.saltHex,
+          verifier: regParams.verifierHex,
+        })
+        .expect(HttpStatus.CREATED);
+
+      // 2. Register Passkey
+      await request(app.getHttpServer())
+        .post('/auth/passkey/register/options')
+        .send({ username })
+        .expect(HttpStatus.OK);
+
+      await request(app.getHttpServer())
+        .post('/auth/passkey/register/verify')
+        .send({
+          username,
+          response: {
+            id: 'mock-cred-id',
+            rawId: 'mock-cred-id',
+            type: 'public-key',
+            response: {},
+          },
+        })
+        .expect(HttpStatus.OK);
+
+      // 3. Generate login options WITHOUT username (usernameless)
+      const simpleWebAuthn = require('@simplewebauthn/server');
+      const originalAuthOptions = simpleWebAuthn.generateAuthenticationOptions;
+      simpleWebAuthn.generateAuthenticationOptions = jest.fn().mockResolvedValue({
+        challenge: 'mock-auth-challenge',
+        allowCredentials: undefined,
+      });
+
+      try {
+        const optionsRes = await request(app.getHttpServer())
+          .post('/auth/passkey/login/options')
+          .send({})
+          .expect(HttpStatus.OK);
+
+        expect(optionsRes.body.allowCredentials).toBeUndefined();
+      } finally {
+        simpleWebAuthn.generateAuthenticationOptions = originalAuthOptions;
+      }
+
+      // 4. Verify login with credential id lookup
+      const verifyRes = await request(app.getHttpServer())
+        .post('/auth/passkey/login/verify')
+        .send({
+          challenge: 'mock-auth-challenge',
+          response: {
+            id: 'mock-cred-id',
+            rawId: 'mock-cred-id',
+            type: 'public-key',
+            response: {},
+          },
+        })
+        .expect(HttpStatus.OK);
+
+      expect(verifyRes.body.token).toBeDefined();
+    });
+  });
 });

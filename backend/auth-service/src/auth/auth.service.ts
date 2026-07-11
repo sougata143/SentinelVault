@@ -35,6 +35,8 @@ export class AuthService {
   private readonly mfaSessions: Map<string, MfaSession> = new Map();
   // Temporary storage for WebAuthn challenges, keyed by username
   private readonly webauthnChallenges: Map<string, { challenge: string; createdAt: number }> = new Map();
+  // Temporary storage for primary passkey challenges, keyed by challenge string
+  private readonly passkeyChallenges: Map<string, { username?: string; createdAt: number }> = new Map();
   // Server secret for generating deterministic dummy parameters for invalid users
   private readonly serverSecret: Buffer;
 
@@ -415,6 +417,101 @@ export class AuthService {
     return { token };
   }
 
+  // ── Primary Passkey Endpoints ──────────────────────────────────────────
+
+  public async generatePasskeyRegisterOptions(username: string): Promise<any> {
+    return await this.generateWebAuthnRegisterOptions(username);
+  }
+
+  public async verifyPasskeyRegister(username: string, response: any): Promise<{ success: boolean }> {
+    return await this.verifyWebAuthnRegister(username, response);
+  }
+
+  public async generatePasskeyLoginOptions(username?: string): Promise<any> {
+    let allowCredentials = undefined;
+
+    if (username) {
+      const user = await this.userRepository.findByUsername(username);
+      if (!user || !user.webauthnCredentials || user.webauthnCredentials.length === 0) {
+        throw new HttpException('Passkey login not set up for this user', HttpStatus.BAD_REQUEST);
+      }
+      allowCredentials = user.webauthnCredentials.map((cred) => ({
+        id: cred.credentialID,
+        type: 'public-key' as const,
+        transports: cred.transports as any,
+      }));
+    }
+
+    const options = await generateAuthenticationOptions({
+      rpID: this.rpID,
+      allowCredentials,
+      userVerification: 'preferred',
+    });
+
+    this.passkeyChallenges.set(options.challenge, {
+      username: username ? username.toLowerCase() : undefined,
+      createdAt: Date.now(),
+    });
+
+    // Clean up old challenges
+    this.pruneOldChallenges();
+
+    return options;
+  }
+
+  public async verifyPasskeyLogin(challenge: string, response: any): Promise<{ token: string }> {
+    if (!challenge) {
+      throw new HttpException('Missing challenge parameter', HttpStatus.BAD_REQUEST);
+    }
+    const challengeRecord = this.passkeyChallenges.get(challenge);
+    if (!challengeRecord || challengeRecord.createdAt < Date.now() - 5 * 60 * 1000) {
+      throw new HttpException('Invalid or expired login challenge', HttpStatus.BAD_REQUEST);
+    }
+    this.passkeyChallenges.delete(challenge);
+
+    let user: UserRecord | null = null;
+    if (challengeRecord.username) {
+      user = await this.userRepository.findByUsername(challengeRecord.username);
+    } else {
+      user = await this.userRepository.findByCredentialId(response.id);
+    }
+
+    if (!user || !user.webauthnCredentials) {
+      throw new HttpException('User or passkey credential not found', HttpStatus.UNAUTHORIZED);
+    }
+
+    const cred = user.webauthnCredentials.find((c) => c.credentialID === response.id);
+    if (!cred) {
+      throw new HttpException('Credential not recognized for this user', HttpStatus.UNAUTHORIZED);
+    }
+
+    const opts: VerifyAuthenticationResponseOpts = {
+      response,
+      expectedChallenge: challenge,
+      expectedOrigin: this.origin,
+      expectedRPID: this.rpID,
+      credential: {
+        id: cred.credentialID,
+        publicKey: Buffer.from(cred.publicKey, 'base64url'),
+        counter: cred.counter,
+        transports: cred.transports as any,
+      },
+    };
+
+    const verification = await verifyAuthenticationResponse(opts);
+
+    if (!verification.verified || !verification.authenticationInfo) {
+      throw new HttpException('WebAuthn login verification failed', HttpStatus.UNAUTHORIZED);
+    }
+
+    // Update credential counter
+    cred.counter = verification.authenticationInfo.newCounter;
+    await this.userRepository.save(user);
+
+    const token = crypto.randomBytes(32).toString('hex');
+    return { token };
+  }
+
   /**
    * Deletes challenge sessions older than 5 minutes.
    */
@@ -428,6 +525,11 @@ export class AuthService {
     for (const [token, session] of this.mfaSessions.entries()) {
       if (session.createdAt < fiveMinutesAgo) {
         this.mfaSessions.delete(token);
+      }
+    }
+    for (const [challenge, session] of this.passkeyChallenges.entries()) {
+      if (session.createdAt < fiveMinutesAgo) {
+        this.passkeyChallenges.delete(challenge);
       }
     }
   }

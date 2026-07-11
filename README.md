@@ -166,11 +166,12 @@ npm run test
 - **Emergency Kit Recovery Key**: Offline-first recovery system using Dual Key-Wrapping (Candidate 1). Generates a 32-character Base32 recovery key client-side, derives a KDF key via Argon2id, wraps the active Vault Key using AES-256-GCM, and persists it via sync API envelopes. Past recovery keys are invalidated on regeneration.
 - **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
 - **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
+- **FIDO2/WebAuthn Passkey Authentication (Feature A)**: Standard WebAuthn primary registration and login ceremonies. Supports both platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (e.g. YubiKeys via USB/NFC/BLE) alongside OPAQUE Account Password flow, including username-less/discoverable credentials.
 
 ---
 
 ## 🔮 Future Scope
 
-1. **FIDO2 / WebAuthn MFA**: Implement passkey and hardware key (e.g. YubiKey) authentication as primary login and unlock options.
+1. **Hardware Key Vault-Unlock (Feature B)**: Implement FIDO2 CTAP2 `hmac-secret` extension as an additional wrapping layer on the Vault Key for secure hardware-key local unlocks.
 2. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
 

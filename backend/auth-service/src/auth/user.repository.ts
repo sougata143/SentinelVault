@@ -42,6 +42,19 @@ export class UserRepository {
   }
 
   /**
+   * Finds a user record by a registered credential ID.
+   */
+  public async findByCredentialId(credentialId: string): Promise<UserRecord | null> {
+    for (const user of this.users.values()) {
+      const match = user.webauthnCredentials?.some((c) => c.credentialID === credentialId);
+      if (match) {
+        return { ...user };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Resets all user records (used for test cleanup).
    */
   public async clear(): Promise<void> {

@@ -88,4 +88,38 @@ export class AuthController {
   ): Promise<{ token: string }> {
     return await this.authService.verifyWebAuthnLogin(body.mfaToken, body.response);
   }
+
+  // ── Primary Passkey Endpoints ──────────────────────────────────────────
+
+  @Post('passkey/register/options')
+  @HttpCode(HttpStatus.OK)
+  public async generatePasskeyRegisterOptions(
+    @Body() body: { username: string },
+  ): Promise<any> {
+    return await this.authService.generatePasskeyRegisterOptions(body.username);
+  }
+
+  @Post('passkey/register/verify')
+  @HttpCode(HttpStatus.OK)
+  public async verifyPasskeyRegister(
+    @Body() body: { username: string; response: any },
+  ): Promise<{ success: boolean }> {
+    return await this.authService.verifyPasskeyRegister(body.username, body.response);
+  }
+
+  @Post('passkey/login/options')
+  @HttpCode(HttpStatus.OK)
+  public async generatePasskeyLoginOptions(
+    @Body() body: { username?: string },
+  ): Promise<any> {
+    return await this.authService.generatePasskeyLoginOptions(body.username);
+  }
+
+  @Post('passkey/login/verify')
+  @HttpCode(HttpStatus.OK)
+  public async verifyPasskeyLogin(
+    @Body() body: { challenge: string; response: any },
+  ): Promise<{ token: string }> {
+    return await this.authService.verifyPasskeyLogin(body.challenge, body.response);
+  }
 }
