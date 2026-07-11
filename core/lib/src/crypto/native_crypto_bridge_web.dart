@@ -7,25 +7,25 @@ import 'native_crypto_bridge.dart';
 // --- JS Bindings ---
 
 @JS()
-external JSUint8Array wasm_derive_master_key(JSUint8Array password, JSUint8Array salt);
+external JSUint8Array wasmDeriveMasterKey(JSUint8Array password, JSUint8Array salt);
 
 @JS()
-external JSUint8Array wasm_encrypt_aes_gcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array plaintext);
+external JSUint8Array wasmEncryptAesGcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array plaintext);
 
 @JS()
-external JSUint8Array wasm_decrypt_aes_gcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array ciphertext);
+external JSUint8Array wasmDecryptAesGcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array ciphertext);
 
 @JS()
-external JSUint8Array wasm_srp_calculate_x(JSString username, JSUint8Array masterKey, JSUint8Array salt);
+external JSUint8Array wasmSrpCalculateX(JSString username, JSUint8Array masterKey, JSUint8Array salt);
 
 @JS()
-external JSUint8Array wasm_srp_calculate_verifier(JSString username, JSUint8Array masterKey, JSUint8Array salt);
+external JSUint8Array wasmSrpCalculateVerifier(JSString username, JSUint8Array masterKey, JSUint8Array salt);
 
 @JS()
-external JSUint8Array wasm_srp_generate_client_ephemeral(JSUint8Array aBytes);
+external JSUint8Array wasmSrpGenerateClientEphemeral(JSUint8Array aBytes);
 
 @JS()
-external JSUint8Array wasm_srp_calculate_client_session(
+external JSUint8Array wasmSrpCalculateClientSession(
   JSString username,
   JSUint8Array salt,
   JSUint8Array aBytes,
@@ -35,10 +35,10 @@ external JSUint8Array wasm_srp_calculate_client_session(
 );
 
 @JS()
-external JSUint8Array wasm_shamir_split(JSUint8Array secret, JSNumber m, JSNumber n);
+external JSUint8Array wasmShamirSplit(JSUint8Array secret, JSNumber m, JSNumber n);
 
 @JS()
-external JSUint8Array wasm_shamir_combine(JSUint8Array flatShares);
+external JSUint8Array wasmShamirCombine(JSUint8Array flatShares);
 
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   NativeCryptoBridgeImpl();
@@ -58,7 +58,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> salt,
   }) async {
     try {
-      final res = wasm_derive_master_key(_toJSArray(password), _toJSArray(salt));
+      final res = wasmDeriveMasterKey(_toJSArray(password), _toJSArray(salt));
       return _toDartList(res);
     } catch (e) {
       throw Exception('Wasm master key derivation failed: $e');
@@ -72,7 +72,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> nonce,
   }) async {
     try {
-      final res = wasm_encrypt_aes_gcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(plaintext));
+      final res = wasmEncryptAesGcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(plaintext));
       return _toDartList(res);
     } catch (e) {
       throw Exception('Wasm AES encrypt failed: $e');
@@ -86,7 +86,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> nonce,
   }) async {
     try {
-      final res = wasm_decrypt_aes_gcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(ciphertextAndMac));
+      final res = wasmDecryptAesGcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(ciphertextAndMac));
       return _toDartList(res);
     } catch (e) {
       throw SecretBoxAuthenticationError();
@@ -100,7 +100,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> salt,
   }) async {
     try {
-      final res = wasm_srp_calculate_x(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
+      final res = wasmSrpCalculateX(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
       return _toDartList(res);
     } catch (e) {
       throw Exception('Wasm SRP calculate_x failed: $e');
@@ -114,7 +114,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> salt,
   }) async {
     try {
-      final res = wasm_srp_calculate_verifier(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
+      final res = wasmSrpCalculateVerifier(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
       return _toDartList(res);
     } catch (e) {
       throw Exception('Wasm SRP calculate_verifier failed: $e');
@@ -126,7 +126,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> secureRandomBytes,
   }) {
     try {
-      final res = wasm_srp_generate_client_ephemeral(_toJSArray(secureRandomBytes));
+      final res = wasmSrpGenerateClientEphemeral(_toJSArray(secureRandomBytes));
       final dartBytes = _toDartList(res);
       final secret = Uint8List.sublistView(dartBytes, 0, 256);
       final publicVal = Uint8List.sublistView(dartBytes, 256, 512);
@@ -146,7 +146,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> masterKey,
   }) async {
     try {
-      final res = wasm_srp_calculate_client_session(
+      final res = wasmSrpCalculateClientSession(
         username.toJS,
         _toJSArray(salt),
         _toJSArray(a),
@@ -171,7 +171,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required int n,
   }) {
     try {
-      final res = wasm_shamir_split(_toJSArray(secret), m.toJS, n.toJS);
+      final res = wasmShamirSplit(_toJSArray(secret), m.toJS, n.toJS);
       final flatBytes = _toDartList(res);
       final shares = <Uint8List>[];
       var cursor = 0;
@@ -213,7 +213,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
         flatBuf.setRange(cursor, cursor + len, s);
         cursor += len;
       }
-      final res = wasm_shamir_combine(_toJSArray(flatBuf));
+      final res = wasmShamirCombine(_toJSArray(flatBuf));
       return _toDartList(res);
     } catch (e) {
       throw ArgumentError('Wasm shamirCombine failed: $e — shares may be invalid or insufficient');

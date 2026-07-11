@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
-import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError;
 
 import 'native_crypto_bridge.dart';
 

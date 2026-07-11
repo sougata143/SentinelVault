@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'crypto.dart';
 
 /// Manages wrapping and unwrapping the Vault Key using a hardware-token derived secret

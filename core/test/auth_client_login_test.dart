@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:cryptography/cryptography.dart';
 import 'package:core/core.dart';
 import 'package:core/src/crypto/srp.dart';
 

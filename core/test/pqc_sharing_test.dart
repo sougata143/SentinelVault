@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:core/src/crypto/native_crypto_bridge_selector.dart';
@@ -105,7 +104,7 @@ void main() {
         ed25519SigB64: invite['ed25519Signature'] as String,
         mldsaSigB64: invite['mldsaSignature'] as String,
         senderEd25519Pub: alice.ed25519Pub,
-        senderMlkemVk: alice.mldsaVk,
+        senderMldsaVk: alice.mldsaVk,
       );
 
       expect(verified, isFalse);
