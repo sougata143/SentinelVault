@@ -32,6 +32,7 @@ export 'src/auth/vault_lock_manager.dart';
 export 'src/auth/biometric_auth_service.dart';
 export 'src/platform/secure_storage.dart';
 export 'src/sync/http_sync_api_client.dart';
+export 'src/crypto/hardware_key_unlock.dart';
 
 
 

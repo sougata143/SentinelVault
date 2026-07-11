@@ -167,11 +167,11 @@ npm run test
 - **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
 - **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
 - **FIDO2/WebAuthn Passkey Authentication (Feature A)**: Standard WebAuthn primary registration and login ceremonies. Supports both platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (e.g. YubiKeys via USB/NFC/BLE) alongside OPAQUE Account Password flow, including username-less/discoverable credentials.
+- **Hardware Key Vault-Unlock (Feature B)**: Secure local vault-unlock option using the FIDO2 CTAP2 `hmac-secret` extension to wrap an additional copy of the Vault Key. Operates as an opt-in additional envelope, ensuring Master Password fallback if the key is lost or removed.
 
 ---
 
 ## 🔮 Future Scope
 
-1. **Hardware Key Vault-Unlock (Feature B)**: Implement FIDO2 CTAP2 `hmac-secret` extension as an additional wrapping layer on the Vault Key for secure hardware-key local unlocks.
-2. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
+1. **Browser Extensions**: Export core dart libraries to Javascript/Wasm to share the same cryptographic engine in Chrome, Firefox, and Safari extensions.
 
