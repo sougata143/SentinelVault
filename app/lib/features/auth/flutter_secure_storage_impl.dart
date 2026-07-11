@@ -99,4 +99,24 @@ class FlutterPlatformSecureStorage implements SecureStorage {
       // ignore
     }
   }
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    await _secureStorage.write(
+      key: key,
+      value: value,
+      iOptions: const IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+      aOptions: const AndroidOptions(encryptedSharedPreferences: false),
+    );
+  }
+
+  @override
+  Future<String?> readString(String key) async {
+    return await _secureStorage.read(key: key);
+  }
+
+  @override
+  Future<void> deleteString(String key) async {
+    await _secureStorage.delete(key: key);
+  }
 }

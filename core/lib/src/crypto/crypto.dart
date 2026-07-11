@@ -8,29 +8,19 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
+import 'native_crypto_bridge.dart';
+import 'native_crypto_bridge_selector.dart';
 
 /// Cryptographic services for SentinelVault key management and encryption.
 class VaultCrypto {
-  /// The Argon2id instance used for key derivation.
-  final Argon2id _argon2id;
-  /// The AES-GCM instance used for symmetric encryption.
-  final AesGcm _aesGcm;
+  /// The platform-specific native/wasm cryptographic bridge.
+  final NativeCryptoBridge _bridge;
   /// The secure random number generator.
   final Random _secureRandom;
 
   /// Creates a new instance of [VaultCrypto] with standard security parameters.
-  /// 
-  /// Memory constraint: 64 MB (65,536 KB)
-  /// Time constraint: 3 iterations
-  /// Parallelism constraint: 4 threads
   VaultCrypto()
-      : _argon2id = Argon2id(
-          memory: 64 * 1024,
-          iterations: 3,
-          parallelism: 4,
-          hashLength: 32,
-        ),
-        _aesGcm = AesGcm.with256bits(),
+      : _bridge = NativeCryptoBridgeImpl(),
         _secureRandom = Random.secure();
 
   /// Generates a list of cryptographically secure random bytes of [length].
@@ -65,14 +55,12 @@ class VaultCrypto {
 
     final passwordBytes = utf8.encode(masterPassword);
     try {
-      final derivedKey = await _argon2id.deriveKey(
-        secretKey: SecretKey(passwordBytes),
-        nonce: salt,
+      return await _bridge.deriveMasterKey(
+        password: passwordBytes,
+        salt: salt,
       );
-      return await derivedKey.extractBytes();
     } finally {
       // Clear sensitive password bytes from memory immediately after derivation
-      // Note: Dart strings are immutable, but we clear the encoded byte array
       _zeroOut(passwordBytes);
     }
   }
@@ -94,18 +82,11 @@ class VaultCrypto {
       throw ArgumentError('Nonce must be exactly 12 bytes (96-bit)');
     }
 
-    final secretKey = SecretKey(key);
-    final secretBox = await _aesGcm.encrypt(
-      plaintext,
-      secretKey: secretKey,
+    return await _bridge.encryptAesGcm(
+      plaintext: plaintext,
+      key: key,
       nonce: nonce,
     );
-
-    // Concatenate Ciphertext and MAC
-    final encryptedBlob = Uint8List(secretBox.cipherText.length + secretBox.mac.bytes.length);
-    encryptedBlob.setRange(0, secretBox.cipherText.length, secretBox.cipherText);
-    encryptedBlob.setRange(secretBox.cipherText.length, encryptedBlob.length, secretBox.mac.bytes);
-    return encryptedBlob;
   }
 
   /// Decrypts AES-256-GCM encrypted bytes.
@@ -129,19 +110,10 @@ class VaultCrypto {
       throw ArgumentError('Ciphertext is too short to contain a valid MAC');
     }
 
-    final ciphertext = ciphertextAndMac.sublist(0, ciphertextAndMac.length - macSize);
-    final macBytes = ciphertextAndMac.sublist(ciphertextAndMac.length - macSize);
-
-    final secretKey = SecretKey(key);
-    final secretBox = SecretBox(
-      ciphertext,
+    return await _bridge.decryptAesGcm(
+      ciphertextAndMac: ciphertextAndMac,
+      key: key,
       nonce: nonce,
-      mac: Mac(macBytes),
-    );
-
-    return await _aesGcm.decrypt(
-      secretBox,
-      secretKey: secretKey,
     );
   }
 

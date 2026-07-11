@@ -12,12 +12,15 @@ class VaultLockManager {
 
   VaultLockManager._internal();
 
+  bool _isDuressMode = false;
+
   String? get sessionToken => _sessionToken;
   List<int>? get masterKey => _masterKey;
   List<int>? get vaultKey => _vaultKey;
 
   bool get isLocked => _vaultKey == null;
   bool get isLoggedIn => _sessionToken != null;
+  bool get isDuressMode => _isDuressMode;
 
   /// Loads the persisted session token from secure storage.
   Future<void> loadSession() async {
@@ -29,9 +32,10 @@ class VaultLockManager {
     SecureStorage.instance.writeSessionToken(token);
   }
 
-  void unlock(List<int> masterKey, List<int> vaultKey) {
+  void unlock(List<int> masterKey, List<int> vaultKey, {bool isDuress = false}) {
     _masterKey = List<int>.from(masterKey);
     _vaultKey = List<int>.from(vaultKey);
+    _isDuressMode = isDuress;
   }
 
   void unlockWithRecoveryKey(List<int> vaultKey) {
@@ -54,6 +58,7 @@ class VaultLockManager {
       }
       _vaultKey = null;
     }
+    _isDuressMode = false;
   }
 
   /// Logs out the user.
@@ -63,6 +68,7 @@ class VaultLockManager {
     SecureStorage.instance.deleteSessionToken();
     isBiometricEnabled = false;
     _clearBiometricCache();
+    _isDuressMode = false;
     if (_masterKey != null) {
       for (var i = 0; i < _masterKey!.length; i++) {
         _masterKey![i] = 0;

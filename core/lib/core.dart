@@ -33,6 +33,9 @@ export 'src/auth/biometric_auth_service.dart';
 export 'src/platform/secure_storage.dart';
 export 'src/sync/http_sync_api_client.dart';
 export 'src/crypto/hardware_key_unlock.dart';
+export 'src/crypto/shamir_recovery.dart';
+export 'src/platform/duress_wipe_hook.dart';
+export 'src/vault/dual_vault_manager.dart';
 
 
 

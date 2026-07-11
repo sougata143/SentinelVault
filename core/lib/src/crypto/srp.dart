@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
+import 'native_crypto_bridge.dart';
+import 'native_crypto_bridge_selector.dart';
 
 /// Client-side Secure Remote Password (SRP-6a) authentication.
 ///
@@ -8,6 +10,8 @@ import 'package:cryptography/cryptography.dart';
 /// Security invariant: Neither the master password nor the derived Master Key
 /// is ever transmitted to the server in plaintext.
 class SrpClient {
+  static final NativeCryptoBridge _bridge = NativeCryptoBridgeImpl();
+
   /// The 2048-bit prime N from RFC 5054 (hexadecimal).
   static final BigInt N = BigInt.parse(
     'AC6BDB41324A9A9BF166DE5E1389582FAF72B6651987EE07FC332F683B94471B'
@@ -51,16 +55,12 @@ class SrpClient {
     List<int> masterKey,
     List<int> salt,
   ) async {
-    final masterKeyHex = masterKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    final identity = utf8.encode('$username:$masterKeyHex');
-    final innerHash = await sha256Hash(identity);
-
-    final outerInput = Uint8List(salt.length + innerHash.length);
-    outerInput.setRange(0, salt.length, salt);
-    outerInput.setRange(salt.length, outerInput.length, innerHash);
-
-    final outerHash = await sha256Hash(outerInput);
-    return bytesToBigInt(outerHash);
+    final xBytes = await _bridge.srpCalculateX(
+      username: username,
+      masterKey: masterKey,
+      salt: salt,
+    );
+    return bytesToBigInt(xBytes);
   }
 
   /// Computes the verifier v = g^x mod N.
@@ -71,17 +71,25 @@ class SrpClient {
     List<int> masterKey,
     List<int> salt,
   ) async {
-    final x = await calculateX(username, masterKey, salt);
-    return g.modPow(x, N);
+    final vBytes = await _bridge.srpCalculateVerifier(
+      username: username,
+      masterKey: masterKey,
+      salt: salt,
+    );
+    return bytesToBigInt(vBytes);
   }
 
   /// Generates client ephemeral secret [a] and public [A].
   ///
   /// Security invariant: Ephemeral secret [a] must be cryptographically secure and kept in memory.
   static SrpEphemeral generateClientEphemeral(List<int> secureRandomBytes) {
-    final a = bytesToBigInt(secureRandomBytes) % N;
-    final A = g.modPow(a, N);
-    return SrpEphemeral(secret: a, publicValue: A);
+    final results = _bridge.srpGenerateClientEphemeral(
+      secureRandomBytes: secureRandomBytes,
+    );
+    return SrpEphemeral(
+      secret: bytesToBigInt(results[0]),
+      publicValue: bytesToBigInt(results[1]),
+    );
   }
 
   /// Computes the client session key K and evidence M1.
@@ -95,71 +103,23 @@ class SrpClient {
     required BigInt B,
     required List<int> masterKey,
   }) async {
-    if (B % N == BigInt.zero) {
-      throw ArgumentError('Server ephemeral B cannot be 0 mod N');
-    }
+    final aBytes = bigIntToBytesPadded(a, 256);
+    final aPubBytes = bigIntToBytesPadded(A, 256);
+    final bPubBytes = bigIntToBytesPadded(B, 256);
 
-    final k = await getMultiplierK();
-    final x = await calculateX(username, masterKey, salt);
-
-    // u = H(A, B)
-    final aBytes = bigIntToBytesPadded(A, 256);
-    final bBytes = bigIntToBytesPadded(B, 256);
-    final uInput = Uint8List(aBytes.length + bBytes.length);
-    uInput.setRange(0, aBytes.length, aBytes);
-    uInput.setRange(aBytes.length, uInput.length, bBytes);
-    final uHash = await sha256Hash(uInput);
-    final u = bytesToBigInt(uHash);
-
-    if (u == BigInt.zero) {
-      throw ArgumentError('Scrambling parameter u cannot be 0');
-    }
-
-    // S = (B - k * g^x) ^ (a + u * x) mod N
-    final exp = a + u * x;
-    final base = (B - k * g.modPow(x, N)) % N;
-    final S = base.modPow(exp, N);
-
-    final sBytes = bigIntToBytesPadded(S, 256);
-    final sessionKey = await sha256Hash(sBytes);
-
-    // M1 = H(H(N) ^ H(g), H(username), salt, A, B, sessionKey)
-    final hn = await sha256Hash(bigIntToBytesPadded(N, 256));
-    final hg = await sha256Hash(bigIntToBytesPadded(g, 256));
-    final hXor = Uint8List(32);
-    for (var i = 0; i < 32; i++) {
-      hXor[i] = hn[i] ^ hg[i];
-    }
-
-    final hu = await sha256Hash(utf8.encode(username));
-
-    final m1Input = Uint8List(32 + 32 + salt.length + 256 + 256 + 32);
-    var offset = 0;
-    m1Input.setRange(offset, offset + 32, hXor);
-    offset += 32;
-    m1Input.setRange(offset, offset + 32, hu);
-    offset += 32;
-    m1Input.setRange(offset, offset + salt.length, salt);
-    offset += salt.length;
-    m1Input.setRange(offset, offset + 256, aBytes);
-    offset += 256;
-    m1Input.setRange(offset, offset + 256, bBytes);
-    offset += 256;
-    m1Input.setRange(offset, offset + 32, sessionKey);
-
-    final m1 = await sha256Hash(m1Input);
-
-    // Expected M2 = H(A, M1, sessionKey)
-    final m2Input = Uint8List(256 + 32 + 32);
-    m2Input.setRange(0, 256, aBytes);
-    m2Input.setRange(256, 256 + 32, m1);
-    m2Input.setRange(256 + 32, m2Input.length, sessionKey);
-    final m2 = await sha256Hash(m2Input);
+    final results = await _bridge.srpCalculateClientSession(
+      username: username,
+      salt: salt,
+      a: aBytes,
+      A: aPubBytes,
+      B: bPubBytes,
+      masterKey: masterKey,
+    );
 
     return SrpSession(
-      sessionKey: sessionKey,
-      clientEvidence: m1,
-      expectedServerEvidence: m2,
+      sessionKey: results[0],
+      clientEvidence: results[1],
+      expectedServerEvidence: results[2],
     );
   }
 

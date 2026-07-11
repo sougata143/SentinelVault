@@ -85,3 +85,46 @@ jobs:
       - name: Run Jest Tests
         run: npm run test
         working-directory: backend/${{ matrix.service }}
+
+  # ── RUST NATIVE CRYPTO CORE JOB ──────────────────────────────────────────
+  rust-build-and-test:
+    name: Rust Crypto Core - ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-ios
+            os: macos-latest
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+          - target: wasm32-unknown-unknown
+            os: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            native/crypto_core/target/
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('native/crypto_core/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+
+      - name: Run Crate Correctness Tests on Host
+        run: cargo test
+        working-directory: native/crypto_core
+
+      - name: Cross-compile Crate for Target
+        run: cargo build --release --target ${{ matrix.target }}
+        working-directory: native/crypto_core

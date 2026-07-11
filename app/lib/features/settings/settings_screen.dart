@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../theme/theme.dart';
+import '../auth/shamir_recovery_setup_screen.dart';
+import 'duress_setup_screen.dart';
 
 class AppSettings {
   static int clipboardTimeoutSeconds = 30;
@@ -453,6 +455,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         )
                       : Icon(_hasRecoveryKey ? Icons.sync : Icons.add, color: AppTheme.primaryColor),
                   onTap: _isCheckingRecovery ? null : _handleSetupRecoveryKey,
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                ListTile(
+                  key: const Key('settings-setup-shamir-recovery-tile'),
+                  leading: const Icon(Icons.people, color: AppTheme.primaryColor),
+                  title: const Text('Split Recovery Key (Shamir M-of-N)'),
+                  subtitle: Text(_isCheckingRecovery
+                      ? 'Checking recovery status...'
+                      : _hasRecoveryKey
+                          ? 'Shamir split recovery is configured. Click to configure again.'
+                          : 'Distribute your Recovery Key among trusted contacts (M-of-N).'),
+                  trailing: Icon(_hasRecoveryKey ? Icons.sync : Icons.add, color: AppTheme.primaryColor),
+                  onTap: _isCheckingRecovery ? null : () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ShamirRecoverySetupScreen(
+                          currentEmail: widget.currentEmail,
+                          syncBaseUrl: widget.syncBaseUrl,
+                          httpClient: widget.httpClient ?? http.Client(),
+                        ),
+                      ),
+                    );
+                    _checkRecoveryStatus();
+                  },
+                ),
+                const Divider(color: Colors.white12, height: 1),
+                ListTile(
+                  key: const Key('settings-duress-decoy-tile'),
+                  leading: const Icon(Icons.shield_outlined, color: Colors.deepOrangeAccent),
+                  title: const Text('Decoy Vault (Duress Mode)'),
+                  subtitle: const Text(
+                    'Set a separate unlock password that opens a harmless decoy vault '
+                    'under coercion, clearing your real vault\'s quick-unlock cache.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const DuressSetupScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

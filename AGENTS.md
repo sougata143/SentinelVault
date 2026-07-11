@@ -53,6 +53,29 @@ models.
     Key by default — it operates paired to the native/desktop app via
     native messaging (see `browser-extension-core` skill) unless a
     standalone mode is explicitly scoped and reviewed separately.
+12. Once the native FFI crypto core is introduced, sensitive cryptographic
+    operations (Argon2id, AES-GCM, SRP/OPAQUE math) must go through it —
+    never reintroduce a pure-Dart implementation of these for "just this
+    one case." See `native-ffi-crypto-core`.
+13. Any Shamir-split recovery share set must use an audited SSS library,
+    never hand-rolled polynomial interpolation. See
+    `shamir-recovery-sharing`.
+14. The Duress/Decoy vault must never claim stronger deniability
+    guarantees in its UI copy than it can actually provide, and a Duress
+    Password trigger must only invalidate Vault Alpha's quick-unlock
+    caches — never delete or otherwise touch Vault Alpha's actual
+    encrypted data. See `duress-decoy-vault`.
+15. Multi-user sharing (hybrid PQC) must never treat a public key fetched
+    from the server as verified identity without the fingerprint-
+    verification step from the approved design doc — see
+    `pqc-hybrid-sharing` before touching any sharing code.
+16. The native crypto core is one Rust crate conditionally compiled per
+    target (`#[cfg(unix)]` vs. `#[cfg(target_arch = "wasm32")]`), never two
+    separate implementations. Dart bindings differ by platform (`dart:ffi`
+    for native, `dart:js_interop` to a Wasm build for Web) but must sit
+    behind one shared Dart interface, selected via conditional export —
+    code above `core/crypto/` must never branch on platform itself. See
+    `docs/FFI_CROSS_PLATFORM_PLAN.md`.
 
 ## Coding standards
 - Dart: follow `effective_dart` lint rules; run `dart analyze` and

@@ -4,6 +4,7 @@ library core.sync;
 import 'dart:math';
 import '../models/models.dart';
 import '../database/vault_database.dart';
+import '../auth/vault_lock_manager.dart';
 
 /// Manage sync state, uploads, downloads, and conflict resolution.
 class SyncEngine {
@@ -76,8 +77,9 @@ class VaultSyncManager {
   /// 4. Finds all local items that have newer versions than remote and pushes them.
   /// 5. If push returns 409 conflicts, resolves them locally (LWW + version increment) and retries sync.
   Future<void> sync() async {
-    if (!isOnline) {
-      // Offline-first: CRUD works with no network, sync is skipped until online
+    if (!isOnline || VaultLockManager.instance.isDuressMode) {
+      // Offline-first: CRUD works with no network, sync is skipped until online.
+      // Duress mode: sync is bypassed to protect the real vault and hide the decoy state.
       return;
     }
 

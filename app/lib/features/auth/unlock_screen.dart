@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../theme/theme.dart';
 import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
+import 'shamir_recovery_reconstruct_screen.dart';
 
 class UnlockScreen extends StatefulWidget {
   final String email;
@@ -158,11 +159,68 @@ class _UnlockScreenState extends State<UnlockScreen> {
     });
 
     final password = _masterPasswordController.text;
-
     bool navigated = false;
+
     try {
       final crypto = VaultCrypto();
 
+      // ── Duress Password Check (before Alpha path) ────────────────────────
+      // Attempt to decrypt the locally-stored decoy vault key.
+      // On match: open Vault Beta, fire wipe hook, navigate — visually
+      // identical to a normal unlock.
+      final duressConfigured =
+          await SecureStorage.instance.readString(DualVaultManager.duressSaltKey);
+      if (duressConfigured != null) {
+        final duressWrappedHex =
+            await SecureStorage.instance.readString(DualVaultManager.duressWrappedKeyKey);
+        if (duressWrappedHex != null) {
+          try {
+            final duressSaltBytes = _hexToBytes(duressConfigured);
+            final duressWrappedBytes = _hexToBytes(duressWrappedHex);
+
+            final duressKdfKey = await crypto.deriveRecoveryKdfKey(
+              recoveryKey: password,
+              salt: duressSaltBytes,
+            );
+            final betaVaultKey = await crypto.unwrapVaultKey(
+              wrappedVaultKey: duressWrappedBytes,
+              masterKey: duressKdfKey,
+            );
+
+            // ── Duress Password matched ──────────────────────────────────
+            // 1. Fire native wipe hook — clears Alpha biometric quick-unlock.
+            await triggerDuressWipeHook();
+
+            // 2. Unlock Vault Beta (decoy) with isDuress flag.
+            VaultLockManager.instance.unlock(
+              duressKdfKey,
+              betaVaultKey,
+              isDuress: true,
+            );
+
+            // 3. Initialize decoy database.
+            final betaDb = SqliteVaultDatabase.inMemory();
+            betaDb.open(betaVaultKey);
+            await DualVaultManager.instance.prepopulateDecoyItems(betaDb, betaVaultKey);
+
+            // 4. Navigate — same transition as a normal unlock.
+            navigated = true;
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => AppShell(db: betaDb, vaultKey: betaVaultKey),
+                ),
+                (route) => false,
+              );
+            }
+            return;
+          } catch (_) {
+            // Duress decrypt failed — fall through to normal Master Password path.
+          }
+        }
+      }
+
+      // ── Normal Alpha unlock path ─────────────────────────────────────────
       // 1. Derive the Master Key locally
       final masterKey = await crypto.deriveMasterKey(
         masterPassword: password,
@@ -229,6 +287,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
   }
 
+
   Future<void> _handleBiometricUnlock() async {
     setState(() {
       _isLoading = true;
@@ -270,6 +329,18 @@ class _UnlockScreenState extends State<UnlockScreen> {
         });
       }
     }
+  }
+
+  void _navigateToReconstructScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ShamirRecoveryReconstructScreen(
+          email: widget.email,
+          syncBaseUrl: widget.syncBaseUrl,
+          httpClient: widget.httpClient ?? http.Client(),
+        ),
+      ),
+    );
   }
 
   Future<void> _showRecoveryDialog() async {
@@ -606,6 +677,15 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             onPressed: isButtonsDisabled ? null : _showRecoveryDialog,
                             child: const Text(
                               'Forgot Master Password? Use Recovery Key',
+                              style: TextStyle(color: AppTheme.primaryColor),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            key: const Key('reconstruct-from-shares-button'),
+                            onPressed: isButtonsDisabled ? null : _navigateToReconstructScreen,
+                            child: const Text(
+                              'Forgot Recovery Key? Reconstruct from Shares',
                               style: TextStyle(color: AppTheme.primaryColor),
                             ),
                           ),

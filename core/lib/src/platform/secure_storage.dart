@@ -33,6 +33,15 @@ abstract class SecureStorage {
 
   /// Resets the biometric configuration change detection status.
   Future<void> resetEnrollmentStatus();
+
+  /// Writes a generic string value.
+  Future<void> writeString(String key, String value);
+
+  /// Reads a generic string value, or null if not found.
+  Future<String?> readString(String key);
+
+  /// Deletes a generic string value.
+  Future<void> deleteString(String key);
 }
 
 /// Fallback in-memory implementation of [SecureStorage] used for tests.
@@ -96,5 +105,22 @@ class InMemorySecureStorage implements SecureStorage {
   /// Sets the mock enrollment change state for tests.
   void setMockEnrollmentChanged(bool changed) {
     _mockEnrollmentChanged = changed;
+  }
+
+  final Map<String, String> _mockStringStore = {};
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    _mockStringStore[key] = value;
+  }
+
+  @override
+  Future<String?> readString(String key) async {
+    return _mockStringStore[key];
+  }
+
+  @override
+  Future<void> deleteString(String key) async {
+    _mockStringStore.remove(key);
   }
 }
