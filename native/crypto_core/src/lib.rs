@@ -94,6 +94,11 @@ pub extern "C" fn encrypt_aes_gcm(
     }
 }
 
+// FFI Error Codes returned by native functions
+pub const FFI_ERR_NULL_POINTER: i32 = -1;
+pub const FFI_ERR_INVALID_LENGTH: i32 = -2;
+pub const FFI_ERR_CRYPTO_FAILURE: i32 = -3;
+
 // 3. AES-256-GCM Decrypt
 #[no_mangle]
 pub extern "C" fn decrypt_aes_gcm(
@@ -106,10 +111,10 @@ pub extern "C" fn decrypt_aes_gcm(
     output_ptr: *mut u8, // pre-allocated ciphertext_len - 16 bytes
 ) -> i32 {
     if key_ptr.is_null() || nonce_ptr.is_null() || ciphertext_ptr.is_null() || output_ptr.is_null() {
-        return -1;
+        return FFI_ERR_NULL_POINTER;
     }
     if key_len != 32 || nonce_len != 12 {
-        return -2;
+        return FFI_ERR_INVALID_LENGTH;
     }
     
     // Securely lock the symmetric key (small secret)
@@ -126,7 +131,7 @@ pub extern "C" fn decrypt_aes_gcm(
             }
             0
         }
-        Err(_) => -3,
+        Err(_) => FFI_ERR_CRYPTO_FAILURE,
     }
 }
 

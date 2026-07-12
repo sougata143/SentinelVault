@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError;
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
@@ -407,7 +408,16 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       );
 
       if (res != 0) {
-        throw Exception('Native AES decrypt failed: $res');
+        switch (res) {
+          case -1:
+            throw ArgumentError('Null pointer passed to native AES decrypt.');
+          case -2:
+            throw ArgumentError('Invalid key length (${key.length}) or nonce length (${nonce.length}) passed to native AES decrypt.');
+          case -3:
+            throw SecretBoxAuthenticationError();
+          default:
+            throw Exception('Native AES decrypt failed with unexpected error code: $res');
+        }
       }
 
       final outBytes = outputPtr.asTypedList(ciphertextAndMac.length - 16);
