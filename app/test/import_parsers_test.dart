@@ -541,9 +541,6 @@ void main() {
       );
 
       // 3. Verify items parsed correctly
-      if (result.errors.isNotEmpty) {
-        print('KeePass parse errors: ${result.errors.map((e) => "${e.sourceRef}: ${e.reason}").toList()}');
-      }
       expect(result.items.length, equals(1));
       expect(result.errors, isEmpty);
       final item = result.items[0];

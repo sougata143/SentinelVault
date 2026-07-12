@@ -108,7 +108,7 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
             backgroundColor: AppTheme.surfaceColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withOpacity(0.05)),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
             ),
             title: const Text(
               'Set Up Emergency Kit?',
@@ -169,7 +169,7 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
               color: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -209,9 +209,9 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withOpacity(0.1),
+                            color: AppTheme.errorColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             _errorMessage!,
@@ -315,7 +315,7 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
               backgroundColor: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               title: const Text(
                 'Your Recovery Key',
@@ -335,9 +335,9 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Text(
                         recoveryKey,
@@ -431,11 +431,13 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
                               recoveryWrappedKeyHex: recoveryWrappedKeyHex,
                             );
 
+                            if (dialogCtx.mounted) {
+                              Navigator.of(dialogCtx).pop();
+                            }
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Recovery Key successfully saved!')),
                               );
-                              Navigator.of(dialogCtx).pop();
                               _navigateToDashboard(db, vaultKey);
                             }
                           } catch (e) {
@@ -529,7 +531,7 @@ class PasswordStrengthMeter extends StatelessWidget {
         Row(
           children: List.generate(4, (index) {
             final isFilled = index < score;
-            final barColor = isFilled ? color : Colors.white.withOpacity(0.1);
+            final barColor = isFilled ? color : Colors.white.withValues(alpha: 0.1);
             return Expanded(
               child: Container(
                 height: 4,

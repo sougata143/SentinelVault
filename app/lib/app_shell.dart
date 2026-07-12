@@ -268,7 +268,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
+              color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(

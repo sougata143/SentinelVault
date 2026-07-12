@@ -23,7 +23,9 @@ class AppTheme {
         surface: surfaceColor,
         error: errorColor,
       ),
-      dialogBackgroundColor: surfaceColor,
+      dialogTheme: const DialogThemeData(
+        backgroundColor: surfaceColor,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: backgroundColor,
         elevation: 0,
@@ -58,7 +60,7 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

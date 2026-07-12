@@ -135,7 +135,6 @@ class ImportScreen extends StatefulWidget {
 class _ImportScreenState extends State<ImportScreen> {
   int _step = 0;
   String _selectedFormat = '';
-  String _fileContent = '';
   final _fileContentController = TextEditingController();
 
   // Generic CSV column mapping
@@ -176,7 +175,6 @@ class _ImportScreenState extends State<ImportScreen> {
       );
       return;
     }
-    _fileContent = content;
     ImportResult result;
     try {
       switch (_selectedFormat) {
@@ -283,7 +281,6 @@ class _ImportScreenState extends State<ImportScreen> {
     final toProcess = List<ParsedItem>.from(_parsedItems);
     // Clear the reference immediately — security invariant
     _parsedItems = [];
-    _fileContent = '';
 
     for (final item in toProcess) {
       try {
@@ -373,7 +370,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: f.$5.withOpacity(0.12),
+                    color: f.$5.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(f.$4, color: f.$5),
@@ -414,9 +411,9 @@ class _ImportScreenState extends State<ImportScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.warningColor.withOpacity(0.08),
+            color: AppTheme.warningColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
           ),
           child: const Row(
             children: [
@@ -639,7 +636,7 @@ class _ImportScreenState extends State<ImportScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.check_circle_outline, color: AppTheme.primaryColor, size: 56),

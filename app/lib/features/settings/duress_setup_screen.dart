@@ -297,7 +297,7 @@ class _DuressSetupScreenState extends State<DuressSetupScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.shade900.withOpacity(0.3),
+        color: Colors.green.shade900.withValues(alpha: 0.3),
         border: Border.all(color: Colors.green.shade700),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -320,7 +320,7 @@ class _DuressSetupScreenState extends State<DuressSetupScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.shade900.withOpacity(0.2),
+        color: Colors.amber.shade900.withValues(alpha: 0.2),
         border: Border.all(color: Colors.amber.shade700),
         borderRadius: BorderRadius.circular(12),
       ),

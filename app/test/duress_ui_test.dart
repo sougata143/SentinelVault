@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -7,17 +6,6 @@ import 'package:http/testing.dart';
 import 'package:core/core.dart';
 import 'package:app/features/auth/unlock_screen.dart';
 import 'package:app/features/settings/duress_setup_screen.dart';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-List<int> _hexToBytes(String hex) {
-  final result = <int>[];
-  for (var i = 0; i + 1 < hex.length; i += 2) {
-    result.add(int.parse(hex.substring(i, i + 2), radix: 16));
-  }
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Tests

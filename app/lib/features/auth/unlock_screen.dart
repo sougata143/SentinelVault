@@ -358,7 +358,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
               backgroundColor: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               title: const Text(
                 'Recovery Key Unlock',
@@ -445,8 +445,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             final db = SqliteVaultDatabase.inMemory();
                             db.open(vaultKey);
 
-                            if (mounted) {
+                            if (dialogCtx.mounted) {
                               Navigator.of(dialogCtx).pop(); // Close dialog
+                            }
+                            if (mounted) {
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
                                   builder: (_) => AppShell(db: db, vaultKey: vaultKey),
@@ -493,7 +495,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
               color: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -549,9 +551,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withOpacity(0.1),
+                            color: AppTheme.errorColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             _fetchErrorMessage!,
@@ -570,9 +572,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             key: const Key('biometric-invalidated-banner'),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               _biometricInvalidatedMessage!,
@@ -590,9 +592,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppTheme.errorColor.withOpacity(0.1),
+                              color: AppTheme.errorColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                              border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               _errorMessage!,
@@ -610,9 +612,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               'Too many failed attempts. Locked for $_lockoutSecondsRemaining seconds.',

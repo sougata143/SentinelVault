@@ -105,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               backgroundColor: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               title: Text(
                 _hasRecoveryKey ? 'Regenerate Emergency Kit' : 'Set up Emergency Kit',
@@ -125,9 +125,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Text(
                         recoveryKey,
@@ -225,11 +225,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               recoveryWrappedKeyHex: recoveryWrappedKeyHex,
                             );
 
+                            if (dialogCtx.mounted) {
+                              Navigator.of(dialogCtx).pop(); // Close dialog
+                            }
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Recovery Key successfully saved!')),
                               );
-                              Navigator.of(dialogCtx).pop(); // Close dialog
                             }
                             _checkRecoveryStatus();
                           } catch (e) {
@@ -330,7 +332,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Auto-Lock Vault'),
                     subtitle: const Text('Locks the vault automatically after inactivity'),
                     value: _autoLock,
-                    activeColor: AppTheme.primaryColor,
+                    activeThumbColor: AppTheme.primaryColor,
                     onChanged: (val) {
                       setState(() {
                         _autoLock = val;
@@ -372,12 +374,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: const Text('Biometric Quick-Unlock'),
                       subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
                       value: _biometricEnabled,
-                      activeColor: AppTheme.primaryColor,
+                      activeThumbColor: AppTheme.primaryColor,
                       onChanged: (val) async {
                         if (val) {
                           final supported = await BiometricAuthService.instance.isBiometricsSupported();
                           if (!supported) {
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Biometrics not supported on this device')),
                               );
@@ -399,7 +401,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               );
                             }
                           } else {
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Biometric authentication failed')),
                               );

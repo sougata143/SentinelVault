@@ -234,7 +234,7 @@ void main() {
       final rk1 = crypto.generateRecoveryKey();
       final salt1 = crypto.generateRandomBytes(16);
       final rkk1 = await crypto.deriveRecoveryKdfKey(recoveryKey: rk1, salt: salt1);
-      final wrappedVK1 = await crypto.wrapVaultKey(vaultKey: vaultKey, masterKey: rkk1);
+      await crypto.wrapVaultKey(vaultKey: vaultKey, masterKey: rkk1);
 
       // Regenerated Recovery Key
       final rk2 = crypto.generateRecoveryKey();

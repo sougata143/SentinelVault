@@ -224,7 +224,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: type,
+                    initialValue: type,
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: const [
                       DropdownMenuItem(value: 'text', child: Text('Plain Text')),
@@ -354,7 +354,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     // Encrypt under the vault key
     final encryptedItem = await item.encrypt(widget.vaultKey, _crypto);
     widget.onSave(encryptedItem);
-    Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -496,7 +498,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),
@@ -683,7 +685,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _ccBrand,
+            initialValue: _ccBrand,
             decoration: const InputDecoration(labelText: 'Brand'),
             items: const [
               DropdownMenuItem(value: 'visa', child: Text('Visa')),
@@ -731,7 +733,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           const SizedBox(height: 16),
           DropdownButtonFormField<String?>(
             key: const Key('cc-billing-address-dropdown'),
-            value: _ccBillingAddressRef,
+            initialValue: _ccBillingAddressRef,
             decoration: const InputDecoration(
               labelText: 'Link Billing Address (Identity)',
               prefixIcon: Icon(Icons.home_outlined),
@@ -858,7 +860,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _bankAccType,
+            initialValue: _bankAccType,
             decoration: const InputDecoration(labelText: 'Account Type'),
             items: const [
               DropdownMenuItem(value: 'checking', child: Text('Checking')),
@@ -1020,9 +1022,9 @@ class PasswordStrengthMeter extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.errorColor.withOpacity(0.05),
+              color: AppTheme.errorColor.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.errorColor.withOpacity(0.15)),
+              border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

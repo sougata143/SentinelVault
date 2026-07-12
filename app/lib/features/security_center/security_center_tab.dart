@@ -274,7 +274,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -313,7 +313,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
                                             child: CircularProgressIndicator(
                                               value: _healthScore / 100.0,
                                               strokeWidth: 10,
-                                              backgroundColor: Colors.white.withOpacity(0.05),
+                                              backgroundColor: Colors.white.withValues(alpha: 0.05),
                                               color: scoreColor,
                                             ),
                                           ),
@@ -382,7 +382,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: AppTheme.primaryColor.withOpacity(0.12),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
                     width: 1.5,
                   ),
                 ),
@@ -403,7 +403,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.primaryColor.withOpacity(0.1),
+                                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Icon(
@@ -588,7 +588,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.white.withOpacity(0.04)),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -632,7 +632,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
         decoration: BoxDecoration(
           color: AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.04)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         ),
         child: const Column(
           children: [
@@ -663,7 +663,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.white.withOpacity(0.04)),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -671,7 +671,7 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  backgroundColor: accentColor.withOpacity(0.1),
+                  backgroundColor: accentColor.withValues(alpha: 0.1),
                   child: Icon(
                     isCrit ? Icons.gpp_bad_outlined : Icons.warning_amber_rounded,
                     color: accentColor,
@@ -709,9 +709,9 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.03),
+                              color: Colors.white.withValues(alpha: 0.03),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.white.withOpacity(0.06)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                             ),
                             child: Text(
                               dc,
@@ -872,7 +872,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
                             children: _liveHeuristics.map((h) => Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppTheme.errorColor.withOpacity(0.15),
+                                color: AppTheme.errorColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -908,7 +908,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: _getVerdictColor(_scanResult!.reputationVerdict, _scanResult!.isMalicious).withOpacity(0.3),
+                    color: _getVerdictColor(_scanResult!.reputationVerdict, _scanResult!.isMalicious).withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -921,7 +921,7 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor: _getVerdictColor(_scanResult!.reputationVerdict, _scanResult!.isMalicious).withOpacity(0.15),
+                            backgroundColor: _getVerdictColor(_scanResult!.reputationVerdict, _scanResult!.isMalicious).withValues(alpha: 0.15),
                             child: Icon(
                               _scanResult!.isMalicious
                                   ? Icons.gpp_bad_outlined
@@ -959,9 +959,9 @@ class _UrlScannerScreenState extends State<UrlScannerScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.02),
+                          color: Colors.white.withValues(alpha: 0.02),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1104,7 +1104,7 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: (_scanResult!.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withOpacity(0.3),
+                    color: (_scanResult!.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -1117,7 +1117,7 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor: (_scanResult!.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withOpacity(0.15),
+                            backgroundColor: (_scanResult!.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withValues(alpha: 0.15),
                             child: Icon(
                               _scanResult!.isMalicious ? Icons.gpp_bad_outlined : Icons.verified_user_outlined,
                               color: _scanResult!.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor,
@@ -1185,10 +1185,10 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.02),
+                                color: Colors.white.withValues(alpha: 0.02),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: (urlResult.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withOpacity(0.15),
+                                  color: (urlResult.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withValues(alpha: 0.15),
                                 ),
                               ),
                               child: Row(
@@ -1219,7 +1219,7 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: (urlResult.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withOpacity(0.1),
+                                      color: (urlResult.isMalicious ? AppTheme.errorColor : AppTheme.primaryColor).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -1257,9 +1257,9 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
+            color: color.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Text(
             status.toUpperCase(),
@@ -1275,9 +1275,9 @@ class _EmailScannerScreenState extends State<EmailScannerScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

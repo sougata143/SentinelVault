@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:core/core.dart';
 import 'package:app/features/auth/master_password_setup_screen.dart';
 import 'package:app/features/settings/settings_screen.dart';
 import 'package:app/app_shell.dart';

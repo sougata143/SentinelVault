@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -88,7 +87,6 @@ class _ShamirRecoveryReconstructScreenState extends State<ShamirRecoveryReconstr
       }
 
       final serverSaltHex = keysMap['recoverySalt']!;
-      final serverWrappedKeyHex = keysMap['wrappedKey']!;
       final serverRecoveryWrappedKeyHex = keysMap['recoveryWrappedKey']!;
 
       // Convert server recovery salt hex back to uuid epoch format for checking

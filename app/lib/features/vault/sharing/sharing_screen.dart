@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
@@ -91,6 +90,7 @@ class _SharingScreenState extends State<SharingScreen> {
         ),
       );
 
+      if (!mounted) return;
       if (confirmed != true) {
         setState(() => _loading = false);
         return;
@@ -109,7 +109,7 @@ class _SharingScreenState extends State<SharingScreen> {
         mldsaSeed: Uint8List.fromList(List.generate(32, (i) => i + 2)),
       );
 
-      final invitePayload = await _sharingManager.createSignedInvitation(
+      await _sharingManager.createSignedInvitation(
         folderId: widget.folderId,
         recipientUserId: 'new-recipient-id',
         senderUserId: widget.senderUserId,
@@ -119,6 +119,8 @@ class _SharingScreenState extends State<SharingScreen> {
         recipientX25519Pub: recipientBundle.x25519Pub,
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
+
+      if (!mounted) return;
 
       // In production: POST /invites with invitePayload
       _emailController.clear();
@@ -140,11 +142,15 @@ class _SharingScreenState extends State<SharingScreen> {
         });
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sharing folder: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing folder: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -169,6 +175,7 @@ class _SharingScreenState extends State<SharingScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (confirm != true) return;
 
     setState(() => _loading = true);
@@ -180,7 +187,7 @@ class _SharingScreenState extends State<SharingScreen> {
       final remaining = _recipients.where((r) => r['userId'] != userId).toList();
 
       // 3. Re-wrap Folder Key for remaining recipients only
-      final wraps = await _sharingManager.rotateFolderKey(
+      await _sharingManager.rotateFolderKey(
         newFolderKey: newFolderKey,
         remainingRecipientsKeys: remaining.map((r) => {
           'userId': r['userId'] as String,
@@ -189,8 +196,12 @@ class _SharingScreenState extends State<SharingScreen> {
         }).toList(),
       );
 
+      if (!mounted) return;
+
       // In production: DELETE /key-directory/wrapped-keys/revoke with wraps
       await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
 
       setState(() {
         _recipients = remaining;
@@ -203,11 +214,15 @@ class _SharingScreenState extends State<SharingScreen> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Revocation failed: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Revocation failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:core/core.dart';
 
 /// Modal dialog requiring the user to explicitly confirm out-of-band key fingerprint verification.
 ///

@@ -43,6 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final token = await widget.authClient.login(email, password);
+      VaultLockManager.instance.setSession(token);
 
       if (mounted) {
         _passwordController.clear();
@@ -85,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
               color: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -129,9 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withOpacity(0.1),
+                            color: AppTheme.errorColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             _errorMessage!,

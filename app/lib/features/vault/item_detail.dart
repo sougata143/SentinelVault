@@ -141,9 +141,9 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.warningColor.withOpacity(0.1),
+                color: AppTheme.warningColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.warningColor.withOpacity(0.2)),
+                border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -221,9 +221,9 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
+                color: Colors.white.withValues(alpha: 0.02),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
               ),
               child: Text(
                 item.notes.plaintext!,
@@ -269,7 +269,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: color, size: 28),

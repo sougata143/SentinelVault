@@ -23,14 +23,12 @@ class VaultTab extends StatefulWidget {
 class _VaultTabState extends State<VaultTab> {
   // Navigation Sidebar filter state
   String _selectedCategory = 'all'; // all, login, credit_card, identity, secure_note, bank_account, password, favorites, trash
-  String? _selectedTag;
   
   // Search, filter, and sort state
   String _searchQuery = '';
   String _sortBy = 'title'; // title, updated
   bool _ascending = true;
 
-  List<EncryptedVaultItem> _dbItems = [];
   List<VaultItem> _decryptedItems = [];
   VaultItem? _selectedItem;
 
@@ -55,7 +53,6 @@ class _VaultTabState extends State<VaultTab> {
     }
 
     setState(() {
-      _dbItems = encItems;
       _decryptedItems = decrypted;
       
       // Select the first item by default on desktop if list is not empty
@@ -330,7 +327,7 @@ class _VaultTabState extends State<VaultTab> {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       selected: isSelected,
-      selectedTileColor: AppTheme.primaryColor.withOpacity(0.08),
+      selectedTileColor: AppTheme.primaryColor.withValues(alpha: 0.08),
       onTap: () {
         setState(() {
           _selectedCategory = cat;
@@ -399,12 +396,12 @@ class _VaultTabState extends State<VaultTab> {
                       final isSelected = _selectedItem?.id == item.id;
                       
                       return Card(
-                        color: isSelected ? AppTheme.primaryColor.withOpacity(0.12) : AppTheme.surfaceColor,
+                        color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.12) : AppTheme.surfaceColor,
                         margin: const EdgeInsets.only(bottom: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: isSelected ? AppTheme.primaryColor : Colors.white.withOpacity(0.05),
+                            color: isSelected ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.05),
                             width: isSelected ? 1.5 : 1.0,
                           ),
                         ),

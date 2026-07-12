@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -27,7 +25,6 @@ class _ShamirRecoverySetupScreenState extends State<ShamirRecoverySetupScreen> {
   int _n = 5;
   bool _isGenerating = false;
   List<RecoveryShare>? _generatedShares;
-  String? _epochId;
   String? _errorMessage;
   final List<bool> _confirmedShares = [];
   int _currentShareIndex = 0;
@@ -85,7 +82,6 @@ class _ShamirRecoverySetupScreenState extends State<ShamirRecoverySetupScreen> {
 
       setState(() {
         _generatedShares = result.shares;
-        _epochId = result.epochId;
         _confirmedShares.clear();
         _confirmedShares.addAll(List.generate(_n, (_) => false));
         _currentShareIndex = 0;
@@ -126,7 +122,6 @@ class _ShamirRecoverySetupScreenState extends State<ShamirRecoverySetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final allConfirmed = _confirmedShares.isNotEmpty && _confirmedShares.every((val) => val);
 
     return Scaffold(
@@ -269,9 +264,9 @@ class _ShamirRecoverySetupScreenState extends State<ShamirRecoverySetupScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: SelectableText(
             currentShare.encodedShare,

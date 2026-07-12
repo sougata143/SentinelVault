@@ -51,10 +51,8 @@ class _ExportScreenState extends State<ExportScreen> {
   static const _maxAuthAttempts = 5;
 
   // Export state
-  bool _exporting = false;
   int _exportedCount = 0;
   String? _exportFilename;
-  String? _exportContent; // text content for web download
 
   // Export service
   final _exportService = ExportService();
@@ -195,7 +193,6 @@ class _ExportScreenState extends State<ExportScreen> {
 
   Future<void> _runSvaultExport() async {
     setState(() {
-      _exporting = true;
       _step = 2;
     });
 
@@ -215,7 +212,6 @@ class _ExportScreenState extends State<ExportScreen> {
     );
 
     setState(() {
-      _exporting = false;
       _exportedCount = encryptedItems.length;
       _exportFilename = filename;
       _step = 3;
@@ -234,7 +230,6 @@ class _ExportScreenState extends State<ExportScreen> {
     }
 
     setState(() {
-      _exporting = true;
       _step = 2;
     });
 
@@ -279,7 +274,6 @@ class _ExportScreenState extends State<ExportScreen> {
 
     if (mounted) {
       setState(() {
-        _exporting = false;
         _exportedCount = encryptedItems.length;
         _exportFilename = filename;
         _step = 3;
@@ -295,10 +289,8 @@ class _ExportScreenState extends State<ExportScreen> {
     required List<int> bytes,
     required String mimeType,
   }) {
-    // The content is surfaced for the test harness and the "copy" fallback in the UI.
-    _exportContent = base64.encode(bytes);
     // In a real build: use universal_html (web) or path_provider (native) to
-    // save the file. This placeholder surfaces the data for test inspection.
+    // save the file. This placeholder is a no-op until platform download is wired up.
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -421,7 +413,7 @@ class _ExportScreenState extends State<ExportScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color),
@@ -438,7 +430,7 @@ class _ExportScreenState extends State<ExportScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: (badgeColor ?? AppTheme.primaryColor).withOpacity(0.15),
+                            color: (badgeColor ?? AppTheme.primaryColor).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -492,9 +484,9 @@ class _ExportScreenState extends State<ExportScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.errorColor.withOpacity(0.08),
+            color: AppTheme.errorColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
           ),
           child: const Row(
             children: [
@@ -568,7 +560,7 @@ class _ExportScreenState extends State<ExportScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_outline, color: AppTheme.primaryColor, size: 56),
@@ -594,9 +586,9 @@ class _ExportScreenState extends State<ExportScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withOpacity(0.08),
+                  color: AppTheme.errorColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
+                  border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
                 ),
                 child: const Text(
                   '⚠️ This file is UNENCRYPTED. Delete it immediately after you have finished using it.',
