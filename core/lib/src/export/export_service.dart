@@ -1,5 +1,4 @@
 import 'dart:convert';
-import '../models/vault_item.dart';
 import '../models/models.dart';
 
 /// Produces export payloads in two formats.
@@ -65,7 +64,7 @@ class ExportService {
 
       String row = '';
       switch (f.runtimeType) {
-        case LoginFields:
+        case const (LoginFields):
           final lf = f as LoginFields;
           row = [
             csv('login'),
@@ -81,7 +80,7 @@ class ExportService {
           ].join(',');
           break;
 
-        case CreditCardFields:
+        case const (CreditCardFields):
           final cf = f as CreditCardFields;
           row = [
             csv('credit_card'),
@@ -103,7 +102,7 @@ class ExportService {
           ].join(',');
           break;
 
-        case IdentityFields:
+        case const (IdentityFields):
           final id = f as IdentityFields;
           row = [
             csv('identity'),
@@ -124,7 +123,7 @@ class ExportService {
           ].join(',');
           break;
 
-        case SecureNoteFields:
+        case const (SecureNoteFields):
           final sn = f as SecureNoteFields;
           row = [
             csv('secure_note'),
@@ -137,7 +136,7 @@ class ExportService {
           ].join(',');
           break;
 
-        case BankAccountFields:
+        case const (BankAccountFields):
           final ba = f as BankAccountFields;
           row = [
             csv('bank_account'),
@@ -155,7 +154,7 @@ class ExportService {
           ].join(',');
           break;
 
-        case PasswordFields:
+        case const (PasswordFields):
           final pf = f as PasswordFields;
           row = [
             csv('password'),

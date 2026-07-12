@@ -2,6 +2,7 @@ import '../import_result.dart';
 
 /// Parses a NordPass CSV export into [ImportResult].
 class NordPassParser {
+  /// Parses NordPass CSV content [csvContent] into parsed items and errors.
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

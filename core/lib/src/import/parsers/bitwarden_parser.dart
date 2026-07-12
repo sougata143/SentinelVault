@@ -70,8 +70,6 @@ class BitwardenParser {
     final notes = raw['notes'] as String?;
     final fav = raw['favorite'] as bool? ?? false;
 
-    // Parse custom fields
-    final rawFields = raw['fields'] as List<dynamic>? ?? [];
     final tags = <String>[];
 
     // Bitwarden doesn't have native tags in the base export schema,

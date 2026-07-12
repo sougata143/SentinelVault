@@ -15,10 +15,15 @@ while any fewer yield zero information about it.
 - **Use an audited SSS library — never a hand-rolled polynomial
   interpolation implementation.** This is a well-known area for subtle
   bugs (weak/predictable randomness for polynomial coefficients, timing
-  side channels during reconstruction). Verify current audited options
-  (Rust crates are generally more mature here than Dart-native ones — this
-  is a good candidate to implement in the `native-ffi-crypto-core` module
-  if that phase is already in place) at implementation time.
+  side channels during reconstruction). Verify current audited options at
+  implementation time.
+- **This is pure platform-agnostic computation — implement it inside the
+  same `native/crypto_core/` Rust crate from Phase 35, not as a separate
+  module or in Dart.** Shamir's Secret Sharing has no OS-syscall
+  dependency, so it compiles identically for Android, iOS, and
+  `wasm32-unknown-unknown` with no `#[cfg]` gating needed beyond wrapping
+  intermediate secrets in the crate's existing `SecureBuffer` type. See
+  `docs/RUST_CROSS_PLATFORM_REEVALUATION.md`.
 - The thing being split is the **existing Recovery Key** from
   `emergency-kit-recovery` — do not invent a second, separate secret. This
   keeps the underlying Vault Key-wrapping construction unchanged; only the
@@ -40,13 +45,18 @@ while any fewer yield zero information about it.
   changing M/N) must invalidate the previous share set entirely.
 - Write tests for: correct reconstruction from exactly M valid shares,
   failed reconstruction from M-1 shares (should yield no partial
-  information, not a corrupted-but-plausible-looking key), and that
-  regenerating shares invalidates the old set.
+  information, not a corrupted-but-plausible-looking key), regenerating
+  shares invalidates the old set, and bit-identical results across the
+  Android/iOS/Wasm builds for the same fixed test vectors (same CI matrix
+  as Phase 35).
 
 ## Output location
-`core/crypto/shamir_recovery.dart` (or native module if built into
-`native-ffi-crypto-core`), building on the existing Recovery Key logic in
-`core/crypto/recovery_key.dart` from `emergency-kit-recovery` — extend it,
-don't fork a parallel recovery mechanism. UI: `app/lib/features/auth/
+`native/crypto_core/src/algorithms/shamir.rs`, exposed through the same
+Dart binding split (`native_crypto_core.dart` interface,
+`native_crypto_core_io.dart`/`native_crypto_core_web.dart`
+implementations) established in Phase 35 — do not create a separate
+Dart-only implementation or a second native module. Builds on the existing
+Recovery Key logic from `emergency-kit-recovery` — extend it, don't fork a
+parallel recovery mechanism. UI: `app/lib/features/auth/
 shamir_recovery_setup_screen.dart` and the corresponding reconstruction
 flow screen.

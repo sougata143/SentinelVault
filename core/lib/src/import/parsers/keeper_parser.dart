@@ -2,6 +2,7 @@ import '../import_result.dart';
 
 /// Parses a Keeper CSV export into [ImportResult].
 class KeeperParser {
+  /// Parses Keeper CSV content [csvContent] into parsed items and errors.
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

@@ -3,16 +3,30 @@ import '../crypto/crypto.dart';
 import 'models.dart';
 
 /// Enum representing the supported vault item types.
+/// Enum representing the supported categories of vault items.
 enum VaultItemType {
+  /// User credentials (username, password, URL, OTP).
   login,
+
+  /// Payment cards (cardholder, card number, CVV, expiry).
   creditCard,
+
+  /// Personal address and contact profile details.
   identity,
+
+  /// A text-only note containing sensitive information.
   secureNote,
+
+  /// Banking credentials (routing number, account number, IBAN).
   bankAccount,
+
+  /// A standalone plaintext password entry.
   password,
 }
 
+/// Extension on [VaultItemType] providing serialization helpers.
 extension VaultItemTypeExtension on VaultItemType {
+  /// Converts the vault item type to its string representation.
   String toValue() {
     switch (this) {
       case VaultItemType.login:
@@ -30,6 +44,7 @@ extension VaultItemTypeExtension on VaultItemType {
     }
   }
 
+  /// Parses a string representation back into a [VaultItemType].
   static VaultItemType fromValue(String value) {
     switch (value) {
       case 'login':
@@ -50,18 +65,26 @@ extension VaultItemTypeExtension on VaultItemType {
   }
 }
 
-/// Represents a value that can be concealed (encrypted individually).
+/// Represents a value that can be individually encrypted or decrypted in a vault item.
 class ConcealedValue {
+  /// Plaintext value, present only when the object is in a decrypted state.
   final String? plaintext;
+
+  /// Base64-encoded encrypted ciphertext of the value.
   final String? ciphertext;
+
+  /// Base64-encoded initialization vector (nonce) used for the encryption.
   final String? nonce;
 
+  /// Returns true if this value is currently encrypted.
   bool get isEncrypted => ciphertext != null && nonce != null;
 
+  /// Creates a plaintext [ConcealedValue] instance.
   const ConcealedValue.plain(this.plaintext)
       : ciphertext = null,
         nonce = null;
 
+  /// Creates an encrypted [ConcealedValue] instance with [ciphertext] and [nonce].
   const ConcealedValue.encrypted({required this.ciphertext, required this.nonce})
       : plaintext = null;
 
@@ -105,6 +128,7 @@ class ConcealedValue {
     }
   }
 
+  /// Serializes this concealed value to a JSON map.
   Map<String, dynamic> toJson() {
     if (isEncrypted) {
       return {
@@ -117,6 +141,7 @@ class ConcealedValue {
     };
   }
 
+  /// Deserializes a concealed value from a JSON map.
   factory ConcealedValue.fromJson(Map<String, dynamic> json) {
     if (json.containsKey('ciphertext') && json.containsKey('nonce')) {
       return ConcealedValue.encrypted(
@@ -128,26 +153,38 @@ class ConcealedValue {
   }
 }
 
-/// Base class for type-specific vault item fields.
+/// Interface for type-specific vault item field representations.
 abstract class VaultItemFields {
+  /// Serializes the field payload to JSON.
   Map<String, dynamic> toJson();
+
+  /// Symmetrically encrypts sensitive fields inside the payload.
   Future<VaultItemFields> encrypt(List<int> key, VaultCrypto crypto);
+
+  /// Symmetrically decrypts sensitive fields inside the payload.
   Future<VaultItemFields> decrypt(List<int> key, VaultCrypto crypto);
 }
 
 // ── Login Fields ──────────────────────────────────────────────────────────
 
+/// Represents a historical record of a previously used password for an account.
 class PasswordHistoryEntry {
+  /// The historical password value (individually encrypted/concealed).
   final ConcealedValue password;
+
+  /// The timestamp when this password was changed or archived.
   final DateTime changedAt;
 
+  /// Creates a new password history entry.
   PasswordHistoryEntry({required this.password, required this.changedAt});
 
+  /// Serializes the history entry to JSON.
   Map<String, dynamic> toJson() => {
         'password': password.toJson(),
         'changed_at': changedAt.toIso8601String(),
       };
 
+  /// Deserializes a password history entry from JSON.
   factory PasswordHistoryEntry.fromJson(Map<String, dynamic> json) {
     return PasswordHistoryEntry(
       password: ConcealedValue.fromJson(json['password'] as Map<String, dynamic>),
@@ -156,13 +193,24 @@ class PasswordHistoryEntry {
   }
 }
 
+/// Vault item payload containing website credentials and login details.
 class LoginFields implements VaultItemFields {
+  /// The username, email, or user identifier for the account.
   final String username;
+
+  /// The password value for the account.
   final ConcealedValue password;
+
+  /// A list of website URLs associated with this credential.
   final List<String> urls;
+
+  /// The shared secret key used for TOTP 2FA code generation.
   final ConcealedValue otpSecret;
+
+  /// A list of past passwords recorded for this account.
   final List<PasswordHistoryEntry> passwordHistory;
 
+  /// Creates login credential fields.
   LoginFields({
     required this.username,
     required this.password,
@@ -180,6 +228,7 @@ class LoginFields implements VaultItemFields {
         'password_history': passwordHistory.map((e) => e.toJson()).toList(),
       };
 
+  /// Deserializes a [LoginFields] payload from a JSON map.
   factory LoginFields.fromJson(Map<String, dynamic> json) {
     return LoginFields(
       username: json['username'] as String? ?? '',
@@ -237,16 +286,33 @@ class LoginFields implements VaultItemFields {
 
 // ── Credit Card Fields ────────────────────────────────────────────────────
 
+/// Vault item payload containing credit/debit card details.
 class CreditCardFields implements VaultItemFields {
+  /// The full name of the cardholder printed on the card.
   final String cardholderName;
+
+  /// The primary account number (PAN) of the credit/debit card.
   final ConcealedValue cardNumber;
+
+  /// The card issuer/payment network, e.g., 'Visa', 'Mastercard', or 'Amex'.
   final String brand;
+
+  /// Expiration month of the card, ranging from 1 to 12.
   final int expiryMonth;
+
+  /// Expiration year of the card (four-digit format, e.g., 2030).
   final int expiryYear;
+
+  /// Card verification value (CVV/CVC) security code.
   final ConcealedValue cvv;
+
+  /// Personal identification number (PIN) of the payment card.
   final ConcealedValue pin;
+
+  /// Optional identifier pointing to a billing address item.
   final String? billingAddressRef;
 
+  /// Creates credit card fields.
   CreditCardFields({
     required this.cardholderName,
     required this.cardNumber,
@@ -270,6 +336,7 @@ class CreditCardFields implements VaultItemFields {
         'billing_address_ref': billingAddressRef,
       };
 
+  /// Deserializes a [CreditCardFields] payload from a JSON map.
   factory CreditCardFields.fromJson(Map<String, dynamic> json) {
     return CreditCardFields(
       cardholderName: json['cardholder_name'] as String? ?? '',
@@ -320,13 +387,24 @@ class CreditCardFields implements VaultItemFields {
 
 // ── Identity Fields ───────────────────────────────────────────────────────
 
+/// Represents a postal address component of an identity profile.
 class IdentityAddress {
+  /// The street name and house/apartment number.
   final String street;
+
+  /// The city or town name.
   final String city;
+
+  /// The state, province, or region name.
   final String state;
+
+  /// The postal or ZIP code.
   final String zip;
+
+  /// The country name.
   final String country;
 
+  /// Creates a new identity address.
   IdentityAddress({
     required this.street,
     required this.city,
@@ -335,6 +413,7 @@ class IdentityAddress {
     required this.country,
   });
 
+  /// Serializes the address to JSON.
   Map<String, dynamic> toJson() => {
         'street': street,
         'city': city,
@@ -343,6 +422,7 @@ class IdentityAddress {
         'country': country,
       };
 
+  /// Deserializes the address from JSON.
   factory IdentityAddress.fromJson(Map<String, dynamic> json) {
     return IdentityAddress(
       street: json['street'] as String? ?? '',
@@ -354,18 +434,39 @@ class IdentityAddress {
   }
 }
 
+/// Vault item payload containing personal identity details.
 class IdentityFields implements VaultItemFields {
+  /// First name (given name).
   final String firstName;
+
+  /// Last name (surname).
   final String lastName;
+
+  /// Optional date of birth (e.g. YYYY-MM-DD).
   final String? birthdate;
+
+  /// Optional gender classifier.
   final String? gender;
+
+  /// Physical postal address details.
   final IdentityAddress address;
+
+  /// List of contact email addresses.
   final List<String> emails;
+
+  /// List of contact telephone numbers.
   final List<String> phoneNumbers;
+
+  /// Optional company or employer name.
   final String? company;
+
+  /// Optional professional job title.
   final String? jobTitle;
+
+  /// Optional personal or professional website URL.
   final String? website;
 
+  /// Creates identity profile fields.
   IdentityFields({
     required this.firstName,
     required this.lastName,
@@ -393,6 +494,7 @@ class IdentityFields implements VaultItemFields {
         'website': website,
       };
 
+  /// Deserializes an [IdentityFields] payload from a JSON map.
   factory IdentityFields.fromJson(Map<String, dynamic> json) {
     return IdentityFields(
       firstName: json['first_name'] as String? ?? '',
@@ -419,9 +521,12 @@ class IdentityFields implements VaultItemFields {
 
 // ── Secure Note Fields ────────────────────────────────────────────────────
 
+/// Vault item payload containing a raw text secure note.
 class SecureNoteFields implements VaultItemFields {
+  /// The sensitive text content of the secure note.
   final ConcealedValue content;
 
+  /// Creates secure note fields.
   SecureNoteFields({required this.content});
 
   @override
@@ -429,6 +534,7 @@ class SecureNoteFields implements VaultItemFields {
         'content': content.toJson(),
       };
 
+  /// Deserializes a [SecureNoteFields] payload from a JSON map.
   factory SecureNoteFields.fromJson(Map<String, dynamic> json) {
     return SecureNoteFields(
       content: json['content'] != null
@@ -450,14 +556,27 @@ class SecureNoteFields implements VaultItemFields {
 
 // ── Bank Account Fields ───────────────────────────────────────────────────
 
+/// Vault item payload containing bank account details.
 class BankAccountFields implements VaultItemFields {
+  /// The name of the banking institution.
   final String bankName;
+
+  /// The type of the bank account (e.g., 'checking', 'savings', 'other').
   final String accountType; // checking | savings | other
+
+  /// The bank account number.
   final ConcealedValue accountNumber;
+
+  /// The bank routing transit number.
   final ConcealedValue routingNumber;
+
+  /// Optional International Bank Account Number (IBAN) code.
   final String? iban;
+
+  /// Optional SWIFT or BIC identifier code.
   final String? swift;
 
+  /// Creates bank account fields.
   BankAccountFields({
     required this.bankName,
     required this.accountType,
@@ -477,6 +596,7 @@ class BankAccountFields implements VaultItemFields {
         'swift': swift,
       };
 
+  /// Deserializes a [BankAccountFields] payload from a JSON map.
   factory BankAccountFields.fromJson(Map<String, dynamic> json) {
     return BankAccountFields(
       bankName: json['bank_name'] as String? ?? '',
@@ -519,16 +639,27 @@ class BankAccountFields implements VaultItemFields {
 
 // ── Standalone Password Fields ────────────────────────────────────────────
 
+/// Vault item payload containing a standalone password.
 class PasswordFields implements VaultItemFields {
+  /// The sensitive plaintext password string.
   final ConcealedValue password;
 
+  /// Creates standalone password fields.
   PasswordFields({required this.password});
 
+  /// Serializes the standalone password payload to a JSON map.
+  ///
+  /// Returns a map with a single `password` key containing the
+  /// [ConcealedValue.toJson] representation of [password].
   @override
   Map<String, dynamic> toJson() => {
         'password': password.toJson(),
       };
 
+  /// Deserializes a [PasswordFields] instance from a JSON map.
+  ///
+  /// Falls back to an empty [ConcealedValue.plain] when the `password` key
+  /// is absent or null, ensuring safe round-trips even for partial records.
   factory PasswordFields.fromJson(Map<String, dynamic> json) {
     return PasswordFields(
       password: json['password'] != null
@@ -550,23 +681,32 @@ class PasswordFields implements VaultItemFields {
 
 // ── Custom Field ──────────────────────────────────────────────────────────
 
+/// Represents a user-defined custom field extension inside a vault item.
 class CustomField {
+  /// The descriptive label or name of the custom field.
   final String label;
+
+  /// The type format of the custom field (e.g. 'text', 'concealed', 'url', 'date', 'otp').
   final String type; // text | concealed | url | date | otp
+
+  /// The concealed value content of the custom field.
   final ConcealedValue value;
 
+  /// Creates a new custom field.
   CustomField({
     required this.label,
     required this.type,
     required this.value,
   });
 
+  /// Serializes the custom field to JSON.
   Map<String, dynamic> toJson() => {
         'label': label,
         'type': type,
         'value': value.toJson(),
       };
 
+  /// Deserializes a custom field from JSON.
   factory CustomField.fromJson(Map<String, dynamic> json) {
     return CustomField(
       label: json['label'] as String? ?? '',
@@ -577,6 +717,7 @@ class CustomField {
     );
   }
 
+  /// Encrypts the custom field value if its type is marked as 'concealed'.
   Future<CustomField> encrypt(List<int> key, VaultCrypto crypto) async {
     if (type == 'concealed') {
       return CustomField(label: label, type: type, value: await value.encrypt(key, crypto));
@@ -584,6 +725,7 @@ class CustomField {
     return this;
   }
 
+  /// Decrypts the custom field value if its type is marked as 'concealed'.
   Future<CustomField> decrypt(List<int> key, VaultCrypto crypto) async {
     if (type == 'concealed') {
       return CustomField(label: label, type: type, value: await value.decrypt(key, crypto));
@@ -594,19 +736,44 @@ class CustomField {
 
 // ── Shared VaultItem Envelope ─────────────────────────────────────────────
 
+/// Plaintext representation of a complete decrypted vault item.
+///
+/// Contains standard metadata envelope fields and a polymorphic [fields] payload.
 class VaultItem {
+  /// Unique identifier (UUID v4) of the vault item.
   final String id;
+
+  /// The item category type classifier.
   final VaultItemType type;
+
+  /// The user-defined title or name of the vault item.
   final String title;
+
+  /// List of tag strings used for organizing and filtering items.
   final List<String> tags;
+
+  /// Indicates if this item is marked as a favorite/starred.
   final bool favorite;
+
+  /// The identifier of the vault this item belongs to.
   final String vaultId;
+
+  /// The timestamp when the item was first created.
   final DateTime createdAt;
+
+  /// The timestamp when the item was last updated.
   final DateTime updatedAt;
+
+  /// The polymorphic type-specific fields of this vault item.
   final VaultItemFields fields;
+
+  /// List of custom fields defined for this item.
   final List<CustomField> customFields;
+
+  /// Polymorphic notes or descriptive text, individually encrypted.
   final ConcealedValue notes;
 
+  /// Creates a new [VaultItem] plaintext representation.
   VaultItem({
     required this.id,
     required this.type,
@@ -621,6 +788,13 @@ class VaultItem {
     required this.notes,
   });
 
+  /// Serializes this [VaultItem] to a JSON map.
+  ///
+  /// All timestamps are encoded as ISO-8601 strings. The [fields] payload is
+  /// serialized polymorphically via [VaultItemFields.toJson]; callers must
+  /// ensure encryption has already been applied before persisting or
+  /// transmitting the result — raw field values must never leave the device
+  /// in plaintext form.
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type.toValue(),
@@ -635,6 +809,13 @@ class VaultItem {
         'notes': notes.toJson(),
       };
 
+  /// Deserializes a [VaultItem] from a JSON map.
+  ///
+  /// The [type] field is used to dispatch the correct [VaultItemFields]
+  /// subtype parser. Missing optional fields fall back to safe defaults
+  /// (empty lists, empty strings, `false` for booleans). Callers are
+  /// responsible for decrypting secret fields after deserialization via
+  /// [VaultItem.decrypt].
   factory VaultItem.fromJson(Map<String, dynamic> json) {
     final type = VaultItemTypeExtension.fromValue(json['type'] as String);
     final fieldsJson = json['fields'] as Map<String, dynamic>? ?? {};

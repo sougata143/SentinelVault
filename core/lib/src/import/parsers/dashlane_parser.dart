@@ -2,6 +2,8 @@ import '../import_result.dart';
 
 /// Parses a Dashlane CSV export into [ImportResult].
 class DashlaneParser {
+  /// Parses a Dashlane CSV file [csvContent] containing accounts, logins, and passwords
+  /// into an [ImportResult] containing parsed vault items and errors.
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

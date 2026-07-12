@@ -27,6 +27,12 @@ biometric-required hardware key where the platform supports it.
   shim rather than settling for a weaker guarantee.
 
 ## Rules of engagement
+- **This feature is native (iOS/Android, and desktop if applicable) only
+  — Web has no Secure Enclave/Keystore equivalent at all, and none should
+  be attempted.** Do not build a "web fallback" biometric option; the Web
+  Unlock screen simply never offers a biometric quick-unlock toggle in the
+  first place. This is a real platform ceiling, not a gap to close — see
+  `docs/RUST_CROSS_PLATFORM_REEVALUATION.md`.
 - Verify current plugin support (e.g. on pub.dev) before assuming a
   specific package covers Secure-Enclave-level access control — this
   moves faster than any static doc, so check at implementation time rather
@@ -45,6 +51,17 @@ biometric-required hardware key where the platform supports it.
   change any of the cryptographic constructions from `crypto-e2ee-core` or
   `vault-unlock-flow`. Do not modify Argon2id parameters, AES-GCM usage, or
   the wrapping hierarchy as part of this work.
+- **Never use a blanket `try/catch { }` around a platform-channel call to
+  paper over a platform that doesn't support it.** A bare catch-and-ignore
+  hides genuine native failures (e.g. a real Keychain/Keystore error on
+  iOS/Android) exactly as silently as it hides the expected "unsupported
+  on Web" case — which means a real failure during an actual security
+  event would disappear too. Guard explicitly instead: check the platform
+  before the call (`kIsWeb` or equivalent) and skip it entirely with a
+  comment stating it's an intentional no-op per this skill, rather than
+  making the call unconditionally and swallowing whatever comes back.
+  Any exception type genuinely expected and safe to ignore should be
+  caught by that specific type, not a bare `catch (e)`.
 
 ## Output location
 `core/platform/secure_storage.dart` (shared interface) with platform-

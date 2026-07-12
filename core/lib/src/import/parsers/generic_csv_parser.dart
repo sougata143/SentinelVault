@@ -10,10 +10,13 @@ import '../import_result.dart';
 /// Columns present in the CSV but not in [columnMapping] are flagged as
 /// unmapped warnings — never silently dropped.
 class GenericCsvParser {
+  /// The user-provided map that links CSV headers (values) to standard vault fields (keys).
   final Map<String, String> columnMapping;
 
+  /// Creates a [GenericCsvParser] with the specified [columnMapping].
   const GenericCsvParser({required this.columnMapping});
 
+  /// Parses generic CSV file [csvContent] based on [columnMapping] into an [ImportResult].
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

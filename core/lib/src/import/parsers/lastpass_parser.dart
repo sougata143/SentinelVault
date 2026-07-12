@@ -18,6 +18,7 @@ class LastPassParser {
   static const _colName = 'name';
   static const _colFav = 'fav';
 
+  /// Parses LastPass CSV content [csvContent] into parsed items and errors.
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

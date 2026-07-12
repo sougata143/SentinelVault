@@ -3,6 +3,7 @@ import '../import_result.dart';
 
 /// Parses a Proton Pass JSON export into [ImportResult].
 class ProtonPassParser {
+  /// Parses Proton Pass JSON export content [jsonContent] into parsed items and errors.
   ImportResult parse(String jsonContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

@@ -24,12 +24,16 @@ own independent copy of the Vault Key.
   a separate, later addition, not the initial implementation, since it
   duplicates the highest-risk part of the system into a second execution
   context.
-- Compile the shared `core/` package to a JS/Wasm bundle
-  (`dart2js` for JS output, or the current Dart-to-Wasm toolchain — verify
-  toolchain maturity at implementation time) only for the pieces actually
-  needed in the paired mode (e.g. any client-side matching/heuristic logic
-  that shouldn't round-trip to the native app for every keystroke) rather
-  than the entire crypto core.
+- Compile the shared `core/` package to a JS/Wasm bundle only for pieces
+  that aren't already covered by the native crypto core's Wasm build (e.g.
+  UI-adjacent matching/heuristic logic that shouldn't round-trip to the
+  native app for every keystroke). **For the actual cryptographic
+  operations, reuse the same `wasm-pack` build of `native/crypto_core/`
+  already produced for Flutter Web (Phase 35) rather than compiling a
+  second, separate Dart-to-Wasm crypto bundle** — one compiled artifact
+  serves both Flutter Web and the browser extensions, so there's no risk
+  of the two drifting out of sync. See
+  `docs/RUST_CROSS_PLATFORM_REEVALUATION.md`.
 
 ## Content-script rules (apply regardless of paired vs. standalone mode)
 - Autofill only into a form whose page origin exactly matches the stored

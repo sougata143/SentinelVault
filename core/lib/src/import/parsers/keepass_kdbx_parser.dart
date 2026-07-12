@@ -4,6 +4,8 @@ import '../import_result.dart';
 
 /// Decrypts and parses a KeePass KDBX database (KDBX3 or KDBX4 format) into [ImportResult].
 class KeePassKdbxParser {
+  /// Decrypts and parses the raw KeePass database [bytes] using the provided [password]
+  /// and optional [keyFileBytes] into an [ImportResult].
   Future<ImportResult> parse({
     required Uint8List bytes,
     required String password,

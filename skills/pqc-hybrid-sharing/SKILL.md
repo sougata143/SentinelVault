@@ -42,12 +42,15 @@ Produce a design doc (`docs/PQC_SHARING_DESIGN.md`) covering:
 Get this design doc reviewed and approved before implementation.
 
 ## Rules of engagement (apply regardless of design-doc specifics)
-- Verify current library maturity for ML-KEM-768/ML-DSA-65 (FIPS 203/204)
-  at implementation time — these are newer than the classical primitives
-  already in use, and ecosystem support varies by platform. Rust
-  implementations are generally more mature than pure-Dart ones; if
-  `native-ffi-crypto-core` is already in place, this is a strong candidate
-  to implement there rather than in Dart directly.
+- **This is pure platform-agnostic computation — implement it inside the
+  same `native/crypto_core/` Rust crate from Phase 35, not a separate
+  module.** ML-KEM-768, ML-DSA-65, X25519, Ed25519, and the HKDF-SHA256
+  combiner have no OS-syscall dependency and compile identically for
+  Android, iOS, and `wasm32-unknown-unknown` — this is the same category
+  as Argon2id/AES-GCM/Shamir, not a special case. Verify current
+  ML-KEM-768/ML-DSA-65 (FIPS 203/204) library maturity at implementation
+  time, but plan to vendor whatever crate is chosen into this same crate
+  rather than a separate one. See `docs/RUST_CROSS_PLATFORM_REEVALUATION.md`.
 - The server may only ever see: public keys, wrapped (ciphertext) Folder
   Keys per recipient, and sharing metadata (who has access to what,
   timestamps) — never a private key, an unwrapped Folder Key, or shared
@@ -58,12 +61,16 @@ Get this design doc reviewed and approved before implementation.
   genuine trust decision the user makes, not a formality to click through.
 - Write tests for: correct hybrid wrap/unwrap round-trip, a tampered
   ciphertext or substituted public key causing a detectable failure (not
-  silent acceptance), and that revoking a recipient's access via key
-  rotation actually prevents that recipient's old wrapped copy from
-  decrypting future Folder Key versions.
+  silent acceptance), that revoking a recipient's access via key rotation
+  actually prevents that recipient's old wrapped copy from decrypting
+  future Folder Key versions, and bit-identical results across the
+  Android/iOS/Wasm builds for the same fixed test vectors (same CI matrix
+  as Phase 35).
 
 ## Output location
 Design doc: `docs/PQC_SHARING_DESIGN.md` (write first). Key directory
 service: `backend/sharing-service/`. Client-side hybrid wrap/unwrap logic:
-`core/crypto/pqc_sharing.dart` (or native module). Sharing UI:
+`native/crypto_core/src/algorithms/pqc_hybrid.rs`, exposed through the same
+Dart binding split established in Phase 35 — do not implement this
+directly in Dart or as a second native module. Sharing UI:
 `app/lib/features/vault/sharing/`.

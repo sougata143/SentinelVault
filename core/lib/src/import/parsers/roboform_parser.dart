@@ -2,6 +2,7 @@ import '../import_result.dart';
 
 /// Parses a RoboForm CSV export into [ImportResult].
 class RoboFormParser {
+  /// Parses RoboForm CSV content [csvContent] into parsed items and errors.
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];

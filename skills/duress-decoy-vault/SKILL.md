@@ -27,7 +27,11 @@ overpromising what the feature can guarantee.
   reference tied to Vault Alpha, forcing manual Master Password entry to
   ever access the real vault again on that device. This must not delete or
   otherwise touch Vault Alpha's actual encrypted data — only invalidate
-  the *quick-unlock* caches for it.
+  the *quick-unlock* caches for it. **On Web, this hook is correctly a
+  no-op** — there is no biometric cache or hardware-key reference to
+  begin with on that platform (see `native-secure-storage`), so the
+  Duress Vault's database-swap behavior (which is pure Dart/math and works
+  identically everywhere) is the entire feature there.
 - This entire feature is opt-in, set up explicitly by the user (choosing
   and confirming a Duress Password distinct from the Master Password, and
   populating Vault Beta with decoy content) — never enabled by default.
@@ -55,11 +59,21 @@ overpromising what the feature can guarantee.
 - Never implement this such that failing to enter either the real Master
   Password or the Duress Password correctly reveals which one was
   "closer" — both wrong attempts must look identical from the outside.
+- **The wipe hook's call site must explicitly guard for platform (e.g.
+  `kIsWeb`) rather than calling unconditionally and relying on the
+  underlying storage layer to swallow the failure.** A blanket
+  `try/catch { }` around the platform-channel call hides a genuine
+  wipe failure on native (iOS/Android) exactly as silently as it hides
+  the expected Web no-op — which means the one moment this feature exists
+  for (an actual duress trigger) could fail with no indication. On native
+  platforms, a failure to wipe the biometric cache must be logged (e.g. to
+  the security activity log) rather than silently ignored.
 - Write tests for: Duress Password opens only Vault Beta and never leaks
   Vault Alpha's existence/content, the native wipe hook fires reliably on
-  Duress Password match, and Vault Alpha's actual encrypted data is
-  provably untouched after a duress trigger (only its quick-unlock caches
-  are cleared).
+  Duress Password match, Vault Alpha's actual encrypted data is provably
+  untouched after a duress trigger (only its quick-unlock caches are
+  cleared), the hook is explicitly skipped (not silently failed) on Web,
+  and a simulated native wipe failure surfaces rather than disappearing.
 
 ## Output location
 `core/vault/dual_vault_manager.dart` for the database-selection logic,

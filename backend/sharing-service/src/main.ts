@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const port = process.env['PORT'] ?? 3002;
+  const port = process.env['PORT'] ?? 3004;
   await app.listen(port);
   console.log(`[sharing-service] Listening on port ${port}`);
 }

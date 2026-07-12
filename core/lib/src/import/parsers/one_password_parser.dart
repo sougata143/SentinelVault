@@ -18,6 +18,7 @@ class OnePasswordParser {
   static const _catIdentity = '004';
   static const _catPassword = '005';
 
+  /// Parses 1Password JSON export content [jsonContent] into parsed items and errors.
   ImportResult parse(String jsonContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];
