@@ -13,6 +13,7 @@ import 'native_crypto_bridge_selector.dart';
 class PqcSharingManager {
   final NativeCryptoBridge _bridge;
 
+  /// Creates a new [PqcSharingManager], optionally using a custom [bridge] for tests.
   PqcSharingManager([NativeCryptoBridge? bridge])
       : _bridge = bridge ?? getNativeCryptoBridge();
 

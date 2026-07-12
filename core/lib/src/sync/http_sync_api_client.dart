@@ -5,7 +5,10 @@ import 'sync.dart';
 
 /// HTTP implementation of the remote Sync API client.
 class HttpSyncApiClient implements SyncApiClient {
+  /// The root URL of the sync server backend service.
   final String baseUrl;
+
+  /// The unique identifier of the user (typically the email address).
   final String userId;
   final http.Client _httpClient;
 
@@ -31,8 +34,9 @@ class HttpSyncApiClient implements SyncApiClient {
       throw Exception('Failed to pull items: ${response.statusCode}');
     }
 
-    final List<dynamic> data = json.decode(response.body);
-    return data.map((jsonItem) {
+    final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+    return data.map((dynamic item) {
+      final jsonItem = item as Map<String, dynamic>;
       return EncryptedVaultItem(
         id: jsonItem['id'] as String,
         encryptedBlob: jsonItem['encryptedBlob'] as String,
@@ -66,9 +70,10 @@ class HttpSyncApiClient implements SyncApiClient {
     );
 
     if (response.statusCode == 409) {
-      final data = json.decode(response.body);
-      final List<dynamic> conflictList = data['conflicts'];
-      final conflicts = conflictList.map((jsonItem) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final List<dynamic> conflictList = data['conflicts'] as List<dynamic>;
+      final conflicts = conflictList.map((dynamic item) {
+        final jsonItem = item as Map<String, dynamic>;
         return EncryptedVaultItem(
           id: jsonItem['id'] as String,
           encryptedBlob: jsonItem['encryptedBlob'] as String,

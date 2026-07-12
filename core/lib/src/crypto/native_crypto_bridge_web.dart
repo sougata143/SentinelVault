@@ -6,24 +6,31 @@ import 'native_crypto_bridge.dart';
 
 // --- JS Bindings ---
 
+/// WebAssembly binding for master key derivation via Argon2id.
 @JS()
 external JSUint8Array wasmDeriveMasterKey(JSUint8Array password, JSUint8Array salt);
 
+/// WebAssembly binding for AES-256-GCM encryption.
 @JS()
 external JSUint8Array wasmEncryptAesGcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array plaintext);
 
+/// WebAssembly binding for AES-256-GCM decryption.
 @JS()
 external JSUint8Array wasmDecryptAesGcm(JSUint8Array key, JSUint8Array nonce, JSUint8Array ciphertext);
 
+/// WebAssembly binding for computing the SRP x parameter.
 @JS()
 external JSUint8Array wasmSrpCalculateX(JSString username, JSUint8Array masterKey, JSUint8Array salt);
 
+/// WebAssembly binding for computing the SRP verifier.
 @JS()
 external JSUint8Array wasmSrpCalculateVerifier(JSString username, JSUint8Array masterKey, JSUint8Array salt);
 
+/// WebAssembly binding for generating SRP client ephemeral values.
 @JS()
 external JSUint8Array wasmSrpGenerateClientEphemeral(JSUint8Array aBytes);
 
+/// WebAssembly binding for computing the SRP client session evidence.
 @JS()
 external JSUint8Array wasmSrpCalculateClientSession(
   JSString username,
@@ -34,13 +41,20 @@ external JSUint8Array wasmSrpCalculateClientSession(
   JSUint8Array masterKey,
 );
 
+/// WebAssembly binding for Shamir's Secret Sharing split operation.
 @JS()
 external JSUint8Array wasmShamirSplit(JSUint8Array secret, JSNumber m, JSNumber n);
 
+/// WebAssembly binding for Shamir's Secret Sharing combine operation.
 @JS()
 external JSUint8Array wasmShamirCombine(JSUint8Array flatShares);
 
+/// A JS-interop-based implementation of [NativeCryptoBridge] for Web platforms.
+///
+/// Under the hood, this delegates to the compiled Rust `crypto_core` Wasm library
+/// running inside the browser JS runtime context.
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
+  /// Creates a new [NativeCryptoBridgeImpl] instance for Web environments.
   NativeCryptoBridgeImpl();
 
   JSUint8Array _toJSArray(List<int> list) {

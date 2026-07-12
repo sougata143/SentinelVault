@@ -145,15 +145,35 @@ abstract class NativeCryptoBridge {
 /// Private fields are named with a `priv` suffix to make accidental logging
 /// easier to audit.
 class PqcKeyBundle {
+  /// The 32-byte public X25519 key used for classical ECDH key exchange.
   final Uint8List x25519Pub;
+
+  /// The 32-byte private X25519 key used for classical ECDH key exchange.
+  /// Treat as secret.
   final Uint8List x25519Priv;     // 32 bytes — treat as secret
+
+  /// The 32-byte public Ed25519 key used for classical digital signature verification.
   final Uint8List ed25519Pub;
+
+  /// The 32-byte private Ed25519 seed key used for signing invitations.
+  /// Treat as secret.
   final Uint8List ed25519Priv;    // 32-byte seed — treat as secret
+
+  /// The 1184-byte ML-KEM-768 encapsulation key (public key) for hybrid key encapsulation.
   final Uint8List mlkemEk;        // 1184 bytes — public
+
+  /// The 2400-byte ML-KEM-768 decapsulation key (private key) for hybrid key decapsulation.
+  /// Treat as secret.
   final Uint8List mlkemDk;        // 2400 bytes — treat as secret
+
+  /// The 1952-byte ML-DSA-65 verification key (public key) for signature verification.
   final Uint8List mldsaVk;        // 1952 bytes — public
+
+  /// The 32-byte ML-DSA-65 private seed key for generating signatures.
+  /// Treat as secret.
   final Uint8List mldsaSeed;      // 32 bytes — treat as secret
 
+  /// Creates a new immutable [PqcKeyBundle] containing all classical and PQ keypair elements.
   const PqcKeyBundle({
     required this.x25519Pub,
     required this.x25519Priv,
@@ -174,11 +194,19 @@ class PqcKeyBundle {
 /// All ciphertext components produced by [pqcHybridWrap].
 /// Safe to store on the server — contains only ciphertext, never plaintext.
 class PqcWrappedKey {
+  /// The 32-byte public ephemeral X25519 key used for ECDH key agreement.
   final Uint8List ephemeralX25519Pub;  // 32 bytes
+
+  /// The 1088-byte ML-KEM-768 ciphertext containing the encapsulated shared secret.
   final Uint8List mlkemCiphertext;     // 1088 bytes
+
+  /// The 12-byte initialization vector (nonce) used for AES-256-GCM symmetric encryption.
   final Uint8List aesNonce;            // 12 bytes
+
+  /// The 48-byte symmetrically encrypted folder key (32 bytes key + 16 bytes GCM auth tag).
   final Uint8List wrappedFolderKey;    // 48 bytes (32 + 16 GCM tag)
 
+  /// Creates a new immutable [PqcWrappedKey] containing all components of the wrapped key.
   const PqcWrappedKey({
     required this.ephemeralX25519Pub,
     required this.mlkemCiphertext,
@@ -189,9 +217,13 @@ class PqcWrappedKey {
 
 /// Ed25519 + ML-DSA-65 dual signature pair.
 class PqcSignatureBundle {
+  /// The 64-byte classical Ed25519 digital signature.
   final Uint8List ed25519Signature;  // 64 bytes
+
+  /// The 3309-byte post-quantum ML-DSA-65 digital signature.
   final Uint8List mldsaSignature;    // 3309 bytes
 
+  /// Creates a new immutable [PqcSignatureBundle] containing both signature parts.
   const PqcSignatureBundle({
     required this.ed25519Signature,
     required this.mldsaSignature,

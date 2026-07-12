@@ -24,7 +24,7 @@ void main() {
       final B = (kv + gb) % SrpClient.N;
 
       late BigInt A;
-      late List<int> M1;
+      late List<int> m1;
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/auth/login/step1') {
@@ -50,9 +50,9 @@ void main() {
           final m1Hex = body['M1'] as String;
           // Decode client evidence M1
           final len = m1Hex.length ~/ 2;
-          M1 = Uint8List(len);
+          m1 = Uint8List(len);
           for (var i = 0; i < len; i++) {
-            M1[i] = int.parse(m1Hex.substring(i * 2, i * 2 + 2), radix: 16);
+            m1[i] = int.parse(m1Hex.substring(i * 2, i * 2 + 2), radix: 16);
           }
 
           // Server derives shared session secret S
@@ -74,7 +74,7 @@ void main() {
           // Server calculates server proof M2 = H(A, M1, sessionKey)
           final m2Input = Uint8List(256 + 32 + 32);
           m2Input.setRange(0, 256, aBytes);
-          m2Input.setRange(256, 256 + 32, M1);
+          m2Input.setRange(256, 256 + 32, m1);
           m2Input.setRange(256 + 32, m2Input.length, sessionKey);
           final m2Bytes = await SrpClient.sha256Hash(m2Input);
 

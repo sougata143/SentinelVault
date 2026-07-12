@@ -11,12 +11,17 @@ import '../crypto/crypto.dart';
 /// This class is responsible only for populating Vault Beta at setup time.
 /// Key storage and verification live in [DuressWipeHook] and [SecureStorage].
 class DualVaultManager {
+  /// The global singleton instance of the dual vault manager.
   static final DualVaultManager instance = DualVaultManager._internal();
   DualVaultManager._internal();
 
-  // SecureStorage keys for the decoy vault configuration.
+  /// SecureStorage key storing the salt used to derive the decoy vault's keys.
   static const String duressSaltKey = 'duress_salt';
+
+  /// SecureStorage key storing the wrapped decoy vault key.
   static const String duressWrappedKeyKey = 'duress_wrapped_vault_key';
+
+  /// SecureStorage key storing whether duress/decoy vault is enabled.
   static const String duressConfiguredKey = 'duress_configured';
 
   /// Prepopulates Vault Beta (decoy) with harmless, plausible items.

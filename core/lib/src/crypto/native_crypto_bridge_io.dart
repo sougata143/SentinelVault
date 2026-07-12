@@ -278,6 +278,10 @@ DynamicLibrary _loadLibrary() {
 
 // --- Implementation ---
 
+/// An FFI-based implementation of [NativeCryptoBridge] for native platforms (iOS, Android, Desktop).
+///
+/// Under the hood, this loads the Rust cross-compiled `crypto_core` dynamic library
+/// and binds the target native functions using `dart:ffi`.
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   late final DynamicLibrary _lib;
   late final _DeriveMasterKeyDart _deriveMasterKeyFn;
@@ -297,6 +301,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   late final _PqcSignInvitationDart _pqcSignInvitationFn;
   late final _PqcVerifyInvitationDart _pqcVerifyInvitationFn;
 
+  /// Creates a new [NativeCryptoBridgeImpl] and binds the Rust library symbols.
   NativeCryptoBridgeImpl() {
     _lib = _loadLibrary();
     _deriveMasterKeyFn = _lib.lookupFunction<_DeriveMasterKeyC, _DeriveMasterKeyDart>('derive_master_key');

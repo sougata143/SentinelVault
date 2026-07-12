@@ -3,6 +3,10 @@ import 'native_crypto_bridge.dart';
 
 /// Stub implementation of [NativeCryptoBridge].
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
+  /// Creates a stub instance of [NativeCryptoBridgeImpl].
+  ///
+  /// Throws an [UnsupportedError] as this constructor should only be invoked
+  /// in test environments or contexts without platform-specific implementations.
   NativeCryptoBridgeImpl() {
     throw UnsupportedError('Cannot create NativeCryptoBridge stub without platform-specific library');
   }

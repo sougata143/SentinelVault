@@ -9,11 +9,13 @@ class AiInsightsResult {
   /// Concrete numbered actions the user should take.
   final List<String> recommendedActions;
 
+  /// Creates a new [AiInsightsResult] with the specified risk summary and recommended actions.
   AiInsightsResult({
     required this.summary,
     required this.recommendedActions,
   });
 
+  /// Decodes an [AiInsightsResult] from a JSON map returned by the backend.
   factory AiInsightsResult.fromJson(Map<String, dynamic> json) {
     return AiInsightsResult(
       summary: json['summary'] as String? ?? '',
@@ -28,8 +30,10 @@ class AiInsightsResult {
 /// - Only non-sensitive aggregate stats are sent to the backend.
 /// - Raw passwords, email addresses, and vault contents are NEVER sent.
 class AiInsightsClient {
+  /// The base URL of the security analysis microservice backend.
   final String backendUrl;
 
+  /// Creates a new [AiInsightsClient], optionally specifying a custom [backendUrl].
   AiInsightsClient({this.backendUrl = 'http://localhost:3003'});
 
   /// Requests AI-generated insights for the given [payload].

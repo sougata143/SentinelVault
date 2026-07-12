@@ -1,12 +1,21 @@
 import '../platform/secure_storage.dart';
 
+/// Manages the state of the local vault lock, in-memory cryptographic keys,
+/// and active backend authentication session.
+///
+/// Security Invariants:
+/// 1. The Account Password and Master Password are completely separate.
+/// 2. The Master Password (and keys derived from it) never leaves the device.
+/// 3. In-memory keys (masterKey, vaultKey) are wiped immediately upon lock or logout.
 class VaultLockManager {
+  /// The global singleton instance of the vault lock manager.
   static final VaultLockManager instance = VaultLockManager._internal();
 
   String? _sessionToken;
   List<int>? _masterKey;
   List<int>? _vaultKey;
 
+  /// Indicates whether the user has toggled biometric quick-unlock in their settings.
   bool isBiometricEnabled = false;
   bool _hasBiometricCache = false;
 
@@ -14,12 +23,22 @@ class VaultLockManager {
 
   bool _isDuressMode = false;
 
+  /// The active backend session JWT token, or null if logged out.
   String? get sessionToken => _sessionToken;
+
+  /// The derived master key used for SRP authentication, or null if locked.
   List<int>? get masterKey => _masterKey;
+
+  /// The vault encryption/decryption key, or null if locked.
   List<int>? get vaultKey => _vaultKey;
 
+  /// Returns true if the vault is currently locked (i.e. vault key is not in memory).
   bool get isLocked => _vaultKey == null;
+
+  /// Returns true if the user is authenticated with the backend (has an active session token).
   bool get isLoggedIn => _sessionToken != null;
+
+  /// Returns true if the vault was unlocked using a decoy/duress password.
   bool get isDuressMode => _isDuressMode;
 
   /// Loads the persisted session token from secure storage.
@@ -27,17 +46,22 @@ class VaultLockManager {
     _sessionToken = await SecureStorage.instance.readSessionToken();
   }
 
+  /// Sets the active backend session [token] and persists it to secure storage.
   void setSession(String token) {
     _sessionToken = token;
     SecureStorage.instance.writeSessionToken(token);
   }
 
+  /// Unlocks the vault by loading the derived [masterKey] and [vaultKey] into memory.
+  ///
+  /// Set [isDuress] to true if unlocked via the decoy password.
   void unlock(List<int> masterKey, List<int> vaultKey, {bool isDuress = false}) {
     _masterKey = List<int>.from(masterKey);
     _vaultKey = List<int>.from(vaultKey);
     _isDuressMode = isDuress;
   }
 
+  /// Unlocks the vault directly using the recovery key's derived [vaultKey] (bypasses Master Password derivation).
   void unlockWithRecoveryKey(List<int> vaultKey) {
     _masterKey = null;
     _vaultKey = List<int>.from(vaultKey);
@@ -96,6 +120,7 @@ class VaultLockManager {
     _clearBiometricCache();
   }
 
+  /// Returns true if a wrapped copy of the vault keys is cached in secure storage.
   bool get hasBiometricCache => _hasBiometricCache;
 
   /// Attempts to restore keys from biometric cache if authentication check [authSuccess] is true.

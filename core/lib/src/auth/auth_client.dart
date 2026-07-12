@@ -6,7 +6,10 @@ import '../crypto/srp.dart';
 
 /// Exception thrown when registration fails because the email is already registered.
 class DuplicateEmailException implements Exception {
+  /// The descriptive error message associated with this duplicate email occurrence.
   final String message;
+
+  /// Creates a [DuplicateEmailException] with the specified [message].
   DuplicateEmailException(this.message);
 
   @override
@@ -15,6 +18,7 @@ class DuplicateEmailException implements Exception {
 
 /// Client for communicating with the NestJS authentication microservice.
 class AuthClient {
+  /// The root URL of the authentication backend service.
   final String baseUrl;
   final http.Client _httpClient;
   final VaultCrypto _crypto;

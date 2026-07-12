@@ -15,18 +15,21 @@ class SecurityActivity {
   /// UTC timestamp when the activity occurred.
   final DateTime timestamp;
 
+  /// Creates a new [SecurityActivity] record with the given metadata.
   const SecurityActivity({
     required this.type,
     required this.itemCount,
     required this.timestamp,
   });
 
+  /// Serializes the security activity record into a JSON-compatible map.
   Map<String, dynamic> toJson() => {
         'type': type,
         'itemCount': itemCount,
         'timestamp': timestamp.toIso8601String(),
       };
 
+  /// Creates a [SecurityActivity] record from a deserialized JSON map.
   factory SecurityActivity.fromJson(Map<String, dynamic> json) =>
       SecurityActivity(
         type: json['type'] as String,
@@ -46,6 +49,8 @@ class SecurityActivity {
 class SecurityActivityLog {
   // Singleton so the same log is visible across the app session.
   SecurityActivityLog._();
+
+  /// The global singleton instance of the [SecurityActivityLog].
   static final SecurityActivityLog instance = SecurityActivityLog._();
 
   final List<SecurityActivity> _entries = [];

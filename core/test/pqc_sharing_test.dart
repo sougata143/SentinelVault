@@ -96,8 +96,8 @@ void main() {
       // Tamper with payload (substitute one char in base64url)
       final rawPayload = invite['signedPayload'] as String;
       final tamperedPayload = rawPayload.endsWith('A')
-          ? rawPayload.substring(0, rawPayload.length - 1) + 'B'
-          : rawPayload.substring(0, rawPayload.length - 1) + 'A';
+          ? '${rawPayload.substring(0, rawPayload.length - 1)}B'
+          : '${rawPayload.substring(0, rawPayload.length - 1)}A';
 
       final verified = await sharing.verifyInvitation(
         signedPayloadB64: tamperedPayload,

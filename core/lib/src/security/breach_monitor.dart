@@ -213,12 +213,17 @@ class BreachCheckException implements Exception {
 
 /// Client to query the NestJS breach monitor endpoints.
 class BackendBreachMonitor {
+  /// The base URL of the breach monitor backend service.
   final String backendUrl;
   final http.Client _client;
 
+  /// Creates a new [BackendBreachMonitor] client.
   BackendBreachMonitor({this.backendUrl = 'http://localhost:3003', http.Client? client})
       : _client = client ?? http.Client();
 
+  /// Enrolls the given [email] and [emailHash] into the dark-web breach monitoring service.
+  ///
+  /// Security invariant: No raw password or vault data is ever sent to this backend endpoint.
   Future<void> optIn(String email, String emailHash) async {
     try {
       final response = await _client.post(
@@ -234,6 +239,7 @@ class BackendBreachMonitor {
     }
   }
 
+  /// Removes the user represented by [emailHash] from the dark-web breach monitoring service.
   Future<void> optOut(String emailHash) async {
     try {
       final response = await _client.delete(
@@ -247,6 +253,9 @@ class BackendBreachMonitor {
     }
   }
 
+  /// Queries the breach database for any known leaks related to the given [emailHash].
+  ///
+  /// Returns a map describing the breach findings.
   Future<Map<String, dynamic>> checkBreaches(String emailHash) async {
     try {
       final response = await _client.post(
@@ -263,6 +272,7 @@ class BackendBreachMonitor {
     }
   }
 
+  /// Retrieves the current subscription/opt-in status for the given [emailHash].
   Future<Map<String, dynamic>> getStatus(String emailHash) async {
     try {
       final response = await _client.get(
