@@ -292,15 +292,23 @@ if [[ "$SKIP_RUST" == false ]]; then
       echo "Adding wasm32-unknown-unknown target..."
       rustup target add wasm32-unknown-unknown
     fi
-    echo "Building wasm32 target (required for the web build)..."
-    (cd "$ROOT_DIR/native/crypto_core" && cargo build --target wasm32-unknown-unknown --features wasm)
+    if command -v wasm-pack >/dev/null 2>&1; then
+      echo "Building WASM crypto bundle via wasm-pack (required for web)..."
+      bash "$ROOT_DIR/native/build_wasm.sh"
+    else
+      echo "Building wasm32 target (raw binary)..."
+      (cd "$ROOT_DIR/native/crypto_core" && cargo build --target wasm32-unknown-unknown --features wasm)
+      c_yellow "⚠ wasm-pack not found — skipped generating JS glue/WASM bundle in app/web/pkg/."
+      c_yellow "  To run on Flutter Web, install wasm-pack: cargo install wasm-pack --locked"
+    fi
   else
     c_yellow "⚠ rustup not found — skipping the Wasm build for the web crypto core."
     c_yellow "  Native builds (iOS/Android/macOS) are unaffected. To enable the web"
     c_yellow "  build, install rustup (see the prerequisites check above) and re-run"
     c_yellow "  this script, or manually run:"
     c_yellow "    rustup target add wasm32-unknown-unknown"
-    c_yellow "    cd native/crypto_core && cargo build --target wasm32-unknown-unknown --features wasm"
+    c_yellow "    cargo install wasm-pack --locked"
+    c_yellow "    bash native/build_wasm.sh"
   fi
 else
   c_yellow "Skipping Rust build (--skip-rust)"
