@@ -15,6 +15,8 @@ yarn-debug.log*
 yarn-error.log*
 .npm/
 .npm-cache/
+# yarn.lock / package-lock.json are intentionally NOT ignored — commit
+# them for reproducible installs.
 
 # Dart & Flutter build files
 .dart_tool/
@@ -24,12 +26,72 @@ yarn-error.log*
 build/
 app/*.iml
 core/*.iml
-*.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+coverage/
+
+# Dart/Flutter lockfiles — convention-dependent, NOT a blanket *.lock rule:
+#   - core/ and browser-extension/ are Dart PACKAGES: don't commit pubspec.lock
+#   - app/ is an APPLICATION: DO commit app/pubspec.lock (intentionally not
+#     ignored below)
+core/pubspec.lock
+browser-extension/pubspec.lock
+
+# Rust / native crypto core build output
+native/crypto_core/target/
+native/crypto_core/**/*.rlib
+# Cargo.lock is intentionally NOT ignored — commit it for reproducible
+# builds of this application's native module.
+
+# Wasm build output (wasm-pack)
+native/crypto_core/pkg/
+native/crypto_core/pkg-web/
+browser-extension/core-bundle/*.wasm
+browser-extension/core-bundle/*_bg.js
+
+# iOS build artifacts
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework
+ios/Flutter/Generated.xcconfig
+ios/Runner/GeneratedPluginRegistrant.*
+ios/DerivedData/
+DerivedData/
+*.ipa
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/key.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Generic app release artifacts
+*.app
 
 # Environment variables & secrets
 .env
 .env.local
 .env.production
+.env.*.local
+*.pem
+*.key
+*.p12
+*.mobileprovision
+
+# Local dev script state (logs, PIDs from start/stop-sentinelvault.sh, if
+# you keep using them locally even after removing them from git tracking)
+.sentinelvault/
+*.log
 
 # Local IDE folders
 .vscode/
@@ -39,3 +101,9 @@ core/*.iml
 *.njsproj
 *.sln
 *.sw?
+
+#local useless files and folders
+skills/*
+docs/alignment-audit.md
+docs/FFI_CROSS_PLATFORM_PLAN.md
+docs/*
