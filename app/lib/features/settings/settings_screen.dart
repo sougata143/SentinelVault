@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
@@ -19,6 +20,14 @@ class SettingsScreen extends StatefulWidget {
   final String syncBaseUrl;
   final http.Client? httpClient;
 
+  /// Platform override used exclusively in tests to simulate Web or native
+  /// rendering without requiring a real browser/device.
+  ///
+  /// In production code, leave this at its default value (`kIsWeb`).
+  /// Set to `true` in a widget test to verify Web-specific layout (e.g.
+  /// confirming the biometric toggle is absent) without spinning up Chrome.
+  final bool isWebOverride;
+
   const SettingsScreen({
     super.key,
     this.onLock,
@@ -26,6 +35,7 @@ class SettingsScreen extends StatefulWidget {
     this.currentEmail = 'auditor@sentinelvault.io',
     this.syncBaseUrl = 'http://localhost:3002',
     this.httpClient,
+    this.isWebOverride = kIsWeb,
   });
 
   @override
@@ -351,54 +361,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   ],
-                  const Divider(color: Colors.white10),
-                  SwitchListTile(
-                    key: const Key('settings-biometric-switch'),
-                    title: const Text('Biometric Quick-Unlock'),
-                    subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
-                    value: _biometricEnabled,
-                    activeColor: AppTheme.primaryColor,
-                    onChanged: (val) async {
-                      if (val) {
-                        final supported = await BiometricAuthService.instance.isBiometricsSupported();
-                        if (!supported) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Biometrics not supported on this device')),
-                            );
+                  // Biometric Quick-Unlock is a native OS-hardware feature.
+                  // On Web there is no Secure Enclave / Keystore equivalent, so
+                  // the toggle is omitted entirely rather than shown-then-failing.
+                  // Reference: docs/RUST_CROSS_PLATFORM_REEVALUATION.md §2.
+                  if (!widget.isWebOverride) ...[
+                    const Divider(color: Colors.white10),
+                    SwitchListTile(
+                      key: const Key('settings-biometric-switch'),
+                      title: const Text('Biometric Quick-Unlock'),
+                      subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
+                      value: _biometricEnabled,
+                      activeColor: AppTheme.primaryColor,
+                      onChanged: (val) async {
+                        if (val) {
+                          final supported = await BiometricAuthService.instance.isBiometricsSupported();
+                          if (!supported) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Biometrics not supported on this device')),
+                              );
+                            }
+                            return;
                           }
-                          return;
-                        }
 
-                        final success = await BiometricAuthService.instance.authenticate();
-                        if (success) {
-                          setState(() {
-                            _biometricEnabled = true;
-                          });
-                          _saveSettings();
-                          if (VaultLockManager.instance.masterKey != null &&
-                              VaultLockManager.instance.vaultKey != null) {
-                            await VaultLockManager.instance.enableBiometrics(
-                              VaultLockManager.instance.masterKey!,
-                              VaultLockManager.instance.vaultKey!,
-                            );
+                          final success = await BiometricAuthService.instance.authenticate();
+                          if (success) {
+                            setState(() {
+                              _biometricEnabled = true;
+                            });
+                            _saveSettings();
+                            if (VaultLockManager.instance.masterKey != null &&
+                                VaultLockManager.instance.vaultKey != null) {
+                              await VaultLockManager.instance.enableBiometrics(
+                                VaultLockManager.instance.masterKey!,
+                                VaultLockManager.instance.vaultKey!,
+                              );
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Biometric authentication failed')),
+                              );
+                            }
                           }
                         } else {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Biometric authentication failed')),
-                            );
-                          }
+                          setState(() {
+                            _biometricEnabled = false;
+                          });
+                          _saveSettings();
+                          VaultLockManager.instance.disableBiometrics();
                         }
-                      } else {
-                        setState(() {
-                          _biometricEnabled = false;
-                        });
-                        _saveSettings();
-                        VaultLockManager.instance.disableBiometrics();
-                      }
-                    },
-                  ),
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

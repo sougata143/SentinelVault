@@ -126,6 +126,11 @@ class VaultLockManager {
 
   void _clearBiometricCache() {
     _hasBiometricCache = false;
-    SecureStorage.instance.deleteBiometricWrappedVaultKey();
+    SecureStorage.instance.deleteBiometricWrappedVaultKey()
+        // The failure is already logged + rethrown inside deleteBiometricWrappedVaultKey.
+        // Catch here so the unawaited fire-and-forget call cannot surface as an
+        // unhandled async exception and crash the app.
+        // ignore: avoid_catches_without_on_clauses
+        .catchError((_) {});
   }
 }

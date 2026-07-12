@@ -220,5 +220,81 @@ void main() {
       expect(find.byKey(const Key('unlock-password-field')), findsOneWidget);
       while (tester.takeException() != null) {}
     });
+
+    // -----------------------------------------------------------------------
+    // Platform-visibility tests for the biometric quick-unlock toggle.
+    //
+    // The toggle must be ABSENT on Web (it is a native OS-hardware feature;
+    // Web has no Secure Enclave / Android Keystore equivalent) and PRESENT on
+    // native (iOS / Android).
+    //
+    // We use SettingsScreen.isWebOverride to simulate both conditions in a
+    // single VM-based test run.  The real kIsWeb path is covered when the
+    // suite runs with `flutter test --platform chrome`.
+    //
+    // Reference: docs/RUST_CROSS_PLATFORM_REEVALUATION.md §2.
+    // -----------------------------------------------------------------------
+
+    testWidgets(
+      'Settings: biometric switch is ABSENT when isWebOverride=true (Web)',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        VaultLockManager.instance.unlock(masterKey, vaultKey);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SettingsScreen(
+              onLock: () {},
+              onLogout: () {},
+              isWebOverride: true, // simulate Web build
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('settings-biometric-switch')),
+          findsNothing,
+          reason: 'Biometric Quick-Unlock switch must be absent on Web '
+              '(no Secure Enclave / Keystore available in browsers).',
+        );
+
+        while (tester.takeException() != null) {}
+      },
+    );
+
+    testWidgets(
+      'Settings: biometric switch is PRESENT when isWebOverride=false (native)',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        VaultLockManager.instance.unlock(masterKey, vaultKey);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SettingsScreen(
+              onLock: () {},
+              onLogout: () {},
+              isWebOverride: false, // simulate iOS / Android
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('settings-biometric-switch')),
+          findsOneWidget,
+          reason: 'Biometric Quick-Unlock switch must be present on native platforms '
+              '(iOS / Android) that have Secure Enclave / Keystore.',
+        );
+
+        while (tester.takeException() != null) {}
+      },
+    );
   });
 }

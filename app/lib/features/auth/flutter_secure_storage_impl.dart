@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:core/core.dart';
@@ -74,10 +75,23 @@ class FlutterPlatformSecureStorage implements SecureStorage {
 
   @override
   Future<void> deleteBiometricWrappedVaultKey() async {
+    // Web is a documented no-op: there is no OS-backed biometric/hardware-key cache
+    // to wipe in a browser context. The Duress wipe hook firing on Web is correct
+    // behaviour — it just has nothing to do here.
+    // Reference: docs/duress-decoy-vault skill + RUST_CROSS_PLATFORM_REEVALUATION.md §2.
+    if (kIsWeb) return;
+
     try {
       await _channel.invokeMethod('deleteBiometricWrappedVaultKey');
     } catch (e) {
-      // ignore errors on deletion
+      // A failure to wipe the biometric cache on a real duress trigger must never
+      // be silently swallowed — log it so it appears in the Security Center, then
+      // rethrow so the caller (triggerDuressWipeHook) can handle or surface it.
+      SecurityActivityLog.instance.logActivity(
+        type: 'biometric_wipe_failure',
+        itemCount: 0,
+      );
+      rethrow;
     }
   }
 

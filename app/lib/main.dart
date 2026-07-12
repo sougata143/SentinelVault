@@ -11,9 +11,16 @@ void main() async {
   // Register real platform-backed secure storage
   SecureStorage.instance = FlutterPlatformSecureStorage();
   
-  // Clear any cached biometric keys from secure storage on startup
-  // to enforce the restart policy (biometric cache is only valid for in-app locks).
-  await SecureStorage.instance.deleteBiometricWrappedVaultKey();
+  // Clear any cached biometric keys from secure storage on startup to enforce
+  // the restart policy (biometric cache is only valid for in-app locks).
+  // We catch any platform-channel or keystore error here: if the wipe fails on
+  // startup the user still must enter their Master Password, so the vault
+  // remains secure. The error is already logged inside deleteBiometricWrappedVaultKey.
+  try {
+    await SecureStorage.instance.deleteBiometricWrappedVaultKey();
+  } catch (_) {
+    // Intentional: logged inside deleteBiometricWrappedVaultKey; do not crash on boot.
+  }
   
   // Load session from secure storage
   await VaultLockManager.instance.loadSession();
