@@ -283,6 +283,10 @@ DynamicLibrary _loadLibrary() {
 /// Under the hood, this loads the Rust cross-compiled `crypto_core` dynamic library
 /// and binds the target native functions using `dart:ffi`.
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
+  /// No-op on native/io platforms; the FFI library is loaded synchronously
+  /// in the constructor and requires no async initialisation.
+  static Future<void> ensureReady() async {}
+
   late final DynamicLibrary _lib;
   late final _DeriveMasterKeyDart _deriveMasterKeyFn;
   late final _EncryptDecryptAesGcmDart _encryptAesGcmFn;

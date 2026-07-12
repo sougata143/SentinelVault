@@ -3,6 +3,10 @@ import 'native_crypto_bridge.dart';
 
 /// Stub implementation of [NativeCryptoBridge].
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
+  /// No-op on non-web platforms; the native FFI library is loaded
+  /// synchronously and requires no async initialisation.
+  static Future<void> ensureReady() async {}
+
   /// Creates a stub instance of [NativeCryptoBridgeImpl].
   ///
   /// Throws an [UnsupportedError] as this constructor should only be invoked

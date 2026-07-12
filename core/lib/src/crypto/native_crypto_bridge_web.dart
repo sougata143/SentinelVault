@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError;
@@ -49,11 +50,65 @@ external JSUint8Array wasmShamirSplit(JSUint8Array secret, JSNumber m, JSNumber 
 @JS()
 external JSUint8Array wasmShamirCombine(JSUint8Array flatShares);
 
+/// JS binding for the Promise that resolves once the WASM crypto module is
+/// fully initialised (set by the loader script in `app/web/index.html`).
+@JS('__cryptoCoreReadyPromise')
+external JSPromise get _cryptoCoreReadyPromise;
+
 /// A JS-interop-based implementation of [NativeCryptoBridge] for Web platforms.
 ///
-/// Under the hood, this delegates to the compiled Rust `crypto_core` Wasm library
-/// running inside the browser JS runtime context.
+/// Under the hood, this delegates to the compiled Rust `crypto_core` Wasm
+/// library running inside the browser JS runtime context via wasm-bindgen.
+///
+/// **Security invariant:** No crypto function may be called before [ensureReady]
+/// has completed.  Every method enforces this with [_checkReady]; callers that
+/// skip [ensureReady] will receive a [StateError] rather than a silent
+/// `NoSuchMethodError` from a missing JS global.
 class NativeCryptoBridgeImpl implements NativeCryptoBridge {
+  // ── WASM readiness ────────────────────────────────────────────────────────
+
+  static bool _ready = false;
+  static Completer<void>? _readyCompleter;
+
+  /// Awaits the WASM module initialisation that the `index.html` loader script
+  /// performs asynchronously at page load.
+  ///
+  /// Must be called once from `main()` (under a `kIsWeb` guard) **before**
+  /// [runApp].  Subsequent calls return immediately once the module is ready.
+  ///
+  /// Throws if the WASM bundle failed to load (e.g. missing `pkg/crypto_core.js`).
+  static Future<void> ensureReady() async {
+    if (_ready) return;
+    if (_readyCompleter != null) {
+      return _readyCompleter!.future;
+    }
+    _readyCompleter = Completer<void>();
+    try {
+      await _cryptoCoreReadyPromise.toDart;
+      _ready = true;
+      _readyCompleter!.complete();
+    } catch (e) {
+      _readyCompleter!.completeError(
+        Exception('Failed to initialise WASM crypto module: $e'),
+      );
+      rethrow;
+    }
+  }
+
+  /// Throws [StateError] if [ensureReady] has not yet completed successfully.
+  ///
+  /// This gives a clear, actionable error instead of the opaque
+  /// `NoSuchMethodError: tried to call a non-function, such as null` that
+  /// would otherwise surface from a missing JS global.
+  void _checkReady() {
+    if (!_ready) {
+      throw StateError(
+        'WASM crypto module is not ready. '
+        'Await NativeCryptoBridgeImpl.ensureReady() in main() before calling crypto functions.',
+      );
+    }
+  }
+
   /// Creates a new [NativeCryptoBridgeImpl] instance for Web environments.
   NativeCryptoBridgeImpl();
 
@@ -71,6 +126,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> password,
     required List<int> salt,
   }) async {
+    _checkReady();
     try {
       final res = wasmDeriveMasterKey(_toJSArray(password), _toJSArray(salt));
       return _toDartList(res);
@@ -85,6 +141,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> key,
     required List<int> nonce,
   }) async {
+    _checkReady();
     try {
       final res = wasmEncryptAesGcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(plaintext));
       return _toDartList(res);
@@ -99,6 +156,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> key,
     required List<int> nonce,
   }) async {
+    _checkReady();
     try {
       final res = wasmDecryptAesGcm(_toJSArray(key), _toJSArray(nonce), _toJSArray(ciphertextAndMac));
       return _toDartList(res);
@@ -113,6 +171,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> masterKey,
     required List<int> salt,
   }) async {
+    _checkReady();
     try {
       final res = wasmSrpCalculateX(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
       return _toDartList(res);
@@ -127,6 +186,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> masterKey,
     required List<int> salt,
   }) async {
+    _checkReady();
     try {
       final res = wasmSrpCalculateVerifier(username.toJS, _toJSArray(masterKey), _toJSArray(salt));
       return _toDartList(res);
@@ -139,6 +199,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   List<Uint8List> srpGenerateClientEphemeral({
     required List<int> secureRandomBytes,
   }) {
+    _checkReady();
     try {
       final res = wasmSrpGenerateClientEphemeral(_toJSArray(secureRandomBytes));
       final dartBytes = _toDartList(res);
@@ -159,6 +220,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> B,
     required List<int> masterKey,
   }) async {
+    _checkReady();
     try {
       final res = wasmSrpCalculateClientSession(
         username.toJS,
@@ -184,6 +246,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required int m,
     required int n,
   }) {
+    _checkReady();
     try {
       final res = wasmShamirSplit(_toJSArray(secret), m.toJS, n.toJS);
       final flatBytes = _toDartList(res);
@@ -210,6 +273,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
   @override
   Uint8List shamirCombine({required List<Uint8List> shares}) {
+    _checkReady();
     try {
       var flatLen = 0;
       for (final s in shares) {

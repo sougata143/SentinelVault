@@ -251,7 +251,16 @@ class _VaultTabState extends State<VaultTab> {
               ),
             ),
           ),
-          Expanded(child: _buildSidebarList()),
+          // Wrap the sidebar list in a Material so that ListTile's
+          // selectedTileColor ink-splash renderer has a Material ancestor.
+          // Container(color:…) compiles to a ColoredBox which is NOT a
+          // Material, causing a Flutter debug assertion.
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: _buildSidebarList(),
+            ),
+          ),
           const Divider(color: Colors.white10),
           Padding(
             padding: const EdgeInsets.all(16),

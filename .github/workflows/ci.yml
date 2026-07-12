@@ -30,6 +30,41 @@ jobs:
       - name: Verify Flutter installation
         run: flutter doctor -v
 
+
+      # ── Rust native crypto core (needed by dart:ffi tests) ─────────────────
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # wasm32 target is also needed for wasm-pack build below
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/crypto_core -> target
+          # Include wasm-pack binary in the cache key so a version bump
+          # forces a fresh install.
+          cache-targets: "true"
+          key: flutter-test-${{ hashFiles('native/crypto_core/Cargo.lock') }}
+
+      - name: Build native libcrypto_core (host — for dart:ffi tests)
+        run: cargo build --release
+        working-directory: native/crypto_core
+        # Produces: native/crypto_core/target/release/libcrypto_core.so
+        # _loadLibrary() in native_crypto_bridge_io.dart probes
+        #   <cwd>/../native/crypto_core/target/release/libcrypto_core.so
+        # where <cwd> is the `core/` directory used by `flutter test`.
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &>/dev/null; then
+            cargo install wasm-pack --locked
+          fi
+
+      - name: Build WASM crypto bundle (for flutter build web)
+        run: bash native/build_wasm.sh
+        # Produces: app/web/pkg/crypto_core.js + app/web/pkg/crypto_core_bg.wasm
+
       # Analyze & Test Core Package
       - name: Core — Install Dependencies
         run: flutter pub get

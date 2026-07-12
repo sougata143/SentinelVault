@@ -7,7 +7,14 @@ import 'features/native_messaging/local_messaging_server.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Web-only: block until the WASM crypto module loaded by index.html is
+  // fully initialised.  This prevents the NoSuchMethodError that occurs when
+  // Dart calls into wasmEncryptAesGcm before wasm-bindgen's async init()
+  // has resolved.  On native/io this is a no-op (ensureWasmReady returns
+  // immediately from the io/stub implementation).
+  await ensureWasmReady();
+
   // Register real platform-backed secure storage
   SecureStorage.instance = FlutterPlatformSecureStorage();
   

@@ -19,3 +19,12 @@ export 'native_crypto_bridge_stub.dart'
 /// [NativeCryptoBridgeImpl] stub, which throws [UnsupportedError] if called —
 /// tests that exercise crypto paths should mock [NativeCryptoBridge] directly.
 NativeCryptoBridge getNativeCryptoBridge() => NativeCryptoBridgeImpl();
+
+/// Ensures the platform crypto implementation is ready before use.
+///
+/// On Web: awaits the WASM module initialisation promise exposed by the
+/// `index.html` loader script.  Must be called once in `main()` before
+/// [runApp] so that no crypto call is made before the module loads.
+///
+/// On native/io and in the stub: returns immediately (no-op).
+Future<void> ensureWasmReady() => NativeCryptoBridgeImpl.ensureReady();
