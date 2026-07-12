@@ -1,21 +1,20 @@
 # SentinelVault
 
-SentinelVault is a hybrid, offline-first, zero-knowledge password manager and security analysis suite. It is designed to run securely across Web, iOS, and Android platforms from a unified Flutter codebase, powered by a shared core package for client-side cryptography and data modeling, and specialized NestJS backend microservices.
+SentinelVault is a hybrid, offline-first, zero-knowledge password manager and security analysis suite. It runs across Web, iOS, and Android from a unified Flutter codebase, backed by a shared Dart core package for client-side cryptography and data modeling, a native Rust cryptography core, and specialized NestJS backend microservices.
 
 ---
 
 ## 🛡️ Security Invariants (Non-Negotiable)
 
-1. **Zero-Knowledge Architecture**: The master password and decrypted vault items never leave the user's device. No plaintext vault item, password, card number, or identity data is ever transmitted to the server or any third-party APIs.
-2. **Local Cryptography**: All symmetric encryption uses AES-256-GCM. Passwords are derived using the Argon2id key derivation function with a unique local salt per user. Cryptographic keys are held purely in volatile memory while the vault is unlocked.
-3. **Privacy-Preserving Breach Monitoring**: Password breach checks use k-anonymity (transmitting only the first 5 characters of the SHA-1 password hash to Have I Been Pwned). Email breach checks are opt-in only with explicit user disclosure before sending.
-4. **Least-Privilege AI Insights**: The AI Insights generation layer (Gemini 1.5 Flash) receives strictly redacted, non-sensitive structural signals (e.g., password zxcvbn scores, file extensions, signature mismatch flags) — never raw passwords or vault content.
+1. **Zero-Knowledge Architecture**: The Master Password and decrypted vault items never leave the user's device. No plaintext vault item, password, card number, or identity data is ever transmitted to the server or any third-party API.
+2. **Two-Secret Model**: Authentication and vault decryption are deliberately separate. The **Account Password** authenticates the user's session (via SRP-6a) and grants no cryptographic access to vault contents. The **Master Password** — a distinct secret, never transmitted to the server in any form — is the only thing that can derive the key needed to decrypt the vault. A valid session alone never unlocks the vault; the Unlock step is always required separately.
+3. **Local Cryptography**: All symmetric encryption uses AES-256-GCM. Keys are derived using Argon2id with a unique local salt per user. Cryptographic key material is held only in volatile memory while the vault is unlocked and is explicitly zeroized afterward.
+4. **Privacy-Preserving Breach Monitoring**: Password breach checks use k-anonymity (only the first 5 characters of the SHA-1 password hash are sent to Have I Been Pwned). Email breach checks are opt-in only, with explicit disclosure before any email address is sent to a third party.
+5. **Least-Privilege AI Insights**: The AI Insights layer (Gemini) receives only redacted, non-sensitive structural signals (e.g. password strength scores, file extensions, signature-mismatch flags) — never raw passwords, emails, files, or vault content.
 
 ---
 
 ## 🏗️ System Architecture
-
-SentinelVault is organized into three primary components:
 
 ```
                           ┌────────────────────────────────────────────────────────┐
@@ -30,6 +29,10 @@ SentinelVault is organized into three primary components:
                           │                      │  Shared Core  │                 │
                           │                      │ (Dart Package)│                 │
                           │                      └───────┬───────┘                 │
+                          │                      ┌───────────────┐                 │
+                          │                      │ Native Crypto │                 │
+                          │                      │ Core (Rust)   │                 │
+                          │                      └───────────────┘                 │
                           └──────────────────────────────┼─────────────────────────┘
                                                          │
                                                          │ TLS 1.3
@@ -37,34 +40,41 @@ SentinelVault is organized into three primary components:
                           ┌────────────────────────────────────────────────────────┐
                           │                      CLOUD LAYER                       │
                           │                                                        │
-                          │    ┌────────────────┐   ┌────────────────────────┐     │
-                          │    │ Auth Service   │   │ Security Analysis      │     │
-                          │    │ ( SRP / MFA /  │   │ Service (NestJS)       │     │
-                          │    │  Passkeys)     │   └────────────────────────┘     │
-                          │    └───────┬────────┘   ┌────────────────────────┐     │
-                          │            │            │ Sharing Service        │     │
-                          │            ▼            │ (PQC Key Directory /   │     │
-                          │       ┌──────────┐      │  Share Invites / REST) │     │
-                          │       │ Postgres │      └────────────────────────┘     │
-                          │       └──────────┘                                     │
+                          │  ┌────────────────┐  ┌────────────────┐               │
+                          │  │ Auth Service   │  │ Sync API        │               │
+                          │  │ (SRP-6a / MFA/ │  │ (Encrypted vault│               │
+                          │  │  Passkeys)     │  │  blob sync)     │               │
+                          │  └───────┬────────┘  └────────┬────────┘               │
+                          │          │                    │                        │
+                          │  ┌───────────────────┐ ┌────────────────────────┐      │
+                          │  │ Security Analysis  │ │ Sharing Service        │      │
+                          │  │ Service (NestJS)   │ │ (PQC Key Directory /   │      │
+                          │  └────────────────────┘ │  Share Invites / REST) │      │
+                          │            │             └────────────────────────┘     │
+                          │            ▼                                            │
+                          │       ┌──────────┐        ┌──────────┐                  │
+                          │       │ Postgres │        │  Redis   │                  │
+                          │       └──────────┘        └──────────┘                  │
                           └────────────────────────────────────────────────────────┘
-
 ```
 
 ### 1. Unified Frontend Client (`app/`)
 A cross-platform Flutter application providing:
 - **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane).
-- **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data breach feed, a weekly AI-generated digest, and quick-scan triggers.
-- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
+- **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data-breach feed, a weekly AI-generated digest, and quick-scan triggers.
+- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require Master Password re-verification.
 
 ### 2. Shared Core (`core/`)
-A platform-agnostic Dart package managing local databases (SQLite), cryptography engines (Argon2id and AES-256-GCM), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`).
+A platform-agnostic Dart package managing local databases (SQLite), the Dart-side crypto interface (delegating to the native Rust core), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`, sync client).
 
-### 3. Backend Services (`backend/`)
-- **auth-service**: Restricts authentication using passwordless passkeys (WebAuthn/FIDO2), secure SRP, rate-limiting, and TOTP MFA.
-- **security-analysis-service**: Handles URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, HIBP cron synchronizations, and allow-listed AI insights generation using Gemini.
-- **sharing-service**: Microservice key directory publishing classical/post-quantum public key bundles, and managing per-recipient wrapped (ciphertext) Folder Keys, securely handling share invitations.
+### 3. Native Crypto Core (`native/crypto_core/`)
+A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secret Sharing, and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
 
+### 4. Backend Services (`backend/`)
+- **auth-service**: Account authentication via SRP-6a (zero-knowledge — the Account Password is never transmitted in a crackable form), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting.
+- **sync-api**: Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock — never anything the server could decrypt.
+- **security-analysis-service**: URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini.
+- **sharing-service**: Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing.
 
 ---
 
@@ -72,30 +82,29 @@ A platform-agnostic Dart package managing local databases (SQLite), cryptography
 
 ```
 .
-├── app/                          # Flutter client application
+├── app/                           # Flutter client application
 │   ├── lib/
-│   │   ├── features/             # Feature UI screens (vault, security_center, etc.)
-│   │   └── theme/                # Global theme configuration
-│   └── test/                     # Widget, UI, and navigation tests
-├── core/                         # Shared cryptography & data package
+│   │   ├── features/              # Feature UI screens (vault, security_center, auth, settings, etc.)
+│   │   └── theme/                 # Global theme configuration
+│   └── test/                      # Widget, UI, and navigation tests
+├── core/                          # Shared cryptography & data package
 │   ├── lib/
-│   │   └── src/                  # Crypto, DB, Models, Security, Import/Export
-│   └── test/                     # Core units and crypto round-trip tests
-├── native/                        # Native FFI Crypto Core (Rust)
-│   ├── crypto_core/
-│   │   ├── src/algorithms/pqc_hybrid.rs # Classical + PQC hybrid math
-│   │   └── Cargo.toml
-├── browser-extension/            # Browser extension (Chrome, Firefox, Safari)
-│   ├── src/                      # Extension popup, content-scripts, native messaging host
-│   ├── core-bundle/              # Compiled shared Dart core JS bundles
-│   └── test/                     # Integration tests for native messaging host
-├── backend/                      # NestJS cloud microservices
-│   ├── auth-service/             # Authentication & user directory microservice
-│   ├── security-analysis-service/# Security reputation, breach, and AI service
-│   └── sharing-service/          # Key Directory & sharing microservice
-├── infra/                        # Cloud Run, Postgres, Redis Terraform templates
-└── docs/                         # Architecture, schemas, and UX definitions
-
+│   │   └── src/                   # Crypto interface, DB, models, security, import/export, sync
+│   └── test/                      # Core unit and crypto round-trip tests
+├── native/                        # Native Crypto Core (Rust)
+│   └── crypto_core/
+│       ├── src/algorithms/        # Argon2id, AES-GCM, SRP, Shamir, pqc_hybrid.rs
+│       └── Cargo.toml
+├── browser-extension/             # Browser extension (Chrome, Firefox, Safari)
+│   ├── src/                       # Extension popup, content scripts, native messaging host
+│   └── test/                      # Native messaging host + content-script integration tests
+├── backend/                       # NestJS cloud microservices
+│   ├── auth-service/              # Account authentication, MFA, passkeys        (:3001)
+│   ├── sync-api/                  # Encrypted vault sync                         (:3002)
+│   ├── security-analysis-service/ # Reputation, breach, and AI insight service   (:3003)
+│   └── sharing-service/           # PQC key directory & folder sharing           (:3004)
+├── infra/                         # Cloud Run, Postgres, Redis Terraform templates
+└── docs/                          # Architecture, schemas, and UX definitions
 ```
 
 ---
@@ -103,52 +112,53 @@ A platform-agnostic Dart package managing local databases (SQLite), cryptography
 ## 🛠️ Local Development Setup
 
 ### Prerequisites
-- Flutter SDK (v3.12+)
-- Node.js (v18+)
+- Flutter SDK (v3.22+, Dart ≥ 3.12)
+- Node.js (v20 LTS+)
+- Rust + Cargo (v1.77+) — required to build the native crypto core
 - Docker & Docker Compose
 
 ### 1. Database and Cache Dependencies
-Spin up PostgreSQL and Redis using Docker:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-### 2. Security Analysis Backend
-Create a `.env` file inside `backend/security-analysis-service/` matching `.env.example`, then run:
+### 2. Build the Native Crypto Core
+The native crate must be built before running `core/` tests or the Flutter app:
 ```bash
-cd backend/security-analysis-service
-npm install
-npm run start
-```
-*Note: Service runs on port `3003`.*
+cd native/crypto_core
+cargo build --release
+cargo test               # mandatory before any change to crypto code
 
-### 3. Authentication Backend
-Create a `.env` file inside `backend/auth-service/`, then run:
-```bash
-cd backend/auth-service
-npm install
-npm run start
+# Web/browser-extension target:
+rustup target add wasm32-unknown-unknown
+cargo build --target wasm32-unknown-unknown --features wasm
 ```
 
-### 4. Key Directory & Sharing Backend
-Run the sharing service:
-```bash
-cd backend/sharing-service
-npm install --legacy-peer-deps
-npm run start
-```
-*Note: Service runs on port `3002`.*
+### 3. Backend Services
+Each service needs its own `.env` (copy from `.env.example` in that service's directory).
 
+```bash
+# Auth Service — :3001
+cd backend/auth-service && npm install && npm run start
+
+# Sync API — :3002
+cd backend/sync-api && npm install && npm run start
+
+# Security Analysis Service — :3003
+cd backend/security-analysis-service && npm install && npm run start
+
+# Sharing Service (PQC Key Directory) — :3004
+cd backend/sharing-service && npm install --legacy-peer-deps && SHARING_PORT=3004 npm run start
+```
 
 ### 4. Running the Flutter App
-Run the client application:
 ```bash
 cd app
 flutter pub get
 flutter run
 ```
 
-To build the client for web distribution:
+Build for web distribution:
 ```bash
 flutter build web --release
 ```
@@ -157,63 +167,59 @@ flutter build web --release
 
 ## 🧪 Testing
 
-### Running Client and Core Tests
-Run all core package tests:
+### Core Package
 ```bash
 cd core
 dart test
 ```
+> Requires the native crypto core to be built first (see setup step 2) — `dart:ffi`/`dart:js_interop` have nothing to load otherwise.
 
-Run all Flutter widget and integration tests (including the Export Auth Gate and Security Dashboard tests):
+### Flutter App
 ```bash
 cd app
-flutter test
+flutter test   # widget, navigation, Export Auth Gate, and Security Dashboard tests
 ```
 
-Run all browser extension tests (native messaging host integration tests + isolated content-script tests):
+### Browser Extension
 ```bash
 cd browser-extension
 dart test
 node test/autofill_test.js
 ```
 
-### Running Backend Tests
-Run NestJS unit and integration test suites:
+### Backend Services
 ```bash
-# Security Reputation, Breach, and AI Service
-cd backend/security-analysis-service
-npm run test
-
-# Key Directory and Sharing Service
-cd backend/sharing-service
-npm run test
+cd backend/security-analysis-service && npm run test
+cd backend/sharing-service && npm run test
+cd backend/auth-service && npm run test
+cd backend/sync-api && npm run test
 ```
-
 
 ---
 
 ## 🚀 Key Features
 
-- **Zero-Knowledge Cryptography**: Local AES-256-GCM symmetric encryption for all vault items, and Argon2id key derivation with a local unique salt.
-- **Secure Remote Password (SRP-6a)**: Zero-knowledge client-server login handshakes preventing plaintext password transmission over the network.
-- **Local Unlock & Brute-Force Lockouts**: Screen-lock client protecting the master key in memory with client-side exponential backoff delays on repeated failed attempts.
-- **Independent Lock vs. Logout**: Separates memory key zero-out (Lock) from token session invalidation (Logout) for maximum security and usability.
-- **Biometric Quick-Unlock & OS-Backed Secure Storage**: Uses `flutter_secure_storage` for session tokens. The biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS with `kSecAccessControlBiometryCurrentSet`, and Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Automatically detects devices/emulators lacking hardware-backed secure storage to disable insecure quick-unlock. Any new biometric enrollment invalidates the cached key and falls back to manual Master Password entry.
-- **Emergency Kit Recovery Key**: Offline-first recovery system using Dual Key-Wrapping (Candidate 1). Generates a 32-character Base32 recovery key client-side, derives a KDF key via Argon2id, wraps the active Vault Key using AES-256-GCM, and persists it via sync API envelopes. Past recovery keys are invalidated on regeneration.
-- **Security Center Dashboard**: Password health score tracking, credential re-use checks, Have I Been Pwned chronological breach feed, and weekly redacted AI digests.
-- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require master-password verification.
-- **FIDO2/WebAuthn Passkey Authentication (Feature A)**: Standard WebAuthn primary registration and login ceremonies. Supports both platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (e.g. YubiKeys via USB/NFC/BLE) alongside OPAQUE Account Password flow, including username-less/discoverable credentials.
-- **Hardware Key Vault-Unlock (Feature B)**: Secure local vault-unlock option using the FIDO2 CTAP2 `hmac-secret` extension to wrap an additional copy of the Vault Key. Operates as an opt-in additional envelope, ensuring Master Password fallback if the key is lost or removed.
-- **Thin Web Extensions (Chrome, Firefox, Safari)**: Paired-mode extension architecture that communicates with the already-running native/desktop app via a native messaging host. Features exact origin matching, blocks cross-origin iframe fills, and reflects locks triggered in the native app within one interaction without holding any Vault Key material inside browser storage. Runs compiled JS bundles compiled directly from the Dart core package.
-- **Shamir's Secret Sharing Recovery (M-of-N)**: Cryptographic recovery key splitting into $N$ unique Base32 packet strings (range 3–10) with adjustable threshold $M$. Standard GF(256) sharks SSS library runs in the native Rust crypto core. Supports local reconstruction and offline invalidation through UUIDv4 epoch management.
-- **Duress / Decoy Vault (Dual-Vault)**: Dual-vault architecture with Vault Alpha (real) and Vault Beta (decoy, configured in Settings). Visually and timing-indistinguishable unlock flow. Decrypting the decoy vault automatically fires a native cache-wipe hook to clear the biometric cache of the real vault without touching its encrypted database. Includes explicit in-app limitations disclosure for plausible deniability.
-- **PQC Hybrid Folder Sharing**: Zero-knowledge hybrid classical + post-quantum folder key sharing using X25519 + ML-KEM-768 for envelope key-wrapping, combined via HKDF-SHA256 and AES-256-GCM. Employs Ed25519 + ML-DSA-65 dual signatures for invite payloads, protecting against server-side key substitution via mandatory out-of-band key fingerprint verification. Enforces revocation via Folder Key rotation and re-wrapping for current recipients.
-
+- **Zero-Knowledge Cryptography**: Local AES-256-GCM encryption for all vault items, Argon2id key derivation with a unique local salt, and a native Rust crypto core shared across native and Wasm builds.
+- **Two-Secret Auth Model**: Account Password (session/identity, SRP-6a) and Master Password (vault unlock) are fully independent — compromising one never grants access via the other.
+- **Secure Remote Password (SRP-6a)**: Zero-knowledge client-server login handshake; the Account Password is never transmitted in a crackable form.
+- **Local Unlock & Brute-Force Lockouts**: Client-side exponential backoff on repeated failed Master Password attempts.
+- **Independent Lock vs. Logout**: Lock clears key material from memory but preserves the session; Logout clears both.
+- **Biometric Quick-Unlock & OS-Backed Secure Storage**: `flutter_secure_storage` for session tokens; the biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS via `kSecAccessControlBiometryCurrentSet`, Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Devices lacking hardware-backed secure storage have quick-unlock disabled automatically; new biometric enrollment invalidates the cache and falls back to manual Master Password entry. Not offered on Web, which has no equivalent hardware to back it.
+- **Emergency Kit Recovery Key**: Offline-first recovery via dual key-wrapping — a client-side-generated recovery key derives a second wrapping key for the Vault Key, persisted as ciphertext via the sync API. Regenerating invalidates prior recovery keys.
+- **Shamir's Secret Sharing Recovery (M-of-N)**: The Emergency Kit recovery key can additionally be split into N shares (threshold M, range 3–10) via an audited GF(256) SSS implementation in the native Rust core, for distributed recovery across trusted contacts.
+- **FIDO2/WebAuthn Passkey Authentication**: Standard WebAuthn registration/login for the Account Password, supporting platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (YubiKey via USB/NFC/BLE).
+- **Hardware Key Vault-Unlock**: Opt-in additional Vault Key wrapping via the FIDO2 CTAP2 `hmac-secret` extension, with Master Password fallback always available if the key is lost or removed.
+- **Duress / Decoy Vault**: Independent Vault Alpha (real) and Vault Beta (decoy) with a visually and timing-indistinguishable unlock flow. Decoy unlock fires a native hook that invalidates the real vault's biometric cache only — never touching its encrypted data — plus an explicit in-app disclosure of the feature's actual limitations.
+- **PQC Hybrid Folder Sharing**: Folder Key sharing via X25519 + ML-KEM-768 envelope wrapping (combined via HKDF-SHA256) and AES-256-GCM, signed with Ed25519 + ML-DSA-65. Mandatory out-of-band key-fingerprint verification defends against server-side public-key substitution; revocation is enforced via Folder Key rotation and re-wrapping.
+- **Thin Browser Extensions (Chrome, Firefox, Safari)**: Paired-mode architecture — the extension holds no Vault Key material itself, instead communicating with the already-unlocked native/desktop app via a native messaging host. Reuses the same Rust-compiled Wasm crypto core built for Flutter Web rather than a separate compiled bundle. Enforces exact-origin autofill matching and blocks cross-origin iframe fills.
+- **Security Center Dashboard**: Password health scoring, credential reuse detection, chronological HIBP breach feed, and a weekly redacted AI-generated digest.
+- **Import/Export Suite**: See Local Development Setup and the frontend client section above for supported formats.
 
 ---
 
 ## 🔮 Future Scope
 
-1. **Peer-to-Peer Syncing**: Implement zero-knowledge direct local syncing via WebRTC/local network broadcasts.
+- **Post-Quantum Account Auth Hardening**: SRP-6a and WebAuthn/passkey signatures are asymmetric/discrete-log-based and theoretically vulnerable to a future quantum computer, unlike the vault's symmetric-only encryption chain. Bounded in severity today (compromise would grant account-level access only, never vault contents) but worth revisiting once post-quantum variants of these protocols mature.
+- **Emergency Kit printable artifact refinements**: further hardening of the offline recovery-kit UX.
 
-
+> Peer-to-peer/local-network syncing was evaluated and intentionally descoped — cloud sync via `sync-api` remains the only sync transport.
