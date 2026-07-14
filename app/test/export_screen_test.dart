@@ -294,5 +294,204 @@ void main() {
       expect(successText.data, contains('.svault'));
       expect(successText.data, isNot(contains('UNENCRYPTED')));
     });
+
+    testWidgets('8. Exported .svault file contents match vault items', (tester) async {
+      // Create a vault with known items
+      final vaultKey = List<int>.filled(32, 42);
+      final db = SqliteVaultDatabase.inMemory();
+      db.open(vaultKey);
+      final crypto = VaultCrypto();
+
+      // Add a login item
+      final loginItem = VaultItem(
+        id: 'test-login-1',
+        type: VaultItemType.login,
+        title: 'Test Login Item',
+        tags: const ['test'],
+        favorite: true,
+        vaultId: '',
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
+        fields: LoginFields(
+          username: 'testuser@example.com',
+          password: const ConcealedValue.plain('TestPassword123!'),
+          urls: const ['https://example.com'],
+          otpSecret: const ConcealedValue.plain('TOTP123'),
+          passwordHistory: const [],
+        ),
+        customFields: const [],
+        notes: const ConcealedValue.plain('Test notes'),
+      );
+      final encryptedLogin = await loginItem.encrypt(vaultKey, crypto);
+      db.insertItem(encryptedLogin);
+
+      // Add a secure note
+      final noteItem = VaultItem(
+        id: 'test-note-1',
+        type: VaultItemType.secureNote,
+        title: 'Test Note',
+        tags: const [],
+        favorite: false,
+        vaultId: '',
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
+        fields: SecureNoteFields(
+          content: const ConcealedValue.plain('Secret note content'),
+        ),
+        customFields: const [],
+        notes: const ConcealedValue.plain(''),
+      );
+      final encryptedNote = await noteItem.encrypt(vaultKey, crypto);
+      db.insertItem(encryptedNote);
+
+      // Export the vault
+      final exportService = ExportService();
+      final encryptedItems = db.getAllItems();
+      final svaultBytes = exportService.buildSvaultBackup(encryptedItems);
+
+      // Verify the exported file contains the encrypted items
+      expect(svaultBytes, isNotEmpty);
+      final svaultJson = jsonDecode(String.fromCharCodes(svaultBytes)) as Map<String, dynamic>;
+      
+      expect(svaultJson['format'], equals('svault'));
+      expect(svaultJson['version'], equals(1));
+      expect(svaultJson['item_count'], equals(2));
+
+      final exportedItems = svaultJson['items'] as List;
+      expect(exportedItems.length, equals(2));
+
+      // Verify the exported items match what we inserted
+      final firstItem = exportedItems[0] as Map<String, dynamic>;
+      expect(firstItem['id'], equals('test-login-1'));
+      expect(firstItem['encryptedBlob'], isNotEmpty);
+      expect(firstItem['nonce'], isNotEmpty);
+      expect(firstItem['version'], equals(1));
+
+      final secondItem = exportedItems[1] as Map<String, dynamic>;
+      expect(secondItem['id'], equals('test-note-1'));
+      expect(secondItem['encryptedBlob'], isNotEmpty);
+      expect(secondItem['nonce'], isNotEmpty);
+
+      // Verify the exported file does NOT contain plaintext passwords
+      final svaultString = String.fromCharCodes(svaultBytes);
+      expect(svaultString, isNot(contains('TestPassword123!')));
+      expect(svaultString, isNot(contains('testuser@example.com')));
+      expect(svaultString, isNot(contains('Secret note content')));
+
+      db.close();
+    });
+
+    testWidgets('9. Exported CSV file contents match decrypted vault items', (tester) async {
+      // Create a vault with known items
+      final vaultKey = List<int>.filled(32, 42);
+      final db = SqliteVaultDatabase.inMemory();
+      db.open(vaultKey);
+      final crypto = VaultCrypto();
+
+      // Add a login item
+      final loginItem = VaultItem(
+        id: 'test-csv-1',
+        type: VaultItemType.login,
+        title: 'CSV Test item',
+        tags: const ['csv-test'],
+        favorite: false,
+        vaultId: '',
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
+        fields: LoginFields(
+          username: 'csvuser@example.com',
+          password: const ConcealedValue.plain('CsvPassword!'),
+          urls: const ['https://csv.example.com'],
+          otpSecret: const ConcealedValue.plain(''),
+          passwordHistory: const [],
+        ),
+        customFields: const [],
+        notes: const ConcealedValue.plain('CSV notes'),
+      );
+      final encryptedLogin = await loginItem.encrypt(vaultKey, crypto);
+      db.insertItem(encryptedLogin);
+
+      // Export to CSV
+      final exportService = ExportService();
+      final encryptedItems = db.getAllItems();
+      
+      // Decrypt items (simulating what export screen does)
+      final decryptedItems = <VaultItem>[];
+      for (final enc in encryptedItems) {
+        decryptedItems.add(await VaultItem.decrypt(enc, vaultKey, crypto));
+      }
+
+      final csv = exportService.buildPlaintextCsv(decryptedItems);
+
+      // Verify CSV contains the expected content
+      expect(csv, contains('type,title,username,password'));
+      expect(csv, contains('login'));
+      expect(csv, contains('CSV Test item'));
+      expect(csv, contains('csvuser@example.com'));
+      expect(csv, contains('CsvPassword!'));
+      expect(csv, contains('https://csv.example.com'));
+      expect(csv, contains('CSV notes'));
+      expect(csv, contains('csv-test'));
+
+      db.close();
+    });
+
+    testWidgets('10. Exported JSON file contents match decrypted vault items', (tester) async {
+      // Create a vault with known items
+      final vaultKey = List<int>.filled(32, 42);
+      final db = SqliteVaultDatabase.inMemory();
+      db.open(vaultKey);
+      final crypto = VaultCrypto();
+
+      // Add a credit card item
+      final cardItem = VaultItem(
+        id: 'test-json-1',
+        type: VaultItemType.creditCard,
+        title: 'Test Card',
+        tags: const [],
+        favorite: false,
+        vaultId: '',
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
+        fields: CreditCardFields(
+          cardholderName: 'Test Holder',
+          cardNumber: const ConcealedValue.plain('4111111111111111'),
+          brand: 'visa',
+          expiryMonth: 12,
+          expiryYear: 2030,
+          cvv: const ConcealedValue.plain('123'),
+          pin: const ConcealedValue.plain(''),
+        ),
+        customFields: const [],
+        notes: const ConcealedValue.plain(''),
+      );
+      final encryptedCard = await cardItem.encrypt(vaultKey, crypto);
+      db.insertItem(encryptedCard);
+
+      // Export to JSON
+      final exportService = ExportService();
+      final encryptedItems = db.getAllItems();
+      
+      // Decrypt items
+      final decryptedItems = <VaultItem>[];
+      for (final enc in encryptedItems) {
+        decryptedItems.add(await VaultItem.decrypt(enc, vaultKey, crypto));
+      }
+
+      final json = exportService.buildPlaintextJson(decryptedItems);
+
+      // Verify JSON contains the expected content
+      expect(json, contains('sentinelvault_plaintext_export'));
+      expect(json, contains('THIS FILE IS UNENCRYPTED'));
+      expect(json, contains('Test Card'));
+      expect(json, contains('4111111111111111'));
+      expect(json, contains('visa'));
+      expect(json, contains('12'));
+      expect(json, contains('2030'));
+      expect(json, contains('123'));
+      expect(json, contains('Test Holder'));
+
+      db.close();
+    });
   });
 }

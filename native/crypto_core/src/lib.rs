@@ -375,6 +375,57 @@ pub fn wasm_srp_calculate_client_session(
 }
 
 // ==========================================================================
+// Shamir's Secret Sharing — WebAssembly Exports
+// ==========================================================================
+//
+// These match the wire format used by the FFI functions (length-prefixed shares)
+// to maintain compatibility with the Dart web implementation.
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn wasm_shamir_split(secret: &[u8], m: u8, n: u8) -> Result<Vec<u8>, JsValue> {
+    let shares = shamir::split_secret(secret, m, n)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    // Flatten into length-prefixed wire format (same as FFI)
+    let mut buf: Vec<u8> = Vec::new();
+    for share_blob in &shares {
+        let share_len = share_blob.len() as u32;
+        buf.extend_from_slice(&share_len.to_le_bytes());
+        buf.extend_from_slice(share_blob);
+    }
+    Ok(buf)
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn wasm_shamir_combine(flat_shares: &[u8]) -> Result<Vec<u8>, JsValue> {
+    // Parse length-prefixed share blobs (same as FFI)
+    let mut share_blobs: Vec<Vec<u8>> = Vec::new();
+    let mut cursor = 0usize;
+    while cursor + 4 <= flat_shares.len() {
+        let len = u32::from_le_bytes([
+            flat_shares[cursor],
+            flat_shares[cursor + 1],
+            flat_shares[cursor + 2],
+            flat_shares[cursor + 3],
+        ]) as usize;
+        cursor += 4;
+        if cursor + len > flat_shares.len() {
+            return Err(JsValue::from_str("malformed input buffer"));
+        }
+        share_blobs.push(flat_shares[cursor..cursor + len].to_vec());
+        cursor += len;
+    }
+    if share_blobs.is_empty() {
+        return Err(JsValue::from_str("no shares provided"));
+    }
+
+    shamir::combine_shares(&share_blobs)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+// ==========================================================================
 // 7. Shamir's Secret Sharing — Split
 // ==========================================================================
 //

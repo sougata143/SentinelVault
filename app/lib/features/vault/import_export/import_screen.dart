@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:core/core.dart';
 import '../../../theme/theme.dart';
 
@@ -167,11 +168,68 @@ class _ImportScreenState extends State<ImportScreen> {
     super.dispose();
   }
 
+  Future<void> _pickFile() async {
+    String? extension;
+    switch (_selectedFormat) {
+      case 'bitwarden':
+        extension = 'json';
+        break;
+      case '1password':
+        extension = '1pux';
+        break;
+      case 'lastpass':
+      case 'chrome_csv':
+      case 'firefox_csv':
+      case 'safari_csv':
+      case 'dashlane':
+      case 'keeper':
+      case 'nordpass':
+      case 'roboform':
+        extension = 'csv';
+        break;
+      case 'protonpass':
+        extension = 'json';
+        break;
+      case 'keepass_kdbx':
+        extension = 'kdbx';
+        break;
+      case 'generic_csv':
+        extension = 'csv';
+        break;
+      default:
+        extension = null;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: extension != null ? FileType.custom : FileType.any,
+      allowedExtensions: extension != null ? [extension] : null,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      final file = result.files.single;
+      final bytes = await file.bytes;
+      
+      if (bytes != null) {
+        if (_selectedFormat == 'keepass_kdbx') {
+          // For KeePass, store as Base64 for the existing parser
+          _fileContentController.text = base64Encode(bytes);
+        } else {
+          // For text-based formats, decode as UTF-8
+          _fileContentController.text = utf8.decode(bytes);
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loaded: ${file.name}')),
+        );
+      }
+    }
+  }
+
   Future<void> _parseContent() async {
     final content = _fileContentController.text.trim();
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please paste or enter the export file content first.')),
+        const SnackBar(content: Text('Please select a file or paste the export file content first.')),
       );
       return;
     }
@@ -473,6 +531,17 @@ class _ImportScreenState extends State<ImportScreen> {
         ],
 
         const SizedBox(height: 20),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.surfaceColor,
+            foregroundColor: AppTheme.primaryColor,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          icon: const Icon(Icons.folder_open),
+          label: const Text('Select File'),
+          onPressed: _pickFile,
+        ),
+        const SizedBox(height: 16),
         Text(
           _selectedFormat == 'keepass_kdbx' ? 'KDBX FILE CONTENT (BASE64)' : 'FILE CONTENT',
           style: const TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
@@ -483,8 +552,8 @@ class _ImportScreenState extends State<ImportScreen> {
           maxLines: 12,
           decoration: InputDecoration(
             hintText: _selectedFormat == 'keepass_kdbx'
-                ? 'Paste the Base64-encoded KDBX file content here...'
-                : 'Paste the export file content here...',
+                ? 'Paste the Base64-encoded KDBX file content here or use Select File above...'
+                : 'Paste the export file content here or use Select File above...',
             alignLabelWithHint: true,
           ),
         ),

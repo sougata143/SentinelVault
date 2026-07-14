@@ -1,0 +1,32 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const decrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const derive_master_key: (a: number, b: number, c: number, d: number, e: number) => number;
+export const encrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const pqc_generate_keypairs: (a: number, b: number, c: number) => number;
+export const pqc_hybrid_unwrap: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
+export const pqc_hybrid_wrap: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const pqc_sign_invitation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const pqc_verify_invitation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+export const shamir_combine: (a: number, b: number, c: number, d: number, e: number) => number;
+export const shamir_split: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const srp_calculate_client_session: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => number;
+export const srp_calculate_verifier: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const srp_calculate_x: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const srp_generate_client_ephemeral: (a: number, b: number, c: number, d: number) => number;
+export const wasm_decrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const wasm_derive_master_key: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+export const wasm_encrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const wasm_srp_calculate_client_session: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];
+export const wasm_srp_calculate_verifier: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+export const wasm_srp_calculate_x: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+export const wasm_srp_generate_client_ephemeral: (a: number, b: number) => [number, number];
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_start: () => void;

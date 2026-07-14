@@ -1,9 +1,19 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { SyncModule } from './sync/sync.module';
 
 @Module({
-  imports: [SyncModule],
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      synchronize: true, // TEMPORARY: Auto-create tables for initial setup. Will be replaced with migrations.
+      logging: false,
+    }),
+    SyncModule,
+  ],
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }

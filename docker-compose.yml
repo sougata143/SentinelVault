@@ -1,17 +1,23 @@
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: sentinelvault-db
     environment:
-      POSTGRES_DB: sentinelvault
-      POSTGRES_USER: sentinel_admin
-      POSTGRES_PASSWORD: sentinel_password_change_me
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelvault}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_password_change_me}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel_admin} -d ${POSTGRES_DB:-sentinelvault}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: always
+    networks:
+      - sentinelvault-net
 
   redis:
     image: redis:7-alpine
@@ -20,8 +26,162 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: always
+    networks:
+      - sentinelvault-net
+
+  auth-service:
+    image: node:20-alpine
+    container_name: sentinelvault-auth
+    working_dir: /app
+    volumes:
+      - ./backend/auth-service:/app
+      - auth_node_modules:/app/node_modules
+    command: sh -c "[ -d node_modules/.bin ] || npm install; npm run start:dev"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      AUTH_PORT: ${AUTH_PORT:-3001}
+    ports:
+      - "${AUTH_PORT:-3001}:${AUTH_PORT:-3001}"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:${AUTH_PORT:-3001}/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net
+
+  sync-api:
+    image: node:20-alpine
+    container_name: sentinelvault-sync
+    working_dir: /app
+    volumes:
+      - ./backend/sync-api:/app
+      - sync_node_modules:/app/node_modules
+    command: sh -c "[ -d node_modules/.bin ] || npm install; npm run start:dev"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SYNC_PORT: ${SYNC_PORT:-3002}
+    ports:
+      - "${SYNC_PORT:-3002}:${SYNC_PORT:-3002}"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SYNC_PORT:-3002}/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net
+
+  security-analysis-service:
+    image: node:20-alpine
+    container_name: sentinelvault-security-analysis
+    working_dir: /app
+    volumes:
+      - ./backend/security-analysis-service:/app
+      - security_analysis_node_modules:/app/node_modules
+    command: sh -c "[ -d node_modules/.bin ] || npm install; npm run start:dev"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SECURITY_ANALYSIS_PORT: ${SECURITY_ANALYSIS_PORT:-3003}
+    ports:
+      - "${SECURITY_ANALYSIS_PORT:-3003}:${SECURITY_ANALYSIS_PORT:-3003}"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SECURITY_ANALYSIS_PORT:-3003}/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net
+
+  sharing-service:
+    image: node:20-alpine
+    container_name: sentinelvault-sharing
+    working_dir: /app
+    volumes:
+      - ./backend/sharing-service:/app
+      - sharing_node_modules:/app/node_modules
+      - sharing_npm_cache:/root/.npm
+    # sharing-service pulls in PQC crypto packages (X25519 + ML-KEM-768,
+    # Ed25519 + ML-DSA-65 per the key-directory/sharing design) that may ship
+    # native or WASM postinstall build steps. node:20-alpine has no build
+    # toolchain by default, which can surface as an EACCES on npm's cache/build
+    # dir rather than a clear "command not found." Installing the toolchain and
+    # pinning HOME/npm cache to a writable, persistent location addresses the
+    # most common cause. If EACCES persists, capture the exact failing path
+    # from the error and we'll target it directly.
+    command: >
+      sh -c "apk add --no-cache python3 make g++ >/dev/null &&
+             ([ -d node_modules/.bin ] || npm install --legacy-peer-deps) &&
+             npm run start:dev"
+    env_file:
+      - .env
+    environment:
+      HOME: /root
+      npm_config_cache: /root/.npm
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SHARING_PORT: ${SHARING_PORT:-3004}
+    ports:
+      - "${SHARING_PORT:-3004}:${SHARING_PORT:-3004}"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SHARING_PORT:-3004}/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net
+
+networks:
+  sentinelvault-net:
+    driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
+  auth_node_modules:
+  sync_node_modules:
+  security_analysis_node_modules:
+  sharing_node_modules:
+  sharing_npm_cache:

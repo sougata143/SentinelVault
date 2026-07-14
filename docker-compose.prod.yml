@@ -1,0 +1,136 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentinelvault-db-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelvault}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_password_change_me}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel_admin} -d ${POSTGRES_DB:-sentinelvault}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    networks:
+      - sentinelvault-net-prod
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinelvault-cache-prod
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    networks:
+      - sentinelvault-net-prod
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    image: sentinelvault/auth-service:latest
+    container_name: sentinelvault-auth-prod
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      AUTH_PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net-prod
+
+  sync-api:
+    build:
+      context: ./backend/sync-api
+      dockerfile: Dockerfile
+    image: sentinelvault/sync-api:latest
+    container_name: sentinelvault-sync-prod
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SYNC_PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net-prod
+
+  security-analysis-service:
+    build:
+      context: ./backend/security-analysis-service
+      dockerfile: Dockerfile
+    image: sentinelvault/security-analysis-service:latest
+    container_name: sentinelvault-security-analysis-prod
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SECURITY_ANALYSIS_PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net-prod
+
+  sharing-service:
+    build:
+      context: ./backend/sharing-service
+      dockerfile: Dockerfile
+    image: sentinelvault/sharing-service:latest
+    container_name: sentinelvault-sharing-prod
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
+      REDIS_URL: redis://redis:6379
+      SHARING_PORT: 3004
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinelvault-net-prod
+
+networks:
+  sentinelvault-net-prod:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:

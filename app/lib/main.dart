@@ -3,6 +3,7 @@ import 'package:core/core.dart';
 import 'app_shell.dart';
 import 'theme/theme.dart';
 import 'features/auth/flutter_secure_storage_impl.dart';
+import 'features/auth/route_guard.dart';
 import 'features/native_messaging/local_messaging_server.dart';
 
 void main() async {
@@ -44,7 +45,7 @@ class MyApp extends StatelessWidget {
       title: 'SentinelVault',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const VaultHomeScreen(),
+      home: const RouteGuard(),
     );
   }
 }

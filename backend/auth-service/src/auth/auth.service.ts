@@ -11,6 +11,8 @@ import {
   VerifyRegistrationResponseOpts,
   VerifyAuthenticationResponseOpts,
 } from '@simplewebauthn/server';
+import { Repository, QueryFailedError } from 'typeorm';
+import { Logger } from '@nestjs/common';
 
 interface LoginChallenge {
   username: string;
@@ -39,6 +41,7 @@ export class AuthService {
   private readonly passkeyChallenges: Map<string, { username?: string; createdAt: number }> = new Map();
   // Server secret for generating deterministic dummy parameters for invalid users
   private readonly serverSecret: Buffer;
+  private readonly logger = new Logger(AuthService.name);
 
   // WebAuthn configuration constants
   private readonly rpName = 'SentinelVault';
@@ -56,20 +59,31 @@ export class AuthService {
     if (!username || !saltHex || !verifierHex) {
       throw new HttpException('Missing registration parameters', HttpStatus.BAD_REQUEST);
     }
+
     const existing = await this.userRepository.findByUsername(username);
     if (existing) {
       throw new HttpException('Username already exists', HttpStatus.CONFLICT);
     }
 
-    await this.userRepository.save({
-      username,
-      salt: saltHex,
-      verifier: verifierHex,
-      failedAttempts: 0,
-      lockoutUntil: null,
-      totpEnabled: false,
-      webauthnEnabled: false,
-    });
+    try {
+      await this.userRepository.save({
+        username,
+        salt: saltHex,
+        verifier: verifierHex,
+        failedAttempts: 0,
+        lockoutUntil: null,
+        totpEnabled: false,
+        webauthnEnabled: false,
+      });
+    } catch (err) {
+      // Postgres unique_violation — most likely a case-insensitive username
+      // race that findByUsername's own check didn't catch
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new HttpException('Username already exists', HttpStatus.CONFLICT);
+      }
+      this.logger.error('User registration failed', err instanceof Error ? err.stack : String(err));
+      throw new HttpException('Registration failed. Please try again.', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     return { success: true };
   }
