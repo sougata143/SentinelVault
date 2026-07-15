@@ -7,7 +7,7 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 ## 🛡️ Security Invariants (Non-Negotiable)
 
 1. **Zero-Knowledge Architecture**: The Master Password and decrypted vault items never leave the user's device. No plaintext vault item, password, card number, or identity data is ever transmitted to the server or any third-party API.
-2. **Two-Secret Model**: Authentication and vault decryption are deliberately separate. The **Account Password** authenticates the user's session (via SRP-6a) and grants no cryptographic access to vault contents. The **Master Password** — a distinct secret, never transmitted to the server in any form — is the only thing that can derive the key needed to decrypt the vault. A valid session alone never unlocks the vault; the Unlock step is always required separately.
+2. **Two-Secret Model**: Authentication and vault decryption are deliberately separate. The **Account Password** authenticates the user's session (via SRP-6a) and grants no cryptographic access to vault contents. The **Master Password** — a distinct secret, never transmitted to the server in any form — is the only thing that can derive the key needed to decrypt the vault. A valid session alone never unlocks the vault; the Unlock step is always required separately. Successful authentication yields a cryptographically signed JWT (HS256, 24 h expiry) stored on-device in secure storage; every subsequent request to the backend microservices is authenticated via `Authorization: Bearer <token>` — the server verifies the signature before trusting any identity claim.
 3. **Local Cryptography**: All symmetric encryption uses AES-256-GCM. Keys are derived using Argon2id with a unique local salt per user. Cryptographic key material is held only in volatile memory while the vault is unlocked and is explicitly zeroized afterward.
 4. **Privacy-Preserving Breach Monitoring**: Password breach checks use k-anonymity (only the first 5 characters of the SHA-1 password hash are sent to Have I Been Pwned). Email breach checks are opt-in only, with explicit disclosure before any email address is sent to a third party.
 5. **Least-Privilege AI Insights**: The AI Insights layer (Gemini) receives only redacted, non-sensitive structural signals (e.g. password strength scores, file extensions, signature-mismatch flags) — never raw passwords, emails, files, or vault content.
@@ -71,10 +71,10 @@ A platform-agnostic Dart package managing local databases (SQLite), the Dart-sid
 A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secret Sharing, and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
 
 ### 4. Backend Services (`backend/`)
-- **auth-service**: Account authentication via SRP-6a (zero-knowledge — the Account Password is never transmitted in a crackable form), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting.
-- **sync-api**: Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock — never anything the server could decrypt.
-- **security-analysis-service**: URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini.
-- **sharing-service**: Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing.
+- **auth-service**: Account authentication via SRP-6a (zero-knowledge — the Account Password is never transmitted in a crackable form), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Issues cryptographically signed JWTs (`@nestjs/jwt`, HS256) containing the server-assigned user UUID as `sub`; token expiry is 24 h.
+- **sync-api**: Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock — never anything the server could decrypt. All endpoints are protected by a custom `JwtAuthGuard`; the acting user ID is extracted from the verified JWT `sub` claim, never from a client-supplied header.
+- **security-analysis-service**: URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini. All identity-gated endpoints verify the JWT before processing.
+- **sharing-service**: Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing. All key-directory and share-invite endpoints are protected by `JwtAuthGuard`.
 
 ---
 
@@ -135,7 +135,7 @@ cargo build --target wasm32-unknown-unknown --features wasm
 ```
 
 ### 3. Backend Services
-Each service needs its own `.env` (copy from `.env.example` in that service's directory).
+Each service reads a shared root `.env` at startup. Copy `.env.example` to `.env` and set a strong `JWT_SECRET` before running in any environment beyond local dev.
 
 ```bash
 # Auth Service — :3001
@@ -188,11 +188,15 @@ node test/autofill_test.js
 ```
 
 ### Backend Services
+All services require a running Postgres + Redis and a `JWT_SECRET` for the integration test suites:
 ```bash
-cd backend/security-analysis-service && npm run test
-cd backend/sharing-service && npm run test
-cd backend/auth-service && npm run test
-cd backend/sync-api && npm run test
+export DB=postgresql://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault
+export JWT_SECRET=test-jwt-secret-at-least-32-bytes-long!!
+
+for svc in auth-service sync-api security-analysis-service sharing-service; do
+  DATABASE_URL=$DB REDIS_URL=redis://localhost:6379 JWT_SECRET=$JWT_SECRET \
+    npm test --prefix backend/$svc -- --forceExit
+done
 ```
 
 ---
@@ -201,7 +205,8 @@ cd backend/sync-api && npm run test
 
 - **Zero-Knowledge Cryptography**: Local AES-256-GCM encryption for all vault items, Argon2id key derivation with a unique local salt, and a native Rust crypto core shared across native and Wasm builds.
 - **Two-Secret Auth Model**: Account Password (session/identity, SRP-6a) and Master Password (vault unlock) are fully independent — compromising one never grants access via the other.
-- **Secure Remote Password (SRP-6a)**: Zero-knowledge client-server login handshake; the Account Password is never transmitted in a crackable form.
+- **Secure Remote Password (SRP-6a)**: Zero-knowledge client-server login handshake; the Account Password is never transmitted in a crackable form. Successful login yields a signed JWT stored on-device; all subsequent API requests carry it as `Authorization: Bearer <token>`.
+- **Server-Side JWT Verification**: Every backend endpoint that modifies or reads user-scoped data validates the `Authorization: Bearer <token>` header via a shared `JwtAuthGuard` before the controller method runs. The acting user identity is derived entirely from the verified JWT `sub` claim — the server never trusts a client-supplied user ID header.
 - **Local Unlock & Brute-Force Lockouts**: Client-side exponential backoff on repeated failed Master Password attempts.
 - **Independent Lock vs. Logout**: Lock clears key material from memory but preserves the session; Logout clears both.
 - **Biometric Quick-Unlock & OS-Backed Secure Storage**: `flutter_secure_storage` for session tokens; the biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS via `kSecAccessControlBiometryCurrentSet`, Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Devices lacking hardware-backed secure storage have quick-unlock disabled automatically; new biometric enrollment invalidates the cache and falls back to manual Master Password entry. Not offered on Web, which has no equivalent hardware to back it.
