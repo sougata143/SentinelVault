@@ -8,7 +8,11 @@ import 'duress_setup_screen.dart';
 
 class AppSettings {
   static int clipboardTimeoutSeconds = 30;
+  /// When true the idle-lock timer is never started ("Never" option).
+  static bool autoLockNever = false;
+  /// When true auto-lock is enabled and obeys [autoLockTimeoutMinutes].
   static bool autoLockEnabled = true;
+  /// Idle timeout in minutes. Ignored when [autoLockNever] is true.
   static int autoLockTimeoutMinutes = 5;
   static bool biometricEnabled = false;
 }
@@ -45,7 +49,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late int _clipboardTimeout;
   late bool _autoLock;
-  late int _autoLockTimeout;
+  /// null means "Never"
+  late int? _autoLockTimeout;
   late bool _biometricEnabled;
 
   bool _hasRecoveryKey = false;
@@ -56,7 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _clipboardTimeout = AppSettings.clipboardTimeoutSeconds;
     _autoLock = AppSettings.autoLockEnabled;
-    _autoLockTimeout = AppSettings.autoLockTimeoutMinutes;
+    _autoLockTimeout = AppSettings.autoLockNever ? null : AppSettings.autoLockTimeoutMinutes;
     _biometricEnabled = AppSettings.biometricEnabled;
     _checkRecoveryStatus();
   }
@@ -260,7 +265,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _saveSettings() {
     AppSettings.clipboardTimeoutSeconds = _clipboardTimeout;
     AppSettings.autoLockEnabled = _autoLock;
-    AppSettings.autoLockTimeoutMinutes = _autoLockTimeout;
+    AppSettings.autoLockNever = (_autoLockTimeout == null);
+    AppSettings.autoLockTimeoutMinutes = _autoLockTimeout ?? AppSettings.autoLockTimeoutMinutes;
     AppSettings.biometricEnabled = _biometricEnabled;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved successfully')),
@@ -344,23 +350,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (_autoLock) ...[
                     const Divider(color: Colors.white10),
                     ListTile(
-                      title: const Text('Auto-Lock Timeout'),
-                      subtitle: Text('$_autoLockTimeout minutes'),
-                      trailing: const Icon(Icons.hourglass_empty, color: AppTheme.primaryColor),
-                    ),
-                    Slider(
-                      value: _autoLockTimeout.toDouble(),
-                      min: 1,
-                      max: 30,
-                      divisions: 29,
-                      activeColor: AppTheme.primaryColor,
-                      inactiveColor: Colors.grey[800],
-                      onChanged: (val) {
-                        setState(() {
-                          _autoLockTimeout = val.toInt();
-                        });
-                        _saveSettings();
-                      },
+                      title: const Text('Auto-Lock After'),
+                      subtitle: const Text('Idle time before the vault locks'),
+                      trailing: DropdownButton<int?>(
+                        key: const Key('auto-lock-timeout-dropdown'),
+                        value: _autoLockTimeout,
+                        dropdownColor: const Color(0xFF1E1E2E),
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 1,    child: Text('1 minute')),
+                          DropdownMenuItem(value: 5,    child: Text('5 minutes')),
+                          DropdownMenuItem(value: 15,   child: Text('15 minutes')),
+                          DropdownMenuItem(value: 30,   child: Text('30 minutes')),
+                          DropdownMenuItem(value: 60,   child: Text('1 hour')),
+                          DropdownMenuItem(value: 240,  child: Text('4 hours')),
+                          DropdownMenuItem(value: null, child: Text('Never')),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            _autoLockTimeout = val;
+                          });
+                          _saveSettings();
+                        },
+                      ),
                     ),
                   ],
                   // Biometric Quick-Unlock is a native OS-hardware feature.

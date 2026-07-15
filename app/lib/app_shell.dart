@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
@@ -36,6 +37,10 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
   Timer? _inactivityTimer;
+  /// Grace-period timer started when the app goes to background on native.
+  /// If the user returns within [_gracePeriod] the vault stays unlocked.
+  Timer? _graceLockTimer;
+  static const _gracePeriod = Duration(seconds: 30);
 
   @override
   void initState() {
@@ -48,27 +53,45 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _inactivityTimer?.cancel();
+    _graceLockTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _triggerLock();
+    switch (state) {
+      case AppLifecycleState.paused:
+        // App moved to background on native. Start a grace-period timer so a
+        // brief app-switch (e.g. checking a notification) does not force a
+        // full re-authentication. The inactivity timer continues counting from
+        // whenever the user last interacted, so very long absences still lock.
+        if (!AppSettings.autoLockNever && AppSettings.autoLockEnabled) {
+          _graceLockTimer ??= Timer(_gracePeriod, _triggerLock);
+        }
+      case AppLifecycleState.resumed:
+        // User returned before the grace period expired — cancel it.
+        _graceLockTimer?.cancel();
+        _graceLockTimer = null;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        break;
     }
   }
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
-    if (AppSettings.autoLockEnabled) {
-      final timeout = widget.autoLockTimeoutOverride ??
-          Duration(minutes: AppSettings.autoLockTimeoutMinutes);
-      _inactivityTimer = Timer(timeout, _triggerLock);
-    }
+    // "Never" option: do not start a timer at all.
+    if (AppSettings.autoLockNever || !AppSettings.autoLockEnabled) return;
+    final timeout = widget.autoLockTimeoutOverride ??
+        Duration(minutes: AppSettings.autoLockTimeoutMinutes);
+    _inactivityTimer = Timer(timeout, _triggerLock);
   }
 
   void _triggerLock() {
     _inactivityTimer?.cancel();
+    _graceLockTimer?.cancel();
+    _graceLockTimer = null;
     VaultLockManager.instance.lock();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(

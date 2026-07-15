@@ -215,16 +215,17 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Send background lifecycle state (triggers lock)
+      // Send background lifecycle state (starts grace-period lock timer)
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      // Transition back to resumed through hidden and inactive
+
+      // Wait 31 seconds for the 30-second grace period timer to expire
+      await tester.pump(const Duration(seconds: 31));
+
+      // Transition back to resumed through hidden and inactive so the navigation transition runs
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.idle();
-      for (int i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      await tester.pumpAndSettle();
 
       // Verify locked and navigated to UnlockScreen
       expect(find.byType(UnlockScreen), findsOneWidget);
