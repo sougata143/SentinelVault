@@ -10,7 +10,7 @@ void main() {
 
   group('Login Form Widget Tests', () {
     testWidgets('1. Login Form Validation Checks', (WidgetTester tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const MyApp(home: VaultHomeScreen()));
 
       // Open Type Picker
       await tester.tap(find.byType(FloatingActionButton));
@@ -31,7 +31,7 @@ void main() {
     });
 
     testWidgets('2. Password Generator and Websites and OTP setup', (WidgetTester tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const MyApp(home: VaultHomeScreen()));
 
       // Open Type Picker
       await tester.tap(find.byType(FloatingActionButton));

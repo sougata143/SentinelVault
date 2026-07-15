@@ -6,14 +6,14 @@
  * @param {Uint8Array} ciphertext
  * @returns {Uint8Array}
  */
-export function wasm_decrypt_aes_gcm(key, nonce, ciphertext) {
+export function wasmDecryptAesGcm(key, nonce, ciphertext) {
     const ptr0 = passArray8ToWasm0(key, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(nonce, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ptr2 = passArray8ToWasm0(ciphertext, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_decrypt_aes_gcm(ptr0, len0, ptr1, len1, ptr2, len2);
+    const ret = wasm.wasmDecryptAesGcm(ptr0, len0, ptr1, len1, ptr2, len2);
     if (ret[3]) {
         throw takeFromExternrefTable0(ret[2]);
     }
@@ -27,12 +27,12 @@ export function wasm_decrypt_aes_gcm(key, nonce, ciphertext) {
  * @param {Uint8Array} salt
  * @returns {Uint8Array}
  */
-export function wasm_derive_master_key(password, salt) {
+export function wasmDeriveMasterKey(password, salt) {
     const ptr0 = passArray8ToWasm0(password, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(salt, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_derive_master_key(ptr0, len0, ptr1, len1);
+    const ret = wasm.wasmDeriveMasterKey(ptr0, len0, ptr1, len1);
     if (ret[3]) {
         throw takeFromExternrefTable0(ret[2]);
     }
@@ -47,20 +47,54 @@ export function wasm_derive_master_key(password, salt) {
  * @param {Uint8Array} plaintext
  * @returns {Uint8Array}
  */
-export function wasm_encrypt_aes_gcm(key, nonce, plaintext) {
+export function wasmEncryptAesGcm(key, nonce, plaintext) {
     const ptr0 = passArray8ToWasm0(key, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(nonce, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ptr2 = passArray8ToWasm0(plaintext, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_encrypt_aes_gcm(ptr0, len0, ptr1, len1, ptr2, len2);
+    const ret = wasm.wasmEncryptAesGcm(ptr0, len0, ptr1, len1, ptr2, len2);
     if (ret[3]) {
         throw takeFromExternrefTable0(ret[2]);
     }
     var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v4;
+}
+
+/**
+ * @param {Uint8Array} flat_shares
+ * @returns {Uint8Array}
+ */
+export function wasmShamirCombine(flat_shares) {
+    const ptr0 = passArray8ToWasm0(flat_shares, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmShamirCombine(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * @param {Uint8Array} secret
+ * @param {number} m
+ * @param {number} n
+ * @returns {Uint8Array}
+ */
+export function wasmShamirSplit(secret, m, n) {
+    const ptr0 = passArray8ToWasm0(secret, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmShamirSplit(ptr0, len0, m, n);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
 }
 
 /**
@@ -72,7 +106,7 @@ export function wasm_encrypt_aes_gcm(key, nonce, plaintext) {
  * @param {Uint8Array} master_key
  * @returns {Uint8Array}
  */
-export function wasm_srp_calculate_client_session(username, salt, a_bytes, a_pub_bytes, b_pub_bytes, master_key) {
+export function wasmSrpCalculateClientSession(username, salt, a_bytes, a_pub_bytes, b_pub_bytes, master_key) {
     const ptr0 = passStringToWasm0(username, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(salt, wasm.__wbindgen_malloc);
@@ -85,7 +119,7 @@ export function wasm_srp_calculate_client_session(username, salt, a_bytes, a_pub
     const len4 = WASM_VECTOR_LEN;
     const ptr5 = passArray8ToWasm0(master_key, wasm.__wbindgen_malloc);
     const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_srp_calculate_client_session(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    const ret = wasm.wasmSrpCalculateClientSession(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
     if (ret[3]) {
         throw takeFromExternrefTable0(ret[2]);
     }
@@ -100,14 +134,14 @@ export function wasm_srp_calculate_client_session(username, salt, a_bytes, a_pub
  * @param {Uint8Array} salt
  * @returns {Uint8Array}
  */
-export function wasm_srp_calculate_verifier(username, master_key, salt) {
+export function wasmSrpCalculateVerifier(username, master_key, salt) {
     const ptr0 = passStringToWasm0(username, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(master_key, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ptr2 = passArray8ToWasm0(salt, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_srp_calculate_verifier(ptr0, len0, ptr1, len1, ptr2, len2);
+    const ret = wasm.wasmSrpCalculateVerifier(ptr0, len0, ptr1, len1, ptr2, len2);
     var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v4;
@@ -119,14 +153,14 @@ export function wasm_srp_calculate_verifier(username, master_key, salt) {
  * @param {Uint8Array} salt
  * @returns {Uint8Array}
  */
-export function wasm_srp_calculate_x(username, master_key, salt) {
+export function wasmSrpCalculateX(username, master_key, salt) {
     const ptr0 = passStringToWasm0(username, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(master_key, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ptr2 = passArray8ToWasm0(salt, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_srp_calculate_x(ptr0, len0, ptr1, len1, ptr2, len2);
+    const ret = wasm.wasmSrpCalculateX(ptr0, len0, ptr1, len1, ptr2, len2);
     var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v4;
@@ -136,10 +170,10 @@ export function wasm_srp_calculate_x(username, master_key, salt) {
  * @param {Uint8Array} a_bytes
  * @returns {Uint8Array}
  */
-export function wasm_srp_generate_client_ephemeral(a_bytes) {
+export function wasmSrpGenerateClientEphemeral(a_bytes) {
     const ptr0 = passArray8ToWasm0(a_bytes, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.wasm_srp_generate_client_ephemeral(ptr0, len0);
+    const ret = wasm.wasmSrpGenerateClientEphemeral(ptr0, len0);
     var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v2;

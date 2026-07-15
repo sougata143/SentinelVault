@@ -298,7 +298,7 @@ pub extern "C" fn srp_calculate_client_session(
 // =========================================================================
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmDeriveMasterKey")]
 pub fn wasm_derive_master_key(password: &[u8], salt: &[u8]) -> Result<Vec<u8>, JsValue> {
     let mut output = vec![0u8; 32];
     algorithms::derive_master_key(password, salt, &mut output)
@@ -307,35 +307,35 @@ pub fn wasm_derive_master_key(password: &[u8], salt: &[u8]) -> Result<Vec<u8>, J
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmEncryptAesGcm")]
 pub fn wasm_encrypt_aes_gcm(key: &[u8], nonce: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, JsValue> {
     algorithms::encrypt_aes_gcm(key, nonce, plaintext)
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmDecryptAesGcm")]
 pub fn wasm_decrypt_aes_gcm(key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, JsValue> {
     algorithms::decrypt_aes_gcm(key, nonce, ciphertext)
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmSrpCalculateX")]
 pub fn wasm_srp_calculate_x(username: &str, master_key: &[u8], salt: &[u8]) -> Vec<u8> {
     let x = algorithms::calculate_x(username, master_key, salt);
     algorithms::biguint_to_bytes_padded(&x, 32)
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmSrpCalculateVerifier")]
 pub fn wasm_srp_calculate_verifier(username: &str, master_key: &[u8], salt: &[u8]) -> Vec<u8> {
     let v = algorithms::calculate_verifier(username, master_key, salt);
     algorithms::biguint_to_bytes_padded(&v, 256)
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmSrpGenerateClientEphemeral")]
 pub fn wasm_srp_generate_client_ephemeral(a_bytes: &[u8]) -> Vec<u8> {
     let (a, a_pub) = algorithms::generate_client_ephemeral(a_bytes);
     let mut out = Vec::with_capacity(512);
@@ -345,7 +345,7 @@ pub fn wasm_srp_generate_client_ephemeral(a_bytes: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmSrpCalculateClientSession")]
 pub fn wasm_srp_calculate_client_session(
     username: &str,
     salt: &[u8],
@@ -382,7 +382,7 @@ pub fn wasm_srp_calculate_client_session(
 // to maintain compatibility with the Dart web implementation.
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmShamirSplit")]
 pub fn wasm_shamir_split(secret: &[u8], m: u8, n: u8) -> Result<Vec<u8>, JsValue> {
     let shares = shamir::split_secret(secret, m, n)
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -398,7 +398,7 @@ pub fn wasm_shamir_split(secret: &[u8], m: u8, n: u8) -> Result<Vec<u8>, JsValue
 }
 
 #[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "wasmShamirCombine")]
 pub fn wasm_shamir_combine(flat_shares: &[u8]) -> Result<Vec<u8>, JsValue> {
     // Parse length-prefixed share blobs (same as FFI)
     let mut share_blobs: Vec<Vec<u8>> = Vec::new();

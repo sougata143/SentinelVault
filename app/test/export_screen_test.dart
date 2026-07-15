@@ -286,7 +286,7 @@ void main() {
       await tester.pump();
 
       // The success screen shows the filename
-      final successText = tester.widget<Text>(
+      final successText = tester.firstWidget<Text>(
         find.byWidgetPredicate(
           (w) => w is Text && (w.data ?? '').contains('sentinelvault_backup'),
         ),
@@ -295,7 +295,7 @@ void main() {
       expect(successText.data, isNot(contains('UNENCRYPTED')));
     });
 
-    testWidgets('8. Exported .svault file contents match vault items', (tester) async {
+    test('8. Exported .svault file contents match vault items', () async {
       // Create a vault with known items
       final vaultKey = List<int>.filled(32, 42);
       final db = SqliteVaultDatabase.inMemory();
@@ -381,7 +381,7 @@ void main() {
       db.close();
     });
 
-    testWidgets('9. Exported CSV file contents match decrypted vault items', (tester) async {
+    test('9. Exported CSV file contents match decrypted vault items', () async {
       // Create a vault with known items
       final vaultKey = List<int>.filled(32, 42);
       final db = SqliteVaultDatabase.inMemory();
@@ -436,7 +436,7 @@ void main() {
       db.close();
     });
 
-    testWidgets('10. Exported JSON file contents match decrypted vault items', (tester) async {
+    test('10. Exported JSON file contents match decrypted vault items', () async {
       // Create a vault with known items
       final vaultKey = List<int>.filled(32, 42);
       final db = SqliteVaultDatabase.inMemory();

@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:app/features/auth/route_guard.dart';
 import 'package:app/features/auth/login_screen.dart';
 import 'package:app/features/auth/unlock_screen.dart';
@@ -36,14 +39,35 @@ void main() {
       VaultLockManager.instance.setSession('fake-session-token');
       // Vault is locked by default (vaultKey is null)
 
+      // Provide a mock HTTP client so UnlockScreen's key-fetch succeeds
+      // and the password form (containing "Master Password") is rendered.
+      final mockSalt = List<int>.filled(16, 0xAB);
+      final mockWrappedKey = List<int>.filled(48, 0xCD);
+      final saltHex = mockSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final wrappedKeyHex = mockWrappedKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          json.encode({'salt': saltHex, 'wrappedKey': wrappedKeyHex}),
+          200,
+        );
+      });
+
       await tester.pumpWidget(
-        const MaterialApp(
-          home: RouteGuard(),
+        MaterialApp(
+          home: RouteGuard(
+            httpClient: mockClient,
+            syncBaseUrl: 'http://fake-sync',
+          ),
         ),
       );
-      await tester.pumpAndSettle();
 
-      // Verify we're on the Unlock screen
+      // Let the async key-fetch complete
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      // Verify we're on the Unlock screen with the password form visible
       expect(find.byType(UnlockScreen), findsOneWidget);
       expect(find.text('Vault is Locked'), findsOneWidget);
       expect(find.text('Master Password'), findsOneWidget);

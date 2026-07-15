@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SyncModule } from './sync/sync.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { SyncModule } from './sync/sync.module';
     }),
     SyncModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule { }

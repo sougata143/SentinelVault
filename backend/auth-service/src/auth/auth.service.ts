@@ -60,7 +60,14 @@ export class AuthService {
       throw new HttpException('Missing registration parameters', HttpStatus.BAD_REQUEST);
     }
 
-    const existing = await this.userRepository.findByUsername(username);
+    let existing;
+    try {
+      existing = await this.userRepository.findByUsername(username);
+    } catch (err) {
+      this.logger.error('findByUsername failed', err instanceof Error ? err.stack : String(err));
+      throw new HttpException('Registration failed. Please try again.', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     if (existing) {
       throw new HttpException('Username already exists', HttpStatus.CONFLICT);
     }
@@ -76,8 +83,6 @@ export class AuthService {
         webauthnEnabled: false,
       });
     } catch (err) {
-      // Postgres unique_violation — most likely a case-insensitive username
-      // race that findByUsername's own check didn't catch
       if (err instanceof QueryFailedError && (err as any).code === '23505') {
         throw new HttpException('Username already exists', HttpStatus.CONFLICT);
       }

@@ -4,7 +4,7 @@ import 'package:app/main.dart';
 
 void main() {
   testWidgets('Password Strength Meter UI Interaction Test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(home: VaultHomeScreen()));
 
     // Verify initial home screen has the floating action button.
     expect(find.byType(FloatingActionButton), findsOneWidget);
@@ -43,7 +43,7 @@ void main() {
   });
 
   testWidgets('URL Scanner Tab UI Test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(home: VaultHomeScreen()));
 
     // 1. Switch to Security Center tab
     await tester.tap(find.text('Security Center'));
@@ -77,7 +77,7 @@ void main() {
   });
 
   testWidgets('Email Scanner Tab UI Test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(home: VaultHomeScreen()));
 
     // 1. Switch to Security Center tab
     await tester.tap(find.text('Security Center'));

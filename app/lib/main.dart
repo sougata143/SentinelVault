@@ -37,7 +37,8 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget? home;
+  const MyApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +46,7 @@ class MyApp extends StatelessWidget {
       title: 'SentinelVault',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const RouteGuard(),
+      home: home ?? const RouteGuard(),
     );
   }
 }

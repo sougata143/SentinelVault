@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityAnalysisModule } from './security-analysis/security-analysis.module';
 import { BreachMonitorModule } from './breach-monitor/breach-monitor.module';
 import { FileReputationModule } from './file-reputation/file-reputation.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { FileReputationModule } from './file-reputation/file-reputation.module';
     BreachMonitorModule,
     FileReputationModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,

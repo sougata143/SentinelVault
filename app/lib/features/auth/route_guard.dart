@@ -13,7 +13,16 @@ import '../../theme/theme.dart';
 /// - Valid session, vault locked → Unlock screen
 /// - Valid session, vault already unlocked → Dashboard (AppShell)
 class RouteGuard extends StatefulWidget {
-  const RouteGuard({super.key});
+  final http.Client? httpClient;
+  final String syncBaseUrl;
+  final String authBaseUrl;
+
+  const RouteGuard({
+    super.key,
+    this.httpClient,
+    this.syncBaseUrl = 'http://localhost:3002',
+    this.authBaseUrl = 'http://localhost:3001',
+  });
 
   @override
   State<RouteGuard> createState() => _RouteGuardState();
@@ -57,7 +66,7 @@ class _RouteGuardState extends State<RouteGuard> {
     if (!_isLoggedIn) {
       // No session → Login screen
       return LoginScreen(
-        authClient: AuthClient(baseUrl: 'http://localhost:3001'),
+        authClient: AuthClient(baseUrl: widget.authBaseUrl),
       );
     }
 
@@ -67,9 +76,9 @@ class _RouteGuardState extends State<RouteGuard> {
       // In production, this should be stored in session or fetched from user profile
       return UnlockScreen(
         email: 'user@example.com', // TODO: Get from session/user profile
-        authClient: AuthClient(baseUrl: 'http://localhost:3001'),
-        syncBaseUrl: 'http://localhost:3002',
-        httpClient: http.Client(),
+        authClient: AuthClient(baseUrl: widget.authBaseUrl),
+        syncBaseUrl: widget.syncBaseUrl,
+        httpClient: widget.httpClient ?? http.Client(),
       );
     }
 

@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { KeyDirectoryModule } from './key-directory/key-directory.module';
 import { ShareInviteModule } from './share-invite/share-invite.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -21,5 +22,6 @@ import { ShareInviteModule } from './share-invite/share-invite.module';
     KeyDirectoryModule,
     ShareInviteModule,
   ],
+  controllers: [HealthController],
 })
 export class SharingModule { }

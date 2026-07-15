@@ -1,19 +1,23 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export function wasm_decrypt_aes_gcm(key: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array): Uint8Array;
+export function wasmDecryptAesGcm(key: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array): Uint8Array;
 
-export function wasm_derive_master_key(password: Uint8Array, salt: Uint8Array): Uint8Array;
+export function wasmDeriveMasterKey(password: Uint8Array, salt: Uint8Array): Uint8Array;
 
-export function wasm_encrypt_aes_gcm(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array): Uint8Array;
+export function wasmEncryptAesGcm(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array): Uint8Array;
 
-export function wasm_srp_calculate_client_session(username: string, salt: Uint8Array, a_bytes: Uint8Array, a_pub_bytes: Uint8Array, b_pub_bytes: Uint8Array, master_key: Uint8Array): Uint8Array;
+export function wasmShamirCombine(flat_shares: Uint8Array): Uint8Array;
 
-export function wasm_srp_calculate_verifier(username: string, master_key: Uint8Array, salt: Uint8Array): Uint8Array;
+export function wasmShamirSplit(secret: Uint8Array, m: number, n: number): Uint8Array;
 
-export function wasm_srp_calculate_x(username: string, master_key: Uint8Array, salt: Uint8Array): Uint8Array;
+export function wasmSrpCalculateClientSession(username: string, salt: Uint8Array, a_bytes: Uint8Array, a_pub_bytes: Uint8Array, b_pub_bytes: Uint8Array, master_key: Uint8Array): Uint8Array;
 
-export function wasm_srp_generate_client_ephemeral(a_bytes: Uint8Array): Uint8Array;
+export function wasmSrpCalculateVerifier(username: string, master_key: Uint8Array, salt: Uint8Array): Uint8Array;
+
+export function wasmSrpCalculateX(username: string, master_key: Uint8Array, salt: Uint8Array): Uint8Array;
+
+export function wasmSrpGenerateClientEphemeral(a_bytes: Uint8Array): Uint8Array;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -33,13 +37,15 @@ export interface InitOutput {
     readonly srp_calculate_verifier: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
     readonly srp_calculate_x: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
     readonly srp_generate_client_ephemeral: (a: number, b: number, c: number, d: number) => number;
-    readonly wasm_decrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly wasm_derive_master_key: (a: number, b: number, c: number, d: number) => [number, number, number, number];
-    readonly wasm_encrypt_aes_gcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly wasm_srp_calculate_client_session: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];
-    readonly wasm_srp_calculate_verifier: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
-    readonly wasm_srp_calculate_x: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
-    readonly wasm_srp_generate_client_ephemeral: (a: number, b: number) => [number, number];
+    readonly wasmDecryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly wasmDeriveMasterKey: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly wasmEncryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly wasmShamirCombine: (a: number, b: number) => [number, number, number, number];
+    readonly wasmShamirSplit: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly wasmSrpCalculateClientSession: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];
+    readonly wasmSrpCalculateVerifier: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+    readonly wasmSrpCalculateX: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+    readonly wasmSrpGenerateClientEphemeral: (a: number, b: number) => [number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;

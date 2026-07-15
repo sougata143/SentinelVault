@@ -8,9 +8,9 @@ describe('SyncService Integration Tests (Version Conflicts & Pull/Push)', () => 
   let app: INestApplication;
   let syncService: SyncService;
 
-  const userId = 'test_user_id';
+  const userId = '00000000-0000-0000-0000-000000000001';
   const item1 = {
-    id: 'item_1',
+    id: '00000000-0000-0000-0000-000000000002',
     encryptedBlob: 'base64ciphertext1',
     nonce: 'nonce1',
     version: 1,
