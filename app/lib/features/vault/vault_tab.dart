@@ -3,6 +3,7 @@ import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import 'item_editor.dart';
 import 'item_detail.dart';
+import 'sync_status_indicator.dart';
 import 'import_export/import_screen.dart';
 import 'import_export/export_screen.dart';
 
@@ -121,6 +122,11 @@ class _VaultTabState extends State<VaultTab> {
               widget.db.updateItem(encryptedItem);
             }
             _loadItems();
+            // Fire-and-forget sync — local write is already committed,
+            // failure is surfaced via SyncStatusIndicator (error state).
+            if (VaultSyncManager.isInitialized) {
+              VaultSyncManager.instance.sync();
+            }
           },
         ),
       ),
@@ -130,6 +136,10 @@ class _VaultTabState extends State<VaultTab> {
   void _deleteItem(String id) {
     widget.db.softDeleteItem(id);
     _loadItems();
+    // Fire-and-forget sync after soft-delete.
+    if (VaultSyncManager.isInitialized) {
+      VaultSyncManager.instance.sync();
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Item deleted locally')),
     );
@@ -203,7 +213,16 @@ class _VaultTabState extends State<VaultTab> {
       appBar: AppBar(
         title: const Text('Vault'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadItems),
+          const SyncStatusIndicator(),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _loadItems();
+              if (VaultSyncManager.isInitialized) {
+                VaultSyncManager.instance.sync();
+              }
+            },
+          ),
         ],
       ),
       drawer: Drawer(

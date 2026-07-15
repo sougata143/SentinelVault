@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import 'theme/theme.dart';
 import 'features/vault/vault_tab.dart';
+import 'features/vault/sync_status_indicator.dart';
 import 'features/security_center/security_center_tab.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/auth/unlock_screen.dart';
@@ -92,6 +92,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _inactivityTimer?.cancel();
     _graceLockTimer?.cancel();
     _graceLockTimer = null;
+    VaultSyncManager.clear();
     VaultLockManager.instance.lock();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -110,6 +111,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   void _triggerLogout() {
     _inactivityTimer?.cancel();
+    VaultSyncManager.clear();
     VaultLockManager.instance.logout();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -170,6 +172,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                   
                   const Spacer(),
+
+                  // Sync status indicator above settings
+                  const SyncStatusIndicator(),
+                  const SizedBox(height: 8),
                   
                   // Settings button
                   IconButton(
@@ -211,6 +217,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         appBar: AppBar(
           title: Text(_selectedTabIndex == 0 ? 'SentinelVault' : 'Security Center'),
           actions: [
+            const SyncStatusIndicator(),
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               tooltip: 'Settings',

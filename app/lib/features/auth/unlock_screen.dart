@@ -203,6 +203,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
             betaDb.open(betaVaultKey);
             await DualVaultManager.instance.prepopulateDecoyItems(betaDb, betaVaultKey);
 
+            // Initialize VaultSyncManager (sync is bypassed due to isDuressMode=true)
+            VaultSyncManager.initialize(
+              localDb: betaDb,
+              api: HttpSyncApiClient(
+                baseUrl: widget.syncBaseUrl,
+                userId: widget.email,
+                httpClient: widget.httpClient,
+              ),
+            );
+            VaultSyncManager.instance.sync();
+
             // 4. Navigate — same transition as a normal unlock.
             navigated = true;
             if (mounted) {
@@ -249,6 +260,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
       // Initialize database and open it
       final db = SqliteVaultDatabase.inMemory();
       db.open(vaultKey);
+
+      // Initialize VaultSyncManager
+      VaultSyncManager.initialize(
+        localDb: db,
+        api: HttpSyncApiClient(
+          baseUrl: widget.syncBaseUrl,
+          userId: widget.email,
+          httpClient: widget.httpClient,
+        ),
+      );
+      VaultSyncManager.instance.sync();
 
       navigated = true;
       if (mounted) {
@@ -302,6 +324,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
           final vaultKey = VaultLockManager.instance.vaultKey!;
           final db = SqliteVaultDatabase.inMemory();
           db.open(vaultKey);
+
+          // Initialize VaultSyncManager
+          VaultSyncManager.initialize(
+            localDb: db,
+            api: HttpSyncApiClient(
+              baseUrl: widget.syncBaseUrl,
+              userId: widget.email,
+              httpClient: widget.httpClient,
+            ),
+          );
+          VaultSyncManager.instance.sync();
 
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
