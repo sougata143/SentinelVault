@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { UserRepository, UserRecord } from './user.repository';
 import { SrpServer } from './srp';
 import { TotpHelper } from './totp';
@@ -48,7 +49,10 @@ export class AuthService {
   private readonly rpID = 'localhost';
   private readonly origin = 'http://localhost:8181';
 
-  constructor(private readonly userRepository: UserRepository) {
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly jwtService: JwtService,
+  ) {
     this.serverSecret = crypto.randomBytes(32);
   }
 
@@ -225,8 +229,11 @@ export class AuthService {
       };
     }
 
-    // No MFA enabled: return the final session token directly
-    const token = crypto.randomBytes(32).toString('hex');
+    // No MFA enabled: issue a signed JWT as the final session token
+    const token = this.jwtService.sign(
+      { sub: user.id!, username: user.username },
+      { expiresIn: '24h' },
+    );
 
     return {
       serverEvidence: verification.serverEvidence!.toString('hex'),
@@ -282,9 +289,12 @@ export class AuthService {
       throw new HttpException('Invalid code', HttpStatus.UNAUTHORIZED);
     }
 
-    // MFA succeeded: clear session and return final token
+    // MFA succeeded: clear session and issue a signed JWT
     this.mfaSessions.delete(mfaToken);
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = this.jwtService.sign(
+      { sub: user.id!, username: user.username },
+      { expiresIn: '24h' },
+    );
     return { token };
   }
 
@@ -430,9 +440,12 @@ export class AuthService {
     cred.counter = verification.authenticationInfo.newCounter;
     await this.userRepository.save(user);
 
-    // MFA succeeded: clear session and return final token
+    // MFA succeeded: clear session and issue a signed JWT
     this.mfaSessions.delete(mfaToken);
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = this.jwtService.sign(
+      { sub: user.id!, username: user.username },
+      { expiresIn: '24h' },
+    );
     return { token };
   }
 
@@ -527,7 +540,10 @@ export class AuthService {
     cred.counter = verification.authenticationInfo.newCounter;
     await this.userRepository.save(user);
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = this.jwtService.sign(
+      { sub: user.id!, username: user.username },
+      { expiresIn: '24h' },
+    );
     return { token };
   }
 

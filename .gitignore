@@ -109,3 +109,5 @@ docs/FFI_CROSS_PLATFORM_PLAN.md
 docs/*
 AGENTS.md
 *.sh
+# Leftover root-owned node_modules moved during repair
+node_modules_old_auth/
