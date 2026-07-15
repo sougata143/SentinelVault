@@ -7,6 +7,7 @@ import '../../theme/theme.dart';
 import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
 import 'shamir_recovery_reconstruct_screen.dart';
+import 'master_password_setup_screen.dart';
 
 class UnlockScreen extends StatefulWidget {
   final String email;
@@ -109,6 +110,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _isFetchingKeys = false;
       });
     } catch (e) {
+      final errStr = e.toString();
+      if (errStr.contains('Vault key not found') || errStr.contains('Vault key not set') || errStr.contains('404')) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => MasterPasswordSetupScreen(
+                email: widget.email,
+                syncBaseUrl: widget.syncBaseUrl,
+                httpClient: widget.httpClient,
+              ),
+            ),
+          );
+        }
+        return;
+      }
       setState(() {
         _fetchErrorMessage = 'Failed to fetch vault credentials. Please check your connection.';
         _isFetchingKeys = false;
