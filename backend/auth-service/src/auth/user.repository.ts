@@ -1,4 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { WebauthnCredential } from './entities/webauthn-credential.entity';
 import * as crypto from 'crypto';
 
 export interface UserRecord {
@@ -24,15 +28,45 @@ export interface UserRecord {
 
 @Injectable()
 export class UserRepository {
-  private readonly users: Map<string, UserRecord> = new Map();
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(WebauthnCredential)
+    private readonly webauthnCredentialRepository: Repository<WebauthnCredential>,
+  ) {}
+
+  private mapUserToRecord(user: User): UserRecord & { id: string } {
+    return {
+      id: user.id,
+      username: user.username,
+      salt: user.salt,
+      verifier: user.verifier,
+      failedAttempts: user.failedAttempts,
+      lockoutUntil: user.lockoutUntil,
+      totpSecret: user.totpSecret || undefined,
+      totpEnabled: user.totpEnabled,
+      webauthnEnabled: user.webauthnEnabled,
+      webauthnCredentials: user.webauthnCredentials?.map((c) => ({
+        credentialID: c.credentialID,
+        publicKey: c.publicKey,
+        counter: typeof c.counter === 'string' ? parseInt(c.counter, 10) : c.counter,
+        transports: c.transports,
+      })),
+    };
+  }
 
   /**
    * Finds a user record by their username (case-insensitive).
    */
   public async findByUsername(username: string): Promise<UserRecord | null> {
-    const record = this.users.get(username.toLowerCase());
-    if (!record) return null;
-    return { ...record };
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.webauthnCredentials', 'credentials')
+      .where('LOWER(user.username) = LOWER(:username)', { username })
+      .getOne();
+
+    if (!user) return null;
+    return this.mapUserToRecord(user);
   }
 
   /**
@@ -41,34 +75,60 @@ export class UserRepository {
    * Returns the saved record with `id` guaranteed to be populated.
    */
   public async save(record: UserRecord): Promise<UserRecord & { id: string }> {
-    const existing = this.users.get(record.username.toLowerCase());
+    // Look up any existing user by username case-insensitively
+    const existing = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.webauthnCredentials', 'credentials')
+      .where('LOWER(user.username) = LOWER(:username)', { username: record.username })
+      .getOne();
+
     const id = record.id ?? existing?.id ?? crypto.randomUUID();
-    const copy = Object.assign(
-      { totpEnabled: false, webauthnEnabled: false },
-      record,
-      { id },
-    );
-    this.users.set(record.username.toLowerCase(), copy);
-    return copy as UserRecord & { id: string };
+
+    const userEntity = existing ?? new User();
+    userEntity.id = id;
+    userEntity.username = record.username;
+    userEntity.salt = record.salt;
+    userEntity.verifier = record.verifier;
+    userEntity.failedAttempts = record.failedAttempts;
+    userEntity.lockoutUntil = record.lockoutUntil;
+    userEntity.totpSecret = record.totpSecret || undefined;
+    userEntity.totpEnabled = record.totpEnabled;
+    userEntity.webauthnEnabled = record.webauthnEnabled;
+
+    if (record.webauthnCredentials) {
+      userEntity.webauthnCredentials = record.webauthnCredentials.map((c) => {
+        const cred = new WebauthnCredential();
+        cred.credentialID = c.credentialID;
+        cred.publicKey = c.publicKey;
+        cred.counter = typeof c.counter === 'string' ? parseInt(c.counter, 10) : c.counter;
+        cred.transports = c.transports;
+        cred.userId = id;
+        return cred;
+      });
+    }
+
+    const savedEntity = await this.userRepository.save(userEntity);
+    return this.mapUserToRecord(savedEntity);
   }
 
   /**
    * Finds a user record by a registered credential ID.
    */
   public async findByCredentialId(credentialId: string): Promise<UserRecord | null> {
-    for (const user of this.users.values()) {
-      const match = user.webauthnCredentials?.some((c) => c.credentialID === credentialId);
-      if (match) {
-        return { ...user };
-      }
-    }
-    return null;
+    const cred = await this.webauthnCredentialRepository.findOne({
+      where: { credentialID: credentialId },
+      relations: ['user', 'user.webauthnCredentials'],
+    });
+
+    if (!cred || !cred.user) return null;
+    return this.mapUserToRecord(cred.user);
   }
 
   /**
    * Resets all user records (used for test cleanup).
    */
   public async clear(): Promise<void> {
-    this.users.clear();
+    await this.webauthnCredentialRepository.createQueryBuilder().delete().execute();
+    await this.userRepository.createQueryBuilder().delete().execute();
   }
 }
