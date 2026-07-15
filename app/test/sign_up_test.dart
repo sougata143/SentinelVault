@@ -20,7 +20,7 @@ class FakeAuthClient implements AuthClient {
   String get baseUrl => 'http://fake';
 
   @override
-  Future<void> register(String email, String password) async {
+  Future<String> register(String email, String password) async {
     if (shouldFailWithDuplicate) {
       throw DuplicateEmailException('Username already exists');
     }
@@ -29,6 +29,7 @@ class FakeAuthClient implements AuthClient {
     }
     registeredEmail = email;
     registeredPassword = password;
+    return 'fake-registration-token';
   }
 
   @override

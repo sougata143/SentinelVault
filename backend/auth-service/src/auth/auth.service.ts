@@ -59,7 +59,7 @@ export class AuthService {
   /**
    * Registers a new user.
    */
-  public async register(username: string, saltHex: string, verifierHex: string): Promise<{ success: boolean }> {
+  public async register(username: string, saltHex: string, verifierHex: string): Promise<{ success: boolean; token: string }> {
     if (!username || !saltHex || !verifierHex) {
       throw new HttpException('Missing registration parameters', HttpStatus.BAD_REQUEST);
     }
@@ -76,8 +76,9 @@ export class AuthService {
       throw new HttpException('Username already exists', HttpStatus.CONFLICT);
     }
 
+    let saved: UserRecord & { id: string };
     try {
-      await this.userRepository.save({
+      saved = await this.userRepository.save({
         username,
         salt: saltHex,
         verifier: verifierHex,
@@ -94,7 +95,14 @@ export class AuthService {
       throw new HttpException('Registration failed. Please try again.', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    return { success: true };
+    // Issue a session JWT immediately so the client can make authenticated
+    // calls (e.g. POST /sync/vault-key) without a separate login round-trip.
+    const token = this.jwtService.sign(
+      { sub: saved.id, username: saved.username },
+      { expiresIn: '24h' },
+    );
+
+    return { success: true, token };
   }
 
   /**

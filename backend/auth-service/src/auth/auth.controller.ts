@@ -9,7 +9,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   public async register(
     @Body() body: { username: string; salt: string; verifier: string },
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; token: string }> {
     return await this.authService.register(body.username, body.salt, body.verifier);
   }
 

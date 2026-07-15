@@ -35,8 +35,12 @@ class AuthClient {
   /// Computes the verifier `v = g^x mod N` client-side from the [email] and [password],
   /// then posts the [email], the random salt (hex), and the computed verifier (hex).
   ///
+  /// Returns the JWT session token issued by the server immediately after
+  /// successful registration, so the caller can set the active session before
+  /// making any further authenticated API calls (e.g. POST /sync/vault-key).
+  ///
   /// Security invariant: The password never leaves the client device in plaintext.
-  Future<void> register(String email, String password) async {
+  Future<String> register(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       throw ArgumentError('Email and password must not be empty');
     }
@@ -66,6 +70,13 @@ class AuthClient {
       } else if (response.statusCode != 201 && response.statusCode != 200) {
         throw Exception('Registration failed with status code: ${response.statusCode}');
       }
+
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      final token = body['token'] as String?;
+      if (token == null || token.isEmpty) {
+        throw Exception('Registration succeeded but server returned no session token');
+      }
+      return token;
     } finally {
       // Clear sensitive memory bytes immediately
       for (var i = 0; i < passwordBytes.length; i++) {

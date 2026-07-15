@@ -44,7 +44,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final password = _passwordController.text;
 
     try {
-      await widget.authClient.register(email, password);
+      final token = await widget.authClient.register(email, password);
+      // Store the session JWT immediately — without this, the subsequent
+      // uploadVaultKey call in MasterPasswordSetupScreen has no Authorization
+      // header and receives a 401 from the JWT guard.
+      VaultLockManager.instance.setSession(token);
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
