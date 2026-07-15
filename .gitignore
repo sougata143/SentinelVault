@@ -111,3 +111,5 @@ AGENTS.md
 *.sh
 # Leftover root-owned node_modules moved during repair
 node_modules_old_auth/
+
+node_modules_old_sharing/

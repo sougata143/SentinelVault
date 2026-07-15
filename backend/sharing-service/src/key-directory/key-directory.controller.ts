@@ -2,7 +2,7 @@
 //  SentinelVault – Key Directory Controller
 // ─────────────────────────────────────────────────────────────────────────────
 import {
-  Controller, Get, Post, Delete, Body, Param, Req,
+  Controller, Get, Post, Delete, Body, Param,
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { KeyDirectoryService } from './key-directory.service';
@@ -12,18 +12,17 @@ import {
   RevokeRecipientDto,
   FetchWrappedKeyDto,
 } from './key-directory.dto';
+import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { CurrentUser } from '../common/current-user.decorator';
 
-// Stub guard – wire in real JWT guard from auth-service in production.
-// Every mutating endpoint must validate the caller's identity.
-import { Request } from 'express';
-
-/** Extracts userId from a validated JWT claim (stub for scaffolding). */
-function callerUserId(req: Request): string {
-  // In production: (req.user as { sub: string }).sub
-  return (req.headers['x-user-id'] as string) ?? 'anonymous';
-}
-
+/**
+ * All mutating and user-scoped read endpoints are protected by JwtAuthGuard.
+ * The guard verifies the Bearer token and attaches req.user = { id, username }.
+ * @CurrentUser() extracts the server-verified user id — it cannot be spoofed
+ * by an `x-user-id` header or any other client-controlled value.
+ */
 @Controller('key-directory')
+@UseGuards(JwtAuthGuard)
 export class KeyDirectoryController {
   constructor(private readonly svc: KeyDirectoryService) {}
 
@@ -32,12 +31,11 @@ export class KeyDirectoryController {
   @Post('keys')
   @HttpCode(HttpStatus.OK)
   publishKeyBundle(
-    @Req() req: Request,
+    @CurrentUser() callerId: string,
     @Body() dto: PublishKeyBundleDto,
   ) {
     // Ensure userId in body matches authenticated caller
-    const caller = callerUserId(req);
-    if (dto.userId !== caller) {
+    if (dto.userId !== callerId) {
       return { ok: false, error: 'userId mismatch' };
     }
     const bundle = this.svc.publishKeyBundle(dto);
@@ -70,10 +68,10 @@ export class KeyDirectoryController {
   @Post('wrapped-keys')
   @HttpCode(HttpStatus.OK)
   publishWrappedKeys(
-    @Req() req: Request,
+    @CurrentUser() callerId: string,
     @Body() dto: PublishWrappedKeysDto,
   ) {
-    this.svc.publishWrappedKeys(callerUserId(req), dto);
+    this.svc.publishWrappedKeys(callerId, dto);
     return { ok: true };
   }
 
@@ -81,11 +79,11 @@ export class KeyDirectoryController {
   // Fetch the calling user's own wrapped Folder Key for a folder.
   @Get('wrapped-keys/:folderId')
   fetchWrappedKey(
-    @Req() req: Request,
+    @CurrentUser() callerId: string,
     @Param('folderId') folderId: string,
   ) {
     const record = this.svc.fetchWrappedKey(
-      callerUserId(req),
+      callerId,
       { folderId } satisfies FetchWrappedKeyDto,
     );
     return { ok: true, record };
@@ -96,10 +94,10 @@ export class KeyDirectoryController {
   @Delete('wrapped-keys/revoke')
   @HttpCode(HttpStatus.OK)
   revokeRecipient(
-    @Req() req: Request,
+    @CurrentUser() callerId: string,
     @Body() dto: RevokeRecipientDto,
   ) {
-    this.svc.revokeRecipient(callerUserId(req), dto);
+    this.svc.revokeRecipient(callerId, dto);
     return { ok: true, newKeyVersion: dto.newKeyVersion };
   }
 

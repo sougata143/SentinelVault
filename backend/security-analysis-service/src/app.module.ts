@@ -6,6 +6,7 @@ import { SecurityAnalysisModule } from './security-analysis/security-analysis.mo
 import { BreachMonitorModule } from './breach-monitor/breach-monitor.module';
 import { FileReputationModule } from './file-reputation/file-reputation.module';
 import { HealthController } from './health.controller';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -20,6 +21,14 @@ import { HealthController } from './health.controller';
       ttl: 60000,
       limit: 100,
     }]),
+    /** JWT_SECRET is the shared root .env secret — same key auth-service signs with. */
+    JwtModule.registerAsync({
+      global: true,
+      useFactory: () => ({
+        secret: process.env.JWT_SECRET,
+        signOptions: { expiresIn: '24h' },
+      }),
+    }),
     SecurityAnalysisModule,
     BreachMonitorModule,
     FileReputationModule,

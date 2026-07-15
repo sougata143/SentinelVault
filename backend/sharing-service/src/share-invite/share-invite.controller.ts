@@ -1,31 +1,34 @@
 import {
-  Controller, Get, Post, Delete, Body, Param, Req,
-  HttpCode, HttpStatus,
+  Controller, Get, Post, Delete, Body, Param,
+  HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { ShareInviteService } from './share-invite.service';
 import { CreateInviteDto, AcceptInviteDto, DeclineInviteDto } from './share-invite.dto';
+import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { CurrentUser } from '../common/current-user.decorator';
 
-function callerUserId(req: Request): string {
-  return (req.headers['x-user-id'] as string) ?? 'anonymous';
-}
-
+/**
+ * All endpoints are protected by JwtAuthGuard.
+ * @CurrentUser() provides the server-verified caller id — cannot be spoofed
+ * by any client-side header including x-user-id.
+ */
 @Controller('invites')
+@UseGuards(JwtAuthGuard)
 export class ShareInviteController {
   constructor(private readonly svc: ShareInviteService) {}
 
   /** POST /invites — Sender creates a share invitation. */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Req() req: Request, @Body() dto: CreateInviteDto) {
-    const invite = this.svc.createInvite(callerUserId(req), dto);
+  create(@CurrentUser() callerId: string, @Body() dto: CreateInviteDto) {
+    const invite = this.svc.createInvite(callerId, dto);
     return { ok: true, inviteId: invite.inviteId, createdAt: invite.createdAt };
   }
 
   /** GET /invites/pending — Recipient lists their pending invitations. */
   @Get('pending')
-  listPending(@Req() req: Request) {
-    const pending = this.svc.listPendingForRecipient(callerUserId(req));
+  listPending(@CurrentUser() callerId: string) {
+    const pending = this.svc.listPendingForRecipient(callerId);
     return {
       ok: true,
       invites: pending.map((inv) => ({
@@ -46,9 +49,9 @@ export class ShareInviteController {
    */
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
-  accept(@Req() req: Request, @Param('id') id: string, @Body() dto: AcceptInviteDto) {
+  accept(@CurrentUser() callerId: string, @Param('id') id: string, @Body() dto: AcceptInviteDto) {
     dto.inviteId = id;
-    const invite = this.svc.acceptInvite(callerUserId(req), dto);
+    const invite = this.svc.acceptInvite(callerId, dto);
     return {
       ok: true,
       inviteId: invite.inviteId,
@@ -59,17 +62,17 @@ export class ShareInviteController {
 
   /** GET /invites/:id/payload — Retrieve wrapped Folder Key after acceptance. */
   @Get(':id/payload')
-  getPayload(@Req() req: Request, @Param('id') id: string) {
-    const result = this.svc.getAcceptedInvitePayload(callerUserId(req), id);
+  getPayload(@CurrentUser() callerId: string, @Param('id') id: string) {
+    const result = this.svc.getAcceptedInvitePayload(callerId, id);
     return { ok: true, ...result };
   }
 
   /** DELETE /invites/:id — Recipient declines an invitation. */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  decline(@Req() req: Request, @Param('id') id: string, @Body() dto: DeclineInviteDto) {
+  decline(@CurrentUser() callerId: string, @Param('id') id: string, @Body() dto: DeclineInviteDto) {
     dto.inviteId = id;
-    this.svc.declineInvite(callerUserId(req), dto);
+    this.svc.declineInvite(callerId, dto);
     return { ok: true };
   }
 }
