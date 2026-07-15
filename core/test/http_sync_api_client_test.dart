@@ -56,5 +56,30 @@ void main() {
         throwsA(isA<Exception>()),
       );
     });
+
+    test('attaches Authorization Bearer header when session token is present', () async {
+      var requestChecked = false;
+      const testToken = 'mock-jwt-session-token-abc';
+      
+      // Inject session token
+      VaultLockManager.instance.setSession(testToken);
+      
+      final mockClient = MockClient((request) async {
+        expect(request.headers['Authorization'], 'Bearer $testToken');
+        requestChecked = true;
+        return http.Response(json.encode({'salt': 'salthex', 'wrappedKey': 'wrappedkeyhex'}), 200);
+      });
+
+      final client = HttpSyncApiClient(baseUrl: baseUrl, userId: userId, httpClient: mockClient);
+      
+      try {
+        await client.fetchVaultKey();
+      } finally {
+        // Clean up session token to keep tests isolated
+        VaultLockManager.instance.logout();
+      }
+
+      expect(requestChecked, isTrue);
+    });
   });
 }

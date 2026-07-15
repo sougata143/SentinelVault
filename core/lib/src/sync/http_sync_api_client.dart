@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'sync.dart';
+import '../auth/vault_lock_manager.dart';
 
 /// HTTP implementation of the remote Sync API client.
 class HttpSyncApiClient implements SyncApiClient {
@@ -19,15 +20,21 @@ class HttpSyncApiClient implements SyncApiClient {
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
 
+  Map<String, String> get _headers {
+    final token = VaultLockManager.instance.sessionToken;
+    return {
+      'Content-Type': 'application/json',
+      'x-user-id': userId,
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
   @override
   Future<List<EncryptedVaultItem>> pull() async {
     final url = Uri.parse('$baseUrl/sync/pull');
     final response = await _httpClient.get(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
+      headers: _headers,
     );
 
     if (response.statusCode != 200) {
@@ -62,10 +69,7 @@ class HttpSyncApiClient implements SyncApiClient {
 
     final response = await _httpClient.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
+      headers: _headers,
       body: json.encode(body),
     );
 
@@ -103,10 +107,7 @@ class HttpSyncApiClient implements SyncApiClient {
     final url = Uri.parse('$baseUrl/sync/vault-key');
     final response = await _httpClient.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
+      headers: _headers,
       body: json.encode({
         'salt': saltHex,
         'wrappedKey': wrappedKeyHex,
@@ -125,10 +126,7 @@ class HttpSyncApiClient implements SyncApiClient {
     final url = Uri.parse('$baseUrl/sync/vault-key');
     final response = await _httpClient.get(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
+      headers: _headers,
     );
 
     if (response.statusCode == 404) {
