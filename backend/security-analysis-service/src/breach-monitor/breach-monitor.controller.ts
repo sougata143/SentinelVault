@@ -60,7 +60,7 @@ export class BreachMonitorController {
   @Post('opt-in')
   @HttpCode(HttpStatus.OK)
   async optIn(@Body() dto: OptInDto): Promise<{ message: string }> {
-    this.breachMonitorService.optIn(dto.emailHash, dto.email);
+    await this.breachMonitorService.optIn(dto.emailHash, dto.email);
     return { message: 'Email monitoring enabled.' };
   }
 
@@ -72,7 +72,7 @@ export class BreachMonitorController {
   async optOut(
     @Param('emailHash') emailHash: string,
   ): Promise<{ message: string }> {
-    this.breachMonitorService.optOut(emailHash);
+    await this.breachMonitorService.optOut(emailHash);
     return { message: 'Email monitoring disabled and data cleared.' };
   }
 
@@ -85,8 +85,8 @@ export class BreachMonitorController {
     @Param('emailHash') emailHash: string,
   ): Promise<{ isOptedIn: boolean; breaches: BreachEntry[] }> {
     return {
-      isOptedIn: this.breachMonitorService.isOptedIn(emailHash),
-      breaches: this.breachMonitorService.getStoredBreaches(emailHash),
+      isOptedIn: await this.breachMonitorService.isOptedIn(emailHash),
+      breaches: await this.breachMonitorService.getStoredBreaches(emailHash),
     };
   }
 
@@ -105,7 +105,7 @@ export class BreachMonitorController {
     const newBreaches = await this.breachMonitorService.runCheckAndDiff(
       body.emailHash,
     );
-    const allBreaches = this.breachMonitorService.getStoredBreaches(body.emailHash);
+    const allBreaches = await this.breachMonitorService.getStoredBreaches(body.emailHash);
 
     // Generate AI insights only when there are breaches to explain.
     let aiInsights: InsightsResult | undefined;
@@ -123,7 +123,7 @@ export class BreachMonitorController {
 
     return {
       emailHash: body.emailHash,
-      isOptedIn: this.breachMonitorService.isOptedIn(body.emailHash),
+      isOptedIn: await this.breachMonitorService.isOptedIn(body.emailHash),
       breaches: allBreaches,
       newBreaches,
       ...(aiInsights ? { aiInsights } : {}),

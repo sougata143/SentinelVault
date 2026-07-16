@@ -1,12 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  SentinelVault – Key Directory Service
+//  SentinelVault – Key Directory Service  (TypeORM-backed)
 //
-//  In-memory store (replace with a durable DB — PostgreSQL / DynamoDB — before
-//  production). This service is the ONLY component allowed to hold user public
-//  keys and ciphertext-wrapped Folder Keys. It MUST NOT accept or persist any
-//  private key, raw Folder Key, or plaintext vault data.
+//  Replaces the in-memory Map implementation with Repository<KeyBundle>,
+//  Repository<WrappedKeyVersion>, and Repository<WrappedKeyRecipient>.
+//
+//  Security invariants (unchanged):
+//  - This service never accepts or stores private keys, raw Folder Keys, or
+//    any plaintext vault data.
+//  - A caller may only fetch their OWN wrapped record — the server never
+//    returns another user's wrapped copy.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import {
   PublishKeyBundleDto,
   PublishWrappedKeysDto,
@@ -14,67 +25,54 @@ import {
   FetchWrappedKeyDto,
   WrappedKeyRecordDto,
 } from './key-directory.dto';
-
-// ── In-memory models ──────────────────────────────────────────────────────────
-
-interface KeyBundle {
-  userId: string;
-  x25519PublicKey: string;
-  ed25519PublicKey: string;
-  mlkemEncapsulationKey: string;
-  mldsaVerifyingKey: string;
-  keyFingerprint: string;
-  publishedAt: Date;
-  updatedAt: Date;
-}
-
-interface WrappedKeyVersion {
-  folderId: string;
-  keyVersion: string;
-  publishedAt: Date;
-  /** Map of recipientUserId → wrapped key record */
-  recipients: Map<string, WrappedKeyRecordDto>;
-}
+import { KeyBundle } from './entities/key-bundle.entity';
+import { WrappedKeyVersion } from './entities/wrapped-key-version.entity';
+import { WrappedKeyRecipient } from './entities/wrapped-key-recipient.entity';
 
 @Injectable()
 export class KeyDirectoryService {
-  // userId → KeyBundle
-  private readonly keyBundles = new Map<string, KeyBundle>();
-
-  // folderId → ordered list of WrappedKeyVersion (newest last)
-  private readonly wrappedKeys = new Map<string, WrappedKeyVersion[]>();
+  constructor(
+    @InjectRepository(KeyBundle)
+    private readonly keyBundleRepo: Repository<KeyBundle>,
+    @InjectRepository(WrappedKeyVersion)
+    private readonly versionRepo: Repository<WrappedKeyVersion>,
+    @InjectRepository(WrappedKeyRecipient)
+    private readonly recipientRepo: Repository<WrappedKeyRecipient>,
+  ) {}
 
   // ── Public Key Directory ────────────────────────────────────────────────────
 
   /**
    * Publishes or rotates a user's public key bundle.
-   * Key rotation is allowed; the new bundle replaces the old one for future
-   * share operations. Existing wrapped copies remain valid — recipients stored
-   * the ek that was current at wrap time.
+   * Upserts by userId (PK): preserves the original publishedAt on update,
+   * only updatedAt changes — matching the former in-memory logic.
    */
-  publishKeyBundle(dto: PublishKeyBundleDto): KeyBundle {
-    const existing = this.keyBundles.get(dto.userId);
-    const bundle: KeyBundle = {
+  async publishKeyBundle(dto: PublishKeyBundleDto): Promise<KeyBundle> {
+    const existing = await this.keyBundleRepo.findOne({
+      where: { userId: dto.userId },
+    });
+
+    const bundle = this.keyBundleRepo.create({
       userId: dto.userId,
       x25519PublicKey: dto.x25519PublicKey,
       ed25519PublicKey: dto.ed25519PublicKey,
       mlkemEncapsulationKey: dto.mlkemEncapsulationKey,
       mldsaVerifyingKey: dto.mldsaVerifyingKey,
       keyFingerprint: dto.keyFingerprint,
+      // Preserve original publishedAt on rotation; set to now on first publish.
       publishedAt: existing?.publishedAt ?? new Date(),
       updatedAt: new Date(),
-    };
-    this.keyBundles.set(dto.userId, bundle);
-    return bundle;
+    });
+
+    return this.keyBundleRepo.save(bundle);
   }
 
   /**
    * Returns the public key bundle for a user.
-   * Callers MUST verify the returned keyFingerprint out-of-band (e.g. via a
-   * QR code / safety-number comparison) before trusting the public keys.
+   * Callers MUST verify keyFingerprint out-of-band before trusting the keys.
    */
-  getKeyBundle(userId: string): KeyBundle {
-    const bundle = this.keyBundles.get(userId);
+  async getKeyBundle(userId: string): Promise<KeyBundle> {
+    const bundle = await this.keyBundleRepo.findOne({ where: { userId } });
     if (!bundle) {
       throw new NotFoundException(`No key bundle found for user ${userId}`);
     }
@@ -85,50 +83,56 @@ export class KeyDirectoryService {
 
   /**
    * Publishes a new version of wrapped Folder Key records for a folder.
-   * The client has already: generated a new Folder Key, wrapped it for every
-   * current recipient using hybrid_encapsulate, and sends ONLY ciphertext here.
-   *
-   * Enforces monotonic key versioning to prevent rollback attacks.
+   * Enforces monotonic key versioning (new version > current latest).
+   * Inserts a new WrappedKeyVersion row and one WrappedKeyRecipient row
+   * per recipient in dto.recipients without touching prior versions.
    */
-  publishWrappedKeys(ownerUserId: string, dto: PublishWrappedKeysDto): void {
-    const existing = this.wrappedKeys.get(dto.folderId) ?? [];
-
-    // Version must be strictly greater than the current latest
-    if (existing.length > 0) {
-      const lastVersion = existing[existing.length - 1]?.keyVersion;
-      if (lastVersion !== undefined && dto.keyVersion <= lastVersion) {
-        throw new ConflictException(
-          `Key version ${dto.keyVersion} is not greater than current version ${lastVersion}`,
-        );
-      }
+  async publishWrappedKeys(
+    ownerUserId: string,
+    dto: PublishWrappedKeysDto,
+  ): Promise<void> {
+    // Monotonic version check — new version must be strictly greater than latest
+    const latestVersion = await this.getCurrentKeyVersion(dto.folderId);
+    if (latestVersion !== null && dto.keyVersion <= latestVersion) {
+      throw new ConflictException(
+        `Key version ${dto.keyVersion} is not greater than current version ${latestVersion}`,
+      );
     }
 
-    const recipientMap = new Map<string, WrappedKeyRecordDto>();
-    for (const rec of dto.recipients) {
-      recipientMap.set(rec.recipientUserId, rec);
-    }
-
-    const version: WrappedKeyVersion = {
+    // Insert the new version row
+    const version = this.versionRepo.create({
       folderId: dto.folderId,
       keyVersion: dto.keyVersion,
       publishedAt: new Date(),
-      recipients: recipientMap,
-    };
+    });
+    await this.versionRepo.save(version);
 
-    existing.push(version);
-    this.wrappedKeys.set(dto.folderId, existing);
+    // Insert one recipient row per entry
+    const recipientRows = dto.recipients.map((rec) =>
+      this.recipientRepo.create({
+        recipientUserId: rec.recipientUserId,
+        folderId: dto.folderId,
+        keyVersion: dto.keyVersion,
+        ephemeralX25519PublicKey: rec.ephemeralX25519PublicKey,
+        mlkemCiphertext: rec.mlkemCiphertext,
+        aesNonce: rec.aesNonce,
+        wrappedFolderKey: rec.wrappedFolderKey,
+      }),
+    );
+    await this.recipientRepo.save(recipientRows);
   }
 
   /**
-   * Revokes a recipient's access by:
-   *  1. Accepting a new Folder Key version wrapped for remaining recipients only.
-   *  2. Removing the revoked recipient's entry from the new version.
+   * Revokes a recipient's access by publishing a new Folder Key version
+   * wrapped for the remaining recipients only.
    *
-   * The revoked recipient's OLD wrapped copies remain in historical versions
-   * but the new version (and all future content) is inaccessible to them.
+   * The revoked recipient's older wrapped copies remain in historical version
+   * rows but the new version (and all future content) is inaccessible to them.
    */
-  revokeRecipient(ownerUserId: string, dto: RevokeRecipientDto): void {
-    // Ensure revoked user is NOT in the remainingRecipients list
+  async revokeRecipient(
+    ownerUserId: string,
+    dto: RevokeRecipientDto,
+  ): Promise<void> {
     const alreadyIncluded = dto.remainingRecipients.some(
       (r) => r.recipientUserId === dto.recipientUserId,
     );
@@ -138,7 +142,7 @@ export class KeyDirectoryService {
       );
     }
 
-    this.publishWrappedKeys(ownerUserId, {
+    await this.publishWrappedKeys(ownerUserId, {
       folderId: dto.folderId,
       keyVersion: dto.newKeyVersion,
       recipients: dto.remainingRecipients,
@@ -147,49 +151,76 @@ export class KeyDirectoryService {
 
   /**
    * Fetches the wrapped Folder Key record for the authenticated calling user.
-   * Returns the requested version (or the latest if not specified).
+   * Returns the requested version, or the latest if not specified.
    *
    * Security: each recipient only receives their own wrapped record —
    * the server never returns another user's wrapped copy.
    */
-  fetchWrappedKey(
+  async fetchWrappedKey(
     callerUserId: string,
     dto: FetchWrappedKeyDto,
-  ): WrappedKeyRecordDto {
-    const versions = this.wrappedKeys.get(dto.folderId);
-    if (!versions || versions.length === 0) {
-      throw new NotFoundException(`No wrapped keys found for folder ${dto.folderId}`);
-    }
+  ): Promise<WrappedKeyRecordDto> {
+    let targetKeyVersion: string;
 
-    let version: WrappedKeyVersion | undefined;
     if (dto.keyVersion !== undefined) {
-      version = versions.find((v) => v.keyVersion === dto.keyVersion);
+      // Verify the requested version exists
+      const version = await this.versionRepo.findOne({
+        where: { folderId: dto.folderId, keyVersion: dto.keyVersion },
+      });
       if (!version) {
         throw new NotFoundException(
           `Key version ${dto.keyVersion} not found for folder ${dto.folderId}`,
         );
       }
+      targetKeyVersion = dto.keyVersion;
     } else {
-      version = versions[versions.length - 1];
+      // Fetch the latest version
+      const latest = await this.getCurrentKeyVersion(dto.folderId);
+      if (latest === null) {
+        throw new NotFoundException(
+          `No wrapped keys found for folder ${dto.folderId}`,
+        );
+      }
+      targetKeyVersion = latest;
     }
 
-    const record = version!.recipients.get(callerUserId);
+    // Fetch the specific recipient row — enforces per-caller security
+    const record = await this.recipientRepo.findOne({
+      where: {
+        recipientUserId: callerUserId,
+        folderId: dto.folderId,
+        keyVersion: targetKeyVersion,
+      },
+    });
     if (!record) {
       throw new NotFoundException(
-        `No wrapped key found for caller in folder ${dto.folderId} version ${version!.keyVersion}`,
+        `No wrapped key found for caller in folder ${dto.folderId} version ${targetKeyVersion}`,
       );
     }
 
-    return record;
+    return {
+      recipientUserId: record.recipientUserId,
+      ephemeralX25519PublicKey: record.ephemeralX25519PublicKey,
+      mlkemCiphertext: record.mlkemCiphertext,
+      aesNonce: record.aesNonce,
+      wrappedFolderKey: record.wrappedFolderKey,
+    };
   }
 
   /**
    * Returns the current (latest) key version string for a folder.
-   * Clients use this to detect when a rotation has occurred.
+   * Returns null if no version has been published for this folder.
+   *
+   * "Latest" is defined as the lexicographically greatest keyVersion —
+   * since clients must send monotonically increasing versions, this is safe.
    */
-  getCurrentKeyVersion(folderId: string): string | null {
-    const versions = this.wrappedKeys.get(folderId);
-    if (!versions || versions.length === 0) return null;
-    return versions[versions.length - 1]?.keyVersion ?? null;
+  async getCurrentKeyVersion(folderId: string): Promise<string | null> {
+    const row = await this.versionRepo
+      .createQueryBuilder('v')
+      .where('v.folderId = :folderId', { folderId })
+      .orderBy('v.keyVersion', 'DESC')
+      .limit(1)
+      .getOne();
+    return row?.keyVersion ?? null;
   }
 }

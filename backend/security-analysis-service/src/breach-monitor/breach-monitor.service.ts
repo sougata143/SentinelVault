@@ -81,7 +81,7 @@ export class BreachMonitorService {
    * returns only *new* breaches found since the last check.
    */
   async runCheckAndDiff(emailHash: string): Promise<BreachEntry[]> {
-    const email = this.breachStore.getEmail(emailHash);
+    const email = await this.breachStore.getEmail(emailHash);
     if (!email) return [];
 
     const incoming = await this.fetchBreachesForEmail(email);
@@ -89,29 +89,29 @@ export class BreachMonitorService {
   }
 
   /** Registers an email for opt-in monitoring. */
-  optIn(emailHash: string, email: string): void {
-    this.breachStore.optIn(emailHash, email);
+  async optIn(emailHash: string, email: string): Promise<void> {
+    await this.breachStore.optIn(emailHash, email);
     this.logger.log(`Email hash ${emailHash.slice(0, 8)}… opted in.`);
   }
 
   /** Removes an email from monitoring. */
-  optOut(emailHash: string): void {
-    this.breachStore.optOut(emailHash);
+  async optOut(emailHash: string): Promise<void> {
+    await this.breachStore.optOut(emailHash);
     this.logger.log(`Email hash ${emailHash.slice(0, 8)}… opted out.`);
   }
 
   /** Returns stored breach metadata for [emailHash]. */
-  getStoredBreaches(emailHash: string): BreachEntry[] {
+  async getStoredBreaches(emailHash: string): Promise<BreachEntry[]> {
     return this.breachStore.getBreaches(emailHash);
   }
 
   /** Returns true if [emailHash] is currently opted in. */
-  isOptedIn(emailHash: string): boolean {
+  async isOptedIn(emailHash: string): Promise<boolean> {
     return this.breachStore.isOptedIn(emailHash);
   }
 
   /** Returns all opted-in email hashes for the scheduler. */
-  allOptedInHashes(): string[] {
+  async allOptedInHashes(): Promise<string[]> {
     return this.breachStore.allOptedInHashes();
   }
 }
