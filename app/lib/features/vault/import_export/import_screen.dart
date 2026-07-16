@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:core/core.dart';
+import 'package:uuid/uuid.dart';
 import '../../../theme/theme.dart';
 
 /// Converts a [ParsedItem] into a [VaultItem], encrypts it under [vaultKey],
@@ -14,7 +15,9 @@ Future<void> encryptAndSave(
   VaultCrypto crypto,
 ) async {
   final now = DateTime.now().toUtc();
-  final id = '${now.millisecondsSinceEpoch}_${item.title.hashCode.abs()}';
+  // Use a proper UUID v4 — the sync backend's encrypted_vault_items table
+  // has a uuid-typed primary key and rejects timestamp strings.
+  final id = const Uuid().v4();
 
   VaultItemFields fields;
   VaultItemType type;

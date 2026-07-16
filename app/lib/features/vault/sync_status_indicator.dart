@@ -31,17 +31,7 @@ class SyncStatusIndicator extends StatelessWidget {
               message: 'Sync pending (connection offline or error)',
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12.0),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_off, color: Colors.orange, size: 18),
-                    SizedBox(width: 4),
-                    Text(
-                      'Pending',
-                      style: TextStyle(color: Colors.orange, fontSize: 12),
-                    ),
-                  ],
-                ),
+                child: Icon(Icons.cloud_off, color: Colors.orange, size: 18),
               ),
             );
           case SyncStatus.success:
