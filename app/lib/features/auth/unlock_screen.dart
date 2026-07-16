@@ -235,7 +235,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
             if (mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
-                  builder: (_) => AppShell(db: betaDb, vaultKey: betaVaultKey),
+                  builder: (_) => AppShell(
+                    db: betaDb,
+                    vaultKey: betaVaultKey,
+                    currentEmail: widget.email,
+                    authClient: widget.authClient,
+                    syncBaseUrl: widget.syncBaseUrl,
+                    httpClient: widget.httpClient,
+                  ),
                 ),
                 (route) => false,
               );
@@ -292,7 +299,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+            builder: (_) => AppShell(
+              db: db,
+              vaultKey: vaultKey,
+              currentEmail: widget.email,
+              authClient: widget.authClient,
+              syncBaseUrl: widget.syncBaseUrl,
+              httpClient: widget.httpClient,
+            ),
           ),
           (route) => false,
         );
@@ -355,7 +369,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
-                builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+                builder: (_) => AppShell(
+                  db: db,
+                  vaultKey: vaultKey,
+                  currentEmail: widget.email,
+                  authClient: widget.authClient,
+                  syncBaseUrl: widget.syncBaseUrl,
+                  httpClient: widget.httpClient,
+                ),
               ),
               (route) => false,
             );
@@ -500,7 +521,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             if (mounted) {
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
-                                  builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+                                  builder: (_) => AppShell(
+                                    db: db,
+                                    vaultKey: vaultKey,
+                                    currentEmail: widget.email,
+                                    authClient: widget.authClient,
+                                    syncBaseUrl: widget.syncBaseUrl,
+                                    httpClient: widget.httpClient,
+                                  ),
                                 ),
                                 (route) => false,
                               );

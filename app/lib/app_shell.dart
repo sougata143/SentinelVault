@@ -117,7 +117,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => LoginScreen(
-            authClient: widget.authClient ?? AuthClient(baseUrl: 'http://localhost:3003'),
+            authClient: widget.authClient ?? AuthClient(baseUrl: 'http://localhost:3001'),
           ),
         ),
         (route) => false,
@@ -175,8 +175,40 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
                   // Sync status indicator above settings
                   const SyncStatusIndicator(),
-                  const SizedBox(height: 8),
-                  
+                  const SizedBox(height: 4),
+
+                  // Logout button
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: AppTheme.errorColor, size: 22),
+                    tooltip: 'Log Out',
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: AppTheme.surfaceColor,
+                          title: const Text('Log Out?', style: TextStyle(color: Colors.white)),
+                          content: const Text(
+                            'This will clear your session and lock the vault. You will need to log in again.',
+                            style: TextStyle(color: AppTheme.textSecondaryColor),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+                              child: const Text('Log Out'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) _triggerLogout();
+                    },
+                  ),
+                  const SizedBox(height: 4),
+
                   // Settings button
                   IconButton(
                     icon: const Icon(Icons.settings_outlined, color: AppTheme.textSecondaryColor),
@@ -218,6 +250,36 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           title: Text(_selectedTabIndex == 0 ? 'SentinelVault' : 'Security Center'),
           actions: [
             const SyncStatusIndicator(),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Log Out',
+              color: AppTheme.errorColor,
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AppTheme.surfaceColor,
+                    title: const Text('Log Out?', style: TextStyle(color: Colors.white)),
+                    content: const Text(
+                      'This will clear your session and lock the vault. You will need to log in again.',
+                      style: TextStyle(color: AppTheme.textSecondaryColor),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+                        child: const Text('Log Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) _triggerLogout();
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               tooltip: 'Settings',
