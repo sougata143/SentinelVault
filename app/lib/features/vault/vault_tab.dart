@@ -137,7 +137,7 @@ class _VaultTabState extends State<VaultTab> {
     widget.db.softDeleteItem(id);
     _loadItems();
     // Fire-and-forget sync after soft-delete.
-    if (VaultSyncManager.isInitialized) {
+            if (VaultSyncManager.isInitialized) {
       VaultSyncManager.instance.sync();
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +218,7 @@ class _VaultTabState extends State<VaultTab> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadItems();
-              if (VaultSyncManager.isInitialized) {
+            if (VaultSyncManager.isInitialized) {
                 VaultSyncManager.instance.sync();
               }
             },
