@@ -23,6 +23,8 @@ class SharingScreen extends StatefulWidget {
 }
 
 class _SharingScreenState extends State<SharingScreen> {
+  static final Map<String, List<Map<String, dynamic>>> _folderRecipientsMap = {};
+
   final _emailController = TextEditingController();
   final _sharingManager = PqcSharingManager();
   bool _loading = false;
@@ -36,21 +38,10 @@ class _SharingScreenState extends State<SharingScreen> {
 
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
-    // In production: fetch from backend sharing-service current key version recipients
-    // Stub local list for UI demo/validation
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 300));
     setState(() {
       _loading = false;
-      // bob-id is currently shared
-      _recipients = [
-        {
-          'userId': 'bob-id-12345',
-          'email': 'bob@example.com',
-          'fingerprint': '49102 95810 39581 02938 10928 30491',
-          'x25519Pub': Uint8List(32),
-          'mlkemEk': Uint8List(1184),
-        }
-      ];
+      _recipients = List.from(_folderRecipientsMap[widget.folderId] ?? []);
     });
   }
 
@@ -131,15 +122,16 @@ class _SharingScreenState extends State<SharingScreen> {
         ),
       );
 
-      // Add to local list for demonstration
+      // Add to local list and sync with static store
       setState(() {
         _recipients.add({
-          'userId': 'new-recipient-id',
+          'userId': 'recipient-${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
           'email': email,
           'fingerprint': safetyNumber,
           'x25519Pub': recipientBundle.x25519Pub,
           'mlkemEk': recipientBundle.mlkemEk,
         });
+        _folderRecipientsMap[widget.folderId] = List.from(_recipients);
       });
     } catch (e) {
       if (mounted) {
@@ -205,6 +197,7 @@ class _SharingScreenState extends State<SharingScreen> {
 
       setState(() {
         _recipients = remaining;
+        _folderRecipientsMap[widget.folderId] = List.from(_recipients);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
