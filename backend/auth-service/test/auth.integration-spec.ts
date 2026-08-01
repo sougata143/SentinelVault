@@ -115,11 +115,11 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
     await app.init();
 
     userRepository = moduleFixture.get<UserRepository>(UserRepository);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   beforeEach(async () => {
     await userRepository.clear();

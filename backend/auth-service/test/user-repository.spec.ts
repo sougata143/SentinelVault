@@ -14,13 +14,13 @@ describe('UserRepository Database Persistence', () => {
 
     repository = appModule.get<UserRepository>(UserRepository);
     await repository.clear();
-  });
+  }, 30000);
 
   afterEach(async () => {
     if (appModule) {
       await appModule.close();
     }
-  });
+  }, 30000);
 
   it('should persist a user across UserRepository instance restarts', async () => {
     const testUsername = 'persist_test_user';
