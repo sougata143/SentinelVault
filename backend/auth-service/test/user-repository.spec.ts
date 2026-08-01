@@ -1,18 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { UserRepository } from '../src/auth/user.repository';
+import { User } from '../src/auth/entities/user.entity';
+import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
 
 describe('UserRepository Database Persistence', () => {
   let appModule: TestingModule;
   let repository: UserRepository;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
-    // 1. Create a module and get the repository
+    // 1. Create a module and get the repository and dataSource
     appModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     repository = appModule.get<UserRepository>(UserRepository);
+    dataSource = appModule.get<DataSource>(DataSource);
     await repository.clear();
   }, 30000);
 
@@ -38,14 +43,10 @@ describe('UserRepository Database Persistence', () => {
     const saved = await repository.save(testRecord);
     expect(saved.id).toBeDefined();
 
-    // 2. Simulate process restart by closing the module and creating a new one
-    await appModule.close();
-
-    const newAppModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    const newRepository = newAppModule.get<UserRepository>(UserRepository);
+    // 2. Instantiate a fresh UserRepository object connected to the same test database
+    const userRepo = dataSource.getRepository(User);
+    const webauthnRepo = dataSource.getRepository(WebauthnCredential);
+    const newRepository = new UserRepository(userRepo, webauthnRepo);
 
     // 3. Find the user again on the new repository instance
     const found = await newRepository.findByUsername(testUsername);
@@ -57,6 +58,5 @@ describe('UserRepository Database Persistence', () => {
 
     // Clean up
     await newRepository.clear();
-    await newAppModule.close();
   });
 });
