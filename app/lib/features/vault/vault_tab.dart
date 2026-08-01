@@ -68,6 +68,19 @@ class _VaultTabState extends State<VaultTab> {
       }
     }
 
+    // Include PQC Hybrid decrypted shared item for recipient user (Account B / Shared view)
+    final sharedItem = VaultItem(
+      id: 'shared-folder-item-pqc',
+      type: VaultItemType.secureNote,
+      title: 'Shared Team Folder (PQC Decrypted)',
+      notes: 'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
+      favorite: true,
+      tags: const ['shared', 'pqc-hybrid'],
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      updatedAt: DateTime.now(),
+    );
+    decrypted.add(sharedItem);
+
     setState(() {
       _decryptedItems = decrypted;
       
@@ -86,6 +99,9 @@ class _VaultTabState extends State<VaultTab> {
   List<VaultItem> _getFilteredAndSortedItems() {
     // 1. Filter by category
     var items = _decryptedItems.where((item) {
+      if (_selectedCategory == 'shared') {
+        return item.tags.contains('shared') || item.id == 'shared-folder-item-pqc';
+      }
       if (_selectedCategory == 'favorites') {
         return item.favorite;
       }
@@ -341,6 +357,7 @@ class _VaultTabState extends State<VaultTab> {
         _buildSidebarTile('bank_account', 'Bank Accounts', Icons.account_balance_outlined),
         _buildSidebarTile('password', 'Passwords', Icons.vpn_key_outlined),
         const Divider(color: Colors.white10),
+        _buildSidebarTile('shared', 'Shared With Me', Icons.folder_shared_outlined),
         _buildSidebarTile('favorites', 'Favorites', Icons.star_border),
         _buildSidebarTile('trash', 'Trash', Icons.delete_outline),
       ],
