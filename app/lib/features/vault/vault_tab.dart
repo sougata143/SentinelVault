@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import '../../theme/theme.dart';
@@ -32,11 +33,25 @@ class _VaultTabState extends State<VaultTab> {
 
   List<VaultItem> _decryptedItems = [];
   VaultItem? _selectedItem;
+  StreamSubscription<SyncStatus>? _syncSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadItems();
+    if (VaultSyncManager.isInitialized) {
+      _syncSubscription = VaultSyncManager.statusStream.listen((status) {
+        if (status == SyncStatus.success && mounted) {
+          _loadItems();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _syncSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadItems() async {

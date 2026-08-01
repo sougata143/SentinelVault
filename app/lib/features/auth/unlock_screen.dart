@@ -284,7 +284,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final db = SqliteVaultDatabase.inMemory();
       db.open(vaultKey);
 
-      // Initialize VaultSyncManager
+      // Initialize VaultSyncManager and await initial remote sync pull
       VaultSyncManager.initialize(
         localDb: db,
         api: HttpSyncApiClient(
@@ -293,7 +293,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
           httpClient: widget.httpClient,
         ),
       );
-      VaultSyncManager.instance.sync();
+      await VaultSyncManager.instance.sync();
 
       navigated = true;
       if (mounted) {
