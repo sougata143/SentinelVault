@@ -1,16 +1,27 @@
 import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, Index } from 'typeorm';
 import { WrappedKeyVersion } from './wrapped-key-version.entity';
 
+/**
+ * One row per (recipient, folder, keyVersion) triple.
+ *
+ * Composite primary key (recipientUserId, folderId, keyVersion) so a user can
+ * hold wrapped copies across multiple folders and multiple key-rotations of the
+ * same folder.  The former single-column PK was wrong — it allowed only one
+ * wrapped copy per recipient globally.
+ */
 @Entity('wrapped_key_recipients')
-@Index(['recipientUserId', 'folderId', 'keyVersion'], { unique: true }) // Unique constraint for composite key
+@Index(['recipientUserId', 'folderId', 'keyVersion'], { unique: true })
 export class WrappedKeyRecipient {
+  /** Part 1 of the composite PK — the recipient's user UUID. */
   @PrimaryColumn({ type: 'uuid' })
   recipientUserId!: string; // References User.id from auth-service
 
-  @Column({ type: 'uuid' })
+  /** Part 2 of the composite PK — the folder UUID. */
+  @PrimaryColumn({ type: 'uuid' })
   folderId!: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  /** Part 3 of the composite PK — the key version string. */
+  @PrimaryColumn({ type: 'varchar', length: 255 })
   keyVersion!: string;
 
   /**

@@ -18,6 +18,11 @@ export const srp_generate_client_ephemeral: (a: number, b: number, c: number, d:
 export const wasmDecryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const wasmDeriveMasterKey: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const wasmEncryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const wasmPqcGenerateKeypairs: () => [number, number];
+export const wasmPqcHybridUnwrap: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];
+export const wasmPqcHybridWrap: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const wasmPqcSignInvitation: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const wasmPqcVerifyInvitation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
 export const wasmShamirCombine: (a: number, b: number) => [number, number, number, number];
 export const wasmShamirSplit: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const wasmSrpCalculateClientSession: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];

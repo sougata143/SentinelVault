@@ -64,6 +64,117 @@ export function wasmEncryptAesGcm(key, nonce, plaintext) {
 }
 
 /**
+ * @returns {Uint8Array}
+ */
+export function wasmPqcGenerateKeypairs() {
+    const ret = wasm.wasmPqcGenerateKeypairs();
+    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v1;
+}
+
+/**
+ * @param {Uint8Array} recipient_x25519_priv
+ * @param {Uint8Array} recipient_mlkem_dk
+ * @param {Uint8Array} ephem_x25519_pub
+ * @param {Uint8Array} mlkem_ct
+ * @param {Uint8Array} aes_nonce
+ * @param {Uint8Array} wrapped_fk
+ * @returns {Uint8Array}
+ */
+export function wasmPqcHybridUnwrap(recipient_x25519_priv, recipient_mlkem_dk, ephem_x25519_pub, mlkem_ct, aes_nonce, wrapped_fk) {
+    const ptr0 = passArray8ToWasm0(recipient_x25519_priv, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(recipient_mlkem_dk, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(ephem_x25519_pub, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArray8ToWasm0(mlkem_ct, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArray8ToWasm0(aes_nonce, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArray8ToWasm0(wrapped_fk, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmPqcHybridUnwrap(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v7 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v7;
+}
+
+/**
+ * @param {Uint8Array} recipient_x25519_pub
+ * @param {Uint8Array} recipient_mlkem_ek
+ * @param {Uint8Array} folder_key
+ * @returns {Uint8Array}
+ */
+export function wasmPqcHybridWrap(recipient_x25519_pub, recipient_mlkem_ek, folder_key) {
+    const ptr0 = passArray8ToWasm0(recipient_x25519_pub, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(recipient_mlkem_ek, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(folder_key, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmPqcHybridWrap(ptr0, len0, ptr1, len1, ptr2, len2);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v4;
+}
+
+/**
+ * @param {Uint8Array} payload
+ * @param {Uint8Array} ed25519_priv
+ * @param {Uint8Array} mldsa_seed
+ * @returns {Uint8Array}
+ */
+export function wasmPqcSignInvitation(payload, ed25519_priv, mldsa_seed) {
+    const ptr0 = passArray8ToWasm0(payload, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(ed25519_priv, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(mldsa_seed, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmPqcSignInvitation(ptr0, len0, ptr1, len1, ptr2, len2);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v4;
+}
+
+/**
+ * @param {Uint8Array} payload
+ * @param {Uint8Array} ed25519_pub
+ * @param {Uint8Array} mldsa_vk
+ * @param {Uint8Array} ed25519_sig
+ * @param {Uint8Array} mldsa_sig
+ * @returns {boolean}
+ */
+export function wasmPqcVerifyInvitation(payload, ed25519_pub, mldsa_vk, ed25519_sig, mldsa_sig) {
+    const ptr0 = passArray8ToWasm0(payload, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(ed25519_pub, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(mldsa_vk, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArray8ToWasm0(ed25519_sig, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArray8ToWasm0(mldsa_sig, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ret = wasm.wasmPqcVerifyInvitation(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0] !== 0;
+}
+
+/**
  * @param {Uint8Array} flat_shares
  * @returns {Uint8Array}
  */

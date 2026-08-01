@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:core/core.dart';
 import 'package:app/features/auth/unlock_screen.dart';
+import 'package:app/features/auth/master_password_setup_screen.dart';
 import 'package:app/app_shell.dart';
 
 void main() {
@@ -208,6 +209,36 @@ void main() {
       // 5th failure (triggers 5s delay)
       await submitIncorrectPassword();
       expect(find.textContaining('Locked for'), findsOneWidget);
+    });
+
+    testWidgets('4. 404 Not Found on key fetch redirects to MasterPasswordSetupScreen', (WidgetTester tester) async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/sync/vault-key');
+        return http.Response(
+          json.encode({
+            'statusCode': 404,
+            'message': 'Vault key not set',
+          }),
+          404,
+        );
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: UnlockScreen(
+            email: email,
+            syncBaseUrl: 'http://fake-sync',
+            httpClient: mockClient,
+          ),
+        ),
+      );
+
+      // Verify loading spinner is shown first
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      // Verify we navigated to MasterPasswordSetupScreen
+      expect(find.byType(MasterPasswordSetupScreen), findsOneWidget);
     });
   });
 }

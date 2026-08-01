@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
+import 'package:uuid/uuid.dart';
 import '../../theme/theme.dart';
 
 class ItemEditorScreen extends StatefulWidget {
@@ -338,7 +339,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         .toList();
 
     final item = VaultItem(
-      id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.item?.id ?? const Uuid().v4(),
       type: _selectedType!,
       title: _titleController.text,
       tags: tags,
