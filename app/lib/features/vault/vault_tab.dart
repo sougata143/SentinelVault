@@ -11,11 +11,13 @@ import 'import_export/export_screen.dart';
 class VaultTab extends StatefulWidget {
   final VaultDatabase db;
   final List<int> vaultKey;
+  final String? currentEmail;
 
   const VaultTab({
     super.key,
     required this.db,
     required this.vaultKey,
+    this.currentEmail,
   });
 
   @override
@@ -283,7 +285,7 @@ class _VaultTabState extends State<VaultTab> {
         children: [
           // Logo or Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
@@ -298,6 +300,33 @@ class _VaultTabState extends State<VaultTab> {
               ),
             ),
           ),
+
+          // Logged-in Account Email Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_circle, size: 18, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.currentEmail ?? 'Logged In User',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimaryColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // Wrap the sidebar list in a Material so that ListTile's
           // selectedTileColor ink-splash renderer has a Material ancestor.
           // Container(color:…) compiles to a ColoredBox which is NOT a

@@ -130,7 +130,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final isLargeScreen = MediaQuery.of(context).size.width >= 900;
 
     final tabs = [
-      VaultTab(db: widget.db, vaultKey: widget.vaultKey),
+      VaultTab(
+        db: widget.db,
+        vaultKey: widget.vaultKey,
+        currentEmail: widget.currentEmail,
+      ),
       SecurityCenterTab(db: widget.db, vaultKey: widget.vaultKey),
     ];
 
