@@ -7,10 +7,18 @@ import '../models/models.dart';
 import '../database/vault_database.dart';
 import '../auth/vault_lock_manager.dart';
 
+/// Represents the current synchronisation status of the client vault.
 enum SyncStatus {
+  /// The sync engine is idle and not actively communicating with the server.
   idle,
+
+  /// The sync engine is actively pulling or pushing items with the server.
   syncing,
+
+  /// The last sync operation completed successfully.
   success,
+
+  /// The last sync operation encountered an error.
   error,
 }
 
@@ -70,6 +78,7 @@ class VaultSyncManager {
 
   static VaultSyncManager? _instance;
 
+  /// Returns the global singleton instance of [VaultSyncManager].
   static VaultSyncManager get instance {
     if (_instance == null) {
       throw StateError('VaultSyncManager has not been initialized. Call initialize() first.');
@@ -77,8 +86,10 @@ class VaultSyncManager {
     return _instance!;
   }
 
+  /// Returns true if [VaultSyncManager] has been initialized via [initialize].
   static bool get isInitialized => _instance != null;
 
+  /// Initializes the global [VaultSyncManager] singleton instance.
   static void initialize({
     required VaultDatabase localDb,
     required SyncApiClient api,
@@ -91,14 +102,19 @@ class VaultSyncManager {
     );
   }
 
+  /// Resets the global [VaultSyncManager] instance and resets status to idle.
   static void clear() {
     _instance = null;
     _setStatus(SyncStatus.idle);
   }
 
   static final StreamController<SyncStatus> _statusController = StreamController<SyncStatus>.broadcast();
+
+  /// Broadcast stream emitting updates when the [SyncStatus] changes.
   static Stream<SyncStatus> get statusStream => _statusController.stream;
   static SyncStatus _currentStatus = SyncStatus.idle;
+
+  /// Returns the current [SyncStatus] of the sync manager.
   static SyncStatus get currentStatus => _currentStatus;
 
   static void _setStatus(SyncStatus status) {
