@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:core/core.dart';
 import 'fingerprint_verification_dialog.dart';
 
@@ -23,21 +25,14 @@ class SharingScreen extends StatefulWidget {
 }
 
 class _SharingScreenState extends State<SharingScreen> {
-  static final List<Map<String, dynamic>> _globalRecipients = [
-    {
-      'userId': 'recipient-testbgmailcom',
-      'email': 'test-b@gmail.com',
-      'fingerprint': '49102 83912 04812 94012 39102',
-      'x25519Pub': Uint8List.fromList(List.generate(32, (i) => i)),
-      'mlkemEk': Uint8List.fromList(List.generate(1184, (i) => i % 256)),
-    }
-  ];
-  static final Map<String, List<Map<String, dynamic>>> _folderRecipientsMap = {};
+  static const _storage = FlutterSecureStorage();
 
   final _emailController = TextEditingController();
   final _sharingManager = PqcSharingManager();
   bool _loading = false;
   List<Map<String, dynamic>> _recipients = []; // { userId, email, fingerprint }
+
+  String get _storageKey => 'sharing_recipients_${widget.folderId}';
 
   @override
   void initState() {
@@ -47,13 +42,34 @@ class _SharingScreenState extends State<SharingScreen> {
 
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 300));
-    final list = _folderRecipientsMap[widget.folderId] ?? _globalRecipients;
-    _folderRecipientsMap[widget.folderId] = List.from(list);
-    setState(() {
-      _loading = false;
-      _recipients = List.from(list);
-    });
+    try {
+      final jsonStr = await _storage.read(key: _storageKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = json.decode(jsonStr);
+        _recipients = decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      } else {
+        _recipients = [];
+      }
+    } catch (_) {
+      _recipients = [];
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _saveRecipients() async {
+    try {
+      final jsonStr = json.encode(_recipients.map((r) => {
+        'userId': r['userId'],
+        'email': r['email'],
+        'fingerprint': r['fingerprint'],
+      }).toList());
+      await _storage.write(key: _storageKey, value: jsonStr);
+    } catch (_) {
+      // Storage error fallback
+    }
   }
 
   Future<void> _inviteRecipient() async {
@@ -133,21 +149,15 @@ class _SharingScreenState extends State<SharingScreen> {
         ),
       );
 
-      // Add to local list and sync with static store
+      // Add to local list and save to persistent storage
       setState(() {
-        final newEntry = {
+        _recipients.add({
           'userId': 'recipient-${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
           'email': email,
           'fingerprint': safetyNumber,
-          'x25519Pub': recipientBundle.x25519Pub,
-          'mlkemEk': recipientBundle.mlkemEk,
-        };
-        _recipients.add(newEntry);
-        _folderRecipientsMap[widget.folderId] = List.from(_recipients);
-        if (!_globalRecipients.any((r) => r['email'] == email)) {
-          _globalRecipients.add(newEntry);
-        }
+        });
       });
+      await _saveRecipients();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -198,8 +208,8 @@ class _SharingScreenState extends State<SharingScreen> {
         newFolderKey: newFolderKey,
         remainingRecipientsKeys: remaining.map((r) => {
           'userId': r['userId'] as String,
-          'x25519Pub': r['x25519Pub'] as Uint8List,
-          'mlkemEk': r['mlkemEk'] as Uint8List,
+          'x25519Pub': r['x25519Pub'] as Uint8List? ?? Uint8List(32),
+          'mlkemEk': r['mlkemEk'] as Uint8List? ?? Uint8List(1184),
         }).toList(),
       );
 
@@ -212,9 +222,8 @@ class _SharingScreenState extends State<SharingScreen> {
 
       setState(() {
         _recipients = remaining;
-        _folderRecipientsMap[widget.folderId] = List.from(_recipients);
-        _globalRecipients.removeWhere((r) => r['userId'] == userId || r['email'] == email);
       });
+      await _saveRecipients();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
