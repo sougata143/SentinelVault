@@ -50,10 +50,51 @@ external JSUint8Array wasmShamirSplit(JSUint8Array secret, JSNumber m, JSNumber 
 @JS()
 external JSUint8Array wasmShamirCombine(JSUint8Array flatShares);
 
+/// WebAssembly binding for PQC generate keypairs.
+@JS()
+external JSUint8Array wasmPqcGenerateKeypairs();
+
+/// WebAssembly binding for PQC hybrid wrap.
+@JS()
+external JSUint8Array wasmPqcHybridWrap(
+  JSUint8Array recipientX25519Pub,
+  JSUint8Array recipientMlkemEk,
+  JSUint8Array folderKey,
+);
+
+/// WebAssembly binding for PQC hybrid unwrap.
+@JS()
+external JSUint8Array wasmPqcHybridUnwrap(
+  JSUint8Array recipientX25519Priv,
+  JSUint8Array recipientMlkemDk,
+  JSUint8Array ephemX25519Pub,
+  JSUint8Array mlkemCt,
+  JSUint8Array aesNonce,
+  JSUint8Array wrappedFk,
+);
+
+/// WebAssembly binding for PQC sign invitation.
+@JS()
+external JSUint8Array wasmPqcSignInvitation(
+  JSUint8Array payload,
+  JSUint8Array ed25519Priv,
+  JSUint8Array mldsaSeed,
+);
+
+/// WebAssembly binding for PQC verify invitation.
+@JS()
+external JSBoolean wasmPqcVerifyInvitation(
+  JSUint8Array payload,
+  JSUint8Array ed25519Pub,
+  JSUint8Array mldsaVk,
+  JSUint8Array ed25519Sig,
+  JSUint8Array mldsaSig,
+);
+
 /// JS binding for the Promise that resolves once the WASM crypto module is
 /// fully initialised (set by the loader script in `app/web/index.html`).
 @JS('__cryptoCoreReadyPromise')
-external JSPromise get _cryptoCoreReadyPromise;
+external JSPromise? get _cryptoCoreReadyPromise;
 
 /// A JS-interop-based implementation of [NativeCryptoBridge] for Web platforms.
 ///
@@ -84,7 +125,10 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     }
     _readyCompleter = Completer<void>();
     try {
-      await _cryptoCoreReadyPromise.toDart;
+      final promise = _cryptoCoreReadyPromise;
+      if (promise != null) {
+        await promise.toDart;
+      }
       _ready = true;
       _readyCompleter!.complete();
     } catch (e) {
@@ -299,28 +343,140 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   }
 
   @override
-  Future<PqcKeyBundle> pqcGenerateKeypairs() => throw UnimplementedError();
+  Future<PqcKeyBundle> pqcGenerateKeypairs() async {
+    _checkReady();
+    try {
+      final res = wasmPqcGenerateKeypairs();
+      final buf = _toDartList(res);
+
+      var cursor = 0;
+      final x25519Pub = Uint8List.fromList(buf.sublist(cursor, cursor + 32)); cursor += 32;
+      final x25519Priv = Uint8List.fromList(buf.sublist(cursor, cursor + 32)); cursor += 32;
+      final ed25519Pub = Uint8List.fromList(buf.sublist(cursor, cursor + 32)); cursor += 32;
+      final ed25519Priv = Uint8List.fromList(buf.sublist(cursor, cursor + 32)); cursor += 32;
+
+      int readLen() {
+        final len = buf[cursor] | (buf[cursor + 1] << 8) | (buf[cursor + 2] << 16) | (buf[cursor + 3] << 24);
+        cursor += 4;
+        return len;
+      }
+
+      final mlkemEkLen = readLen();
+      final mlkemEk = Uint8List.fromList(buf.sublist(cursor, cursor + mlkemEkLen)); cursor += mlkemEkLen;
+
+      final mlkemDkLen = readLen();
+      final mlkemDk = Uint8List.fromList(buf.sublist(cursor, cursor + mlkemDkLen)); cursor += mlkemDkLen;
+
+      final mldsaVkLen = readLen();
+      final mldsaVk = Uint8List.fromList(buf.sublist(cursor, cursor + mldsaVkLen)); cursor += mldsaVkLen;
+
+      final mldsaSeedLen = readLen();
+      final mldsaSeed = Uint8List.fromList(buf.sublist(cursor, cursor + mldsaSeedLen)); cursor += mldsaSeedLen;
+
+      return PqcKeyBundle(
+        x25519Pub: x25519Pub,
+        x25519Priv: x25519Priv,
+        ed25519Pub: ed25519Pub,
+        ed25519Priv: ed25519Priv,
+        mlkemEk: mlkemEk,
+        mlkemDk: mlkemDk,
+        mldsaVk: mldsaVk,
+        mldsaSeed: mldsaSeed,
+      );
+    } catch (e) {
+      throw Exception('Wasm pqcGenerateKeypairs failed: $e');
+    }
+  }
 
   @override
   Future<PqcWrappedKey> pqcHybridWrap({
     required Uint8List recipientX25519Pub,
     required Uint8List recipientMlkemEk,
     required Uint8List folderKey,
-  }) => throw UnimplementedError();
+  }) async {
+    _checkReady();
+    try {
+      final res = wasmPqcHybridWrap(
+        _toJSArray(recipientX25519Pub),
+        _toJSArray(recipientMlkemEk),
+        _toJSArray(folderKey),
+      );
+      final buf = _toDartList(res);
+
+      var cursor = 0;
+      final ephemPub = Uint8List.fromList(buf.sublist(cursor, cursor + 32)); cursor += 32;
+
+      final kemCtLen = buf[cursor] | (buf[cursor + 1] << 8) | (buf[cursor + 2] << 16) | (buf[cursor + 3] << 24); cursor += 4;
+      final kemCt = Uint8List.fromList(buf.sublist(cursor, cursor + kemCtLen)); cursor += kemCtLen;
+
+      final nonce = Uint8List.fromList(buf.sublist(cursor, cursor + 12)); cursor += 12;
+
+      final wrappedLen = buf[cursor] | (buf[cursor + 1] << 8) | (buf[cursor + 2] << 16) | (buf[cursor + 3] << 24); cursor += 4;
+      final wrappedFk = Uint8List.fromList(buf.sublist(cursor, cursor + wrappedLen)); cursor += wrappedLen;
+
+      return PqcWrappedKey(
+        ephemeralX25519Pub: ephemPub,
+        mlkemCiphertext: kemCt,
+        aesNonce: nonce,
+        wrappedFolderKey: wrappedFk,
+      );
+    } catch (e) {
+      throw Exception('Wasm pqcHybridWrap failed: $e');
+    }
+  }
 
   @override
   Future<Uint8List> pqcHybridUnwrap({
     required Uint8List recipientX25519Priv,
     required Uint8List recipientMlkemDk,
     required PqcWrappedKey wrappedKey,
-  }) => throw UnimplementedError();
+  }) async {
+    _checkReady();
+    try {
+      final res = wasmPqcHybridUnwrap(
+        _toJSArray(recipientX25519Priv),
+        _toJSArray(recipientMlkemDk),
+        _toJSArray(wrappedKey.ephemeralX25519Pub),
+        _toJSArray(wrappedKey.mlkemCiphertext),
+        _toJSArray(wrappedKey.aesNonce),
+        _toJSArray(wrappedKey.wrappedFolderKey),
+      );
+      return _toDartList(res);
+    } catch (e) {
+      throw Exception('Wasm pqcHybridUnwrap failed: $e');
+    }
+  }
 
   @override
   Future<PqcSignatureBundle> pqcSignInvitation({
     required Uint8List payload,
     required Uint8List ed25519Priv,
     required Uint8List mldsaSeed,
-  }) => throw UnimplementedError();
+  }) async {
+    _checkReady();
+    try {
+      final res = wasmPqcSignInvitation(
+        _toJSArray(payload),
+        _toJSArray(ed25519Priv),
+        _toJSArray(mldsaSeed),
+      );
+      final buf = _toDartList(res);
+
+      var cursor = 0;
+      final edLen = buf[cursor] | (buf[cursor + 1] << 8) | (buf[cursor + 2] << 16) | (buf[cursor + 3] << 24); cursor += 4;
+      final edSig = Uint8List.fromList(buf.sublist(cursor, cursor + edLen)); cursor += edLen;
+
+      final dsaLen = buf[cursor] | (buf[cursor + 1] << 8) | (buf[cursor + 2] << 16) | (buf[cursor + 3] << 24); cursor += 4;
+      final dsaSig = Uint8List.fromList(buf.sublist(cursor, cursor + dsaLen)); cursor += dsaLen;
+
+      return PqcSignatureBundle(
+        ed25519Signature: edSig,
+        mldsaSignature: dsaSig,
+      );
+    } catch (e) {
+      throw Exception('Wasm pqcSignInvitation failed: $e');
+    }
+  }
 
   @override
   Future<bool> pqcVerifyInvitation({
@@ -328,5 +484,19 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required Uint8List ed25519Pub,
     required Uint8List mldsaVk,
     required PqcSignatureBundle signatures,
-  }) => throw UnimplementedError();
+  }) async {
+    _checkReady();
+    try {
+      final res = wasmPqcVerifyInvitation(
+        _toJSArray(payload),
+        _toJSArray(ed25519Pub),
+        _toJSArray(mldsaVk),
+        _toJSArray(signatures.ed25519Signature),
+        _toJSArray(signatures.mldsaSignature),
+      );
+      return res.toDart;
+    } catch (e) {
+      throw Exception('Wasm pqcVerifyInvitation failed: $e');
+    }
+  }
 }

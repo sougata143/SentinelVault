@@ -5,6 +5,10 @@ import 'package:core/src/crypto/pqc_sharing.dart';
 import 'package:core/src/crypto/native_crypto_bridge.dart';
 
 void main() {
+  setUpAll(() async {
+    await ensureWasmReady();
+  });
+
   group('PqcSharingManager Tests', () {
     late NativeCryptoBridge bridge;
     late PqcSharingManager sharing;

@@ -426,6 +426,118 @@ pub fn wasm_shamir_combine(flat_shares: &[u8]) -> Result<Vec<u8>, JsValue> {
 }
 
 // ==========================================================================
+// PQC Hybrid — WebAssembly Exports
+// ==========================================================================
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(js_name = "wasmPqcGenerateKeypairs")]
+pub fn wasm_pqc_generate_keypairs() -> Vec<u8> {
+    let (x_pub, x_priv, ed_pub, ed_priv, kem_ek, kem_dk, dsa_vk, dsa_seed) =
+        algorithms::pqc_hybrid::generate_keypairs();
+
+    let mut buf: Vec<u8> = Vec::with_capacity(5728);
+    buf.extend_from_slice(&x_pub);
+    buf.extend_from_slice(&x_priv);
+    buf.extend_from_slice(&ed_pub);
+    buf.extend_from_slice(&ed_priv);
+    for chunk in [&kem_ek, &kem_dk, &dsa_vk, &dsa_seed] {
+        buf.extend_from_slice(&(chunk.len() as u32).to_le_bytes());
+        buf.extend_from_slice(chunk);
+    }
+    buf
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(js_name = "wasmPqcHybridWrap")]
+pub fn wasm_pqc_hybrid_wrap(
+    recipient_x25519_pub: &[u8],
+    recipient_mlkem_ek: &[u8],
+    folder_key: &[u8],
+) -> Result<Vec<u8>, JsValue> {
+    let x25519_pub: &[u8; 32] = recipient_x25519_pub.try_into()
+        .map_err(|_| JsValue::from_str("Invalid recipient_x25519_pub length"))?;
+    let fk: &[u8; 32] = folder_key.try_into()
+        .map_err(|_| JsValue::from_str("Invalid folder_key length"))?;
+
+    let (ephem_pub, kem_ct, nonce, wrapped) = algorithms::pqc_hybrid::hybrid_encapsulate(
+        x25519_pub, recipient_mlkem_ek, fk
+    ).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let mut buf: Vec<u8> = Vec::new();
+    buf.extend_from_slice(&ephem_pub);
+    buf.extend_from_slice(&(kem_ct.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&kem_ct);
+    buf.extend_from_slice(&nonce);
+    buf.extend_from_slice(&(wrapped.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&wrapped);
+    Ok(buf)
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(js_name = "wasmPqcHybridUnwrap")]
+pub fn wasm_pqc_hybrid_unwrap(
+    recipient_x25519_priv: &[u8],
+    recipient_mlkem_dk: &[u8],
+    ephem_x25519_pub: &[u8],
+    mlkem_ct: &[u8],
+    aes_nonce: &[u8],
+    wrapped_fk: &[u8],
+) -> Result<Vec<u8>, JsValue> {
+    let x25519_priv: &[u8; 32] = recipient_x25519_priv.try_into()
+        .map_err(|_| JsValue::from_str("Invalid recipient_x25519_priv length"))?;
+    let ephem_pub: &[u8; 32] = ephem_x25519_pub.try_into()
+        .map_err(|_| JsValue::from_str("Invalid ephem_x25519_pub length"))?;
+    let nonce: &[u8; 12] = aes_nonce.try_into()
+        .map_err(|_| JsValue::from_str("Invalid aes_nonce length"))?;
+
+    let fk = algorithms::pqc_hybrid::hybrid_decapsulate(
+        x25519_priv, recipient_mlkem_dk, ephem_pub, mlkem_ct, nonce, wrapped_fk
+    ).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    Ok(fk.to_vec())
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(js_name = "wasmPqcSignInvitation")]
+pub fn wasm_pqc_sign_invitation(
+    payload: &[u8],
+    ed25519_priv: &[u8],
+    mldsa_seed: &[u8],
+) -> Result<Vec<u8>, JsValue> {
+    let ed_priv: &[u8; 32] = ed25519_priv.try_into()
+        .map_err(|_| JsValue::from_str("Invalid ed25519_priv length"))?;
+    let (ed_sig, dsa_sig) = algorithms::pqc_hybrid::sign_invitation(
+        payload, ed_priv, mldsa_seed
+    ).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let mut buf: Vec<u8> = Vec::new();
+    buf.extend_from_slice(&(ed_sig.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&ed_sig);
+    buf.extend_from_slice(&(dsa_sig.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&dsa_sig);
+    Ok(buf)
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(js_name = "wasmPqcVerifyInvitation")]
+pub fn wasm_pqc_verify_invitation(
+    payload: &[u8],
+    ed25519_pub: &[u8],
+    mldsa_vk: &[u8],
+    ed25519_sig: &[u8],
+    mldsa_sig: &[u8],
+) -> Result<bool, JsValue> {
+    let ed_pub: &[u8; 32] = ed25519_pub.try_into()
+        .map_err(|_| JsValue::from_str("Invalid ed25519_pub length"))?;
+    let ed_sig: &[u8; 64] = ed25519_sig.try_into()
+        .map_err(|_| JsValue::from_str("Invalid ed25519_sig length"))?;
+
+    algorithms::pqc_hybrid::verify_invitation(
+        payload, ed_pub, mldsa_vk, ed_sig, mldsa_sig
+    ).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+// ==========================================================================
 // 7. Shamir's Secret Sharing — Split
 // ==========================================================================
 //

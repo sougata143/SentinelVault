@@ -59,3 +59,7 @@ default = []
 # their browser-entropy features enabled when building with --features wasm.
 wasm = ["wasm-bindgen", "getrandom/js", "getrandom-v04/wasm_js"]
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+
