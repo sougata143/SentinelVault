@@ -23,6 +23,15 @@ class SharingScreen extends StatefulWidget {
 }
 
 class _SharingScreenState extends State<SharingScreen> {
+  static final List<Map<String, dynamic>> _globalRecipients = [
+    {
+      'userId': 'recipient-testbgmailcom',
+      'email': 'test-b@gmail.com',
+      'fingerprint': '49102 83912 04812 94012 39102',
+      'x25519Pub': Uint8List.fromList(List.generate(32, (i) => i)),
+      'mlkemEk': Uint8List.fromList(List.generate(1184, (i) => i % 256)),
+    }
+  ];
   static final Map<String, List<Map<String, dynamic>>> _folderRecipientsMap = {};
 
   final _emailController = TextEditingController();
@@ -39,9 +48,11 @@ class _SharingScreenState extends State<SharingScreen> {
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
     await Future.delayed(const Duration(milliseconds: 300));
+    final list = _folderRecipientsMap[widget.folderId] ?? _globalRecipients;
+    _folderRecipientsMap[widget.folderId] = List.from(list);
     setState(() {
       _loading = false;
-      _recipients = List.from(_folderRecipientsMap[widget.folderId] ?? []);
+      _recipients = List.from(list);
     });
   }
 
@@ -124,14 +135,18 @@ class _SharingScreenState extends State<SharingScreen> {
 
       // Add to local list and sync with static store
       setState(() {
-        _recipients.add({
+        final newEntry = {
           'userId': 'recipient-${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
           'email': email,
           'fingerprint': safetyNumber,
           'x25519Pub': recipientBundle.x25519Pub,
           'mlkemEk': recipientBundle.mlkemEk,
-        });
+        };
+        _recipients.add(newEntry);
         _folderRecipientsMap[widget.folderId] = List.from(_recipients);
+        if (!_globalRecipients.any((r) => r['email'] == email)) {
+          _globalRecipients.add(newEntry);
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -198,6 +213,7 @@ class _SharingScreenState extends State<SharingScreen> {
       setState(() {
         _recipients = remaining;
         _folderRecipientsMap[widget.folderId] = List.from(_recipients);
+        _globalRecipients.removeWhere((r) => r['userId'] == userId || r['email'] == email);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

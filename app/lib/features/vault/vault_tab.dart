@@ -75,11 +75,20 @@ class _VaultTabState extends State<VaultTab> {
       id: 'shared-folder-item-pqc',
       type: VaultItemType.secureNote,
       title: 'Shared Team Folder (PQC Decrypted)',
-      notes: 'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
-      favorite: true,
       tags: const ['shared', 'pqc-hybrid'],
+      favorite: true,
+      vaultId: 'default-vault',
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       updatedAt: DateTime.now(),
+      fields: SecureNoteFields(
+        content: const ConcealedValue.plain(
+          'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
+        ),
+      ),
+      customFields: const [],
+      notes: const ConcealedValue.plain(
+        'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
+      ),
     );
     decrypted.add(sharedItem);
 
