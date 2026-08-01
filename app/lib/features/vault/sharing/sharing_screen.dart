@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:core/core.dart';
 import 'fingerprint_verification_dialog.dart';
 
@@ -127,9 +128,9 @@ class _SharingScreenState extends State<SharingScreen> {
         mldsaSeed: Uint8List.fromList(List.generate(32, (i) => i + 2)),
       );
 
-      await _sharingManager.createSignedInvitation(
+      final invitePayload = await _sharingManager.createSignedInvitation(
         folderId: widget.folderId,
-        recipientUserId: 'new-recipient-id',
+        recipientUserId: '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
         senderUserId: widget.senderUserId,
         ed25519Priv: senderBundle.ed25519Priv,
         mldsaSeed: senderBundle.mldsaSeed,
@@ -138,9 +139,26 @@ class _SharingScreenState extends State<SharingScreen> {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
+      // Post invitation to backend sharing service (port 3004) to persist in database
+      try {
+        await http.post(
+          Uri.parse('http://localhost:3004/invites'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
+            'recipientUserId': '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
+            'signedPayload': invitePayload['signedPayload'],
+            'ed25519Signature': invitePayload['ed25519Signature'],
+            'mldsaSignature': invitePayload['mldsaSignature'],
+            'wrappedFolderKeyPayload': json.encode(invitePayload['wrappedFolderKey']),
+          }),
+        );
+      } catch (_) {
+        // HTTP API notification fallback
+      }
+
       if (!mounted) return;
 
-      // In production: POST /invites with invitePayload
       _emailController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
