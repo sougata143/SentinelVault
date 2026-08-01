@@ -1,4 +1,4 @@
-# SentinelVault
+﻿# SentinelVault
 
 SentinelVault is a hybrid, offline-first, zero-knowledge password manager and security analysis suite. It runs across Web, iOS, and Android from a unified Flutter codebase, backed by a shared Dart core package for client-side cryptography and data modeling, a native Rust cryptography core, and specialized NestJS backend microservices.
 
@@ -6,8 +6,8 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 
 ## 🛡️ Security Invariants (Non-Negotiable)
 
-1. **Zero-Knowledge Architecture**: The Master Password and decrypted vault items never leave the user's device. No plaintext vault item, password, card number, or identity data is ever transmitted to the server or any third-party API.
-2. **Two-Secret Model**: Authentication and vault decryption are deliberately separate. The **Account Password** authenticates the user's session (via SRP-6a) and grants no cryptographic access to vault contents. The **Master Password** — a distinct secret, never transmitted to the server in any form — is the only thing that can derive the key needed to decrypt the vault. A valid session alone never unlocks the vault; the Unlock step is always required separately. Successful authentication yields a cryptographically signed JWT (HS256, 24 h expiry) stored on-device in secure storage; every subsequent request to the backend microservices is authenticated via `Authorization: Bearer <token>` — the server verifies the signature before trusting any identity claim.
+1. **Zero-Knowledge Architecture**: The Master Password and decrypted vault items never leave the user''s device. No plaintext vault item, password, card number, or identity data is ever transmitted to the server or any third-party API.
+2. **Two-Secret Model**: Authentication and vault decryption are deliberately separate. The **Account Password** authenticates the user''s session (via SRP-6a) and grants no cryptographic access to vault contents. The **Master Password** — a distinct secret, never transmitted to the server in any form — is the only thing that can derive the key needed to decrypt the vault. A valid session alone never unlocks the vault; the Unlock step is always required separately. Successful authentication yields a cryptographically signed JWT (HS256, 24 h expiry) stored on-device in secure storage; every subsequent request to the backend microservices is authenticated via `Authorization: Bearer <token>` — the server verifies the signature before trusting any identity claim.
 3. **Local Cryptography**: All symmetric encryption uses AES-256-GCM. Keys are derived using Argon2id with a unique local salt per user. Cryptographic key material is held only in volatile memory while the vault is unlocked and is explicitly zeroized afterward.
 4. **Privacy-Preserving Breach Monitoring**: Password breach checks use k-anonymity (only the first 5 characters of the SHA-1 password hash are sent to Have I Been Pwned). Email breach checks are opt-in only, with explicit disclosure before any email address is sent to a third party.
 5. **Least-Privilege AI Insights**: The AI Insights layer (Gemini) receives only redacted, non-sensitive structural signals (e.g. password strength scores, file extensions, signature-mismatch flags) — never raw passwords, emails, files, or vault content.
@@ -68,13 +68,13 @@ A cross-platform Flutter application providing:
 A platform-agnostic Dart package managing local databases (SQLite), the Dart-side crypto interface (delegating to the native Rust core), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`, sync client).
 
 ### 3. Native Crypto Core (`native/crypto_core/`)
-A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secret Sharing, and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
+A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir''s Secret Sharing, and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
 
 ### 4. Backend Services (`backend/`)
-- **auth-service**: Account authentication via SRP-6a (zero-knowledge — the Account Password is never transmitted in a crackable form), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Issues cryptographically signed JWTs (`@nestjs/jwt`, HS256) containing the server-assigned user UUID as `sub`; token expiry is 24 h.
-- **sync-api**: Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock — never anything the server could decrypt. All endpoints are protected by a custom `JwtAuthGuard`; the acting user ID is extracted from the verified JWT `sub` claim, never from a client-supplied header.
-- **security-analysis-service**: URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini. All identity-gated endpoints verify the JWT before processing.
-- **sharing-service**: Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing. All key-directory and share-invite endpoints are protected by `JwtAuthGuard`.
+- **auth-service** (`:3001`): Account authentication via SRP-6a (zero-knowledge), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Issues HS256 JWTs with 24 h expiry. TypeORM-backed Postgres persistence for user records — verified to survive service restarts.
+- **sync-api** (`:3002`): Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock. All endpoints are protected by `JwtAuthGuard`; the acting user ID is extracted from the verified JWT `sub` claim.
+- **security-analysis-service** (`:3003`): URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini. All identity-gated endpoints verify the JWT before processing.
+- **sharing-service** (`:3004`): Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing. All key-directory and share-invite endpoints are protected by `JwtAuthGuard`.
 
 ---
 
@@ -117,12 +117,32 @@ A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secre
 - Rust + Cargo (v1.77+) — required to build the native crypto core
 - Docker & Docker Compose
 
-### 1. Database and Cache Dependencies
+### 1. Environment Variables
+Copy the root `.env.example` to `.env` and fill in the required values:
+
+```bash
+cp .env.example .env
+```
+
+Key variables:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Postgres DSN, e.g. `postgres://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault` |
+| `JWT_SECRET` | HS256 signing key — **must be at least 32 bytes in production** |
+| `REDIS_URL` | Redis DSN, e.g. `redis://localhost:6379` |
+| `GEMINI_API_KEY` | (Optional) Google Gemini API key for AI Insights; falls back to static placeholders if unset |
+
+### 2. Database and Cache Dependencies
 ```bash
 docker compose up -d
 ```
 
-### 2. Build the Native Crypto Core
+This starts:
+- **Postgres 16** on port `5432` (database: `sentinelvault`, user: `sentinel_admin`)
+- **Redis 7** on port `6379`
+
+### 3. Build the Native Crypto Core
 The native crate must be built before running `core/` tests or the Flutter app:
 ```bash
 cd native/crypto_core
@@ -134,8 +154,8 @@ rustup target add wasm32-unknown-unknown
 cargo build --target wasm32-unknown-unknown --features wasm
 ```
 
-### 3. Backend Services
-Each service reads a shared root `.env` at startup. Copy `.env.example` to `.env` and set a strong `JWT_SECRET` before running in any environment beyond local dev.
+### 4. Backend Services
+Each service reads `DATABASE_URL`, `JWT_SECRET`, and `REDIS_URL` from environment variables (or the root `.env` file).
 
 ```bash
 # Auth Service — :3001
@@ -151,7 +171,7 @@ cd backend/security-analysis-service && npm install && npm run start
 cd backend/sharing-service && npm install --legacy-peer-deps && SHARING_PORT=3004 npm run start
 ```
 
-### 4. Running the Flutter App
+### 5. Running the Flutter App
 ```bash
 cd app
 flutter pub get
@@ -172,12 +192,13 @@ flutter build web --release
 cd core
 dart test
 ```
-> Requires the native crypto core to be built first (see setup step 2) — `dart:ffi`/`dart:js_interop` have nothing to load otherwise.
+> Requires the native crypto core to be built first (see step 3) — `dart:ffi`/`dart:js_interop` have nothing to load otherwise.
 
 ### Flutter App
 ```bash
 cd app
-flutter test   # widget, navigation, Export Auth Gate, and Security Dashboard tests
+flutter test     # widget, navigation, Export Auth Gate, and Security Dashboard tests
+flutter analyze  # must report "No issues found"
 ```
 
 ### Browser Extension
@@ -188,16 +209,25 @@ node test/autofill_test.js
 ```
 
 ### Backend Services
-All services require a running Postgres + Redis and a `JWT_SECRET` for the integration test suites:
+All services require a running Postgres + Redis instance and a `JWT_SECRET`. The CI pipeline provisions these automatically via service containers; for local runs:
+
 ```bash
-export DB=postgresql://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault
+export DATABASE_URL=postgresql://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault
 export JWT_SECRET=test-jwt-secret-at-least-32-bytes-long!!
+export REDIS_URL=redis://localhost:6379
 
 for svc in auth-service sync-api security-analysis-service sharing-service; do
-  DATABASE_URL=$DB REDIS_URL=redis://localhost:6379 JWT_SECRET=$JWT_SECRET \
+  DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL JWT_SECRET=$JWT_SECRET \
     npm test --prefix backend/$svc -- --forceExit
 done
 ```
+
+### CI Pipeline
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and `develop`:
+- **flutter-analyze**: `flutter analyze` on both `app/` and `core/` — must report zero issues
+- **flutter-test**: `flutter test` on `app/`
+- **core-tests**: `dart test` on `core/`
+- **backend-test**: Full Jest suites for all four NestJS services; Postgres 16 + Redis 7 service containers are spun up automatically in CI matching the local `docker-compose.yml` configuration
 
 ---
 
@@ -211,10 +241,10 @@ done
 - **Independent Lock vs. Logout**: Lock clears key material from memory but preserves the session; Logout clears both.
 - **Biometric Quick-Unlock & OS-Backed Secure Storage**: `flutter_secure_storage` for session tokens; the biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS via `kSecAccessControlBiometryCurrentSet`, Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Devices lacking hardware-backed secure storage have quick-unlock disabled automatically; new biometric enrollment invalidates the cache and falls back to manual Master Password entry. Not offered on Web, which has no equivalent hardware to back it.
 - **Emergency Kit Recovery Key**: Offline-first recovery via dual key-wrapping — a client-side-generated recovery key derives a second wrapping key for the Vault Key, persisted as ciphertext via the sync API. Regenerating invalidates prior recovery keys.
-- **Shamir's Secret Sharing Recovery (M-of-N)**: The Emergency Kit recovery key can additionally be split into N shares (threshold M, range 3–10) via an audited GF(256) SSS implementation in the native Rust core, for distributed recovery across trusted contacts.
+- **Shamir''s Secret Sharing Recovery (M-of-N)**: The Emergency Kit recovery key can additionally be split into N shares (threshold M, range 3–10) via an audited GF(256) SSS implementation in the native Rust core, for distributed recovery across trusted contacts.
 - **FIDO2/WebAuthn Passkey Authentication**: Standard WebAuthn registration/login for the Account Password, supporting platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (YubiKey via USB/NFC/BLE).
 - **Hardware Key Vault-Unlock**: Opt-in additional Vault Key wrapping via the FIDO2 CTAP2 `hmac-secret` extension, with Master Password fallback always available if the key is lost or removed.
-- **Duress / Decoy Vault**: Independent Vault Alpha (real) and Vault Beta (decoy) with a visually and timing-indistinguishable unlock flow. Decoy unlock fires a native hook that invalidates the real vault's biometric cache only — never touching its encrypted data — plus an explicit in-app disclosure of the feature's actual limitations.
+- **Duress / Decoy Vault**: Independent Vault Alpha (real) and Vault Beta (decoy) with a visually and timing-indistinguishable unlock flow. Decoy unlock fires a native hook that invalidates the real vault''s biometric cache only — never touching its encrypted data — plus an explicit in-app disclosure of the feature''s actual limitations.
 - **PQC Hybrid Folder Sharing**: Folder Key sharing via X25519 + ML-KEM-768 envelope wrapping (combined via HKDF-SHA256) and AES-256-GCM, signed with Ed25519 + ML-DSA-65. Mandatory out-of-band key-fingerprint verification defends against server-side public-key substitution; revocation is enforced via Folder Key rotation and re-wrapping.
 - **Thin Browser Extensions (Chrome, Firefox, Safari)**: Paired-mode architecture — the extension holds no Vault Key material itself, instead communicating with the already-unlocked native/desktop app via a native messaging host. Reuses the same Rust-compiled Wasm crypto core built for Flutter Web rather than a separate compiled bundle. Enforces exact-origin autofill matching and blocks cross-origin iframe fills.
 - **Security Center Dashboard**: Password health scoring, credential reuse detection, chronological HIBP breach feed, and a weekly redacted AI-generated digest.
@@ -224,7 +254,7 @@ done
 
 ## 🔮 Future Scope
 
-- **Post-Quantum Account Auth Hardening**: SRP-6a and WebAuthn/passkey signatures are asymmetric/discrete-log-based and theoretically vulnerable to a future quantum computer, unlike the vault's symmetric-only encryption chain. Bounded in severity today (compromise would grant account-level access only, never vault contents) but worth revisiting once post-quantum variants of these protocols mature.
+- **Post-Quantum Account Auth Hardening**: SRP-6a and WebAuthn/passkey signatures are asymmetric/discrete-log-based and theoretically vulnerable to a future quantum computer, unlike the vault''s symmetric-only encryption chain. Bounded in severity today (compromise would grant account-level access only, never vault contents) but worth revisiting once post-quantum variants of these protocols mature.
 - **Emergency Kit printable artifact refinements**: further hardening of the offline recovery-kit UX.
 
 > Peer-to-peer/local-network syncing was evaluated and intentionally descoped — cloud sync via `sync-api` remains the only sync transport.

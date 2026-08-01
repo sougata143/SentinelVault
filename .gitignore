@@ -15,6 +15,7 @@ yarn-debug.log*
 yarn-error.log*
 .npm/
 .npm-cache/
+npm-cache/
 # yarn.lock / package-lock.json are intentionally NOT ignored — commit
 # them for reproducible installs.
 
@@ -49,6 +50,10 @@ native/crypto_core/pkg/
 native/crypto_core/pkg-web/
 browser-extension/core-bundle/*.wasm
 browser-extension/core-bundle/*_bg.js
+# Browser extension compiled JS bundles
+browser-extension/core-bundle/core.js
+browser-extension/core-bundle/core.js.deps
+browser-extension/core-bundle/core.js.map
 
 # iOS build artifacts
 ios/Pods/
@@ -102,14 +107,29 @@ android/key.properties
 *.sln
 *.sw?
 
-#local useless files and folders
-skills/*
-docs/alignment-audit.md
-docs/FFI_CROSS_PLATFORM_PLAN.md
-docs/*
-AGENTS.md
-*.sh
-# Leftover root-owned node_modules moved during repair
+# Local temporary & build folders
 node_modules_old_auth/
-
 node_modules_old_sharing/
+
+# Local dev / ad-hoc shell scripts (not part of the build)
+*.sh
+abhishekARC125.sh
+run-client.sh
+docker-start.sh
+start-sentinelvault.sh
+stop-sentinelvault.sh
+
+# Agent instruction files (local tooling, not project docs)
+AGENTS.md
+skills/
+
+# Transient docs: e2e test scripts, regression reports, and one-off debug files
+docs/e2e_*.py
+docs/srp_login.js
+docs/alignment-audit.md
+docs/BUGFIX_ROUND1_ANALYSIS.md
+docs/AUTH_TOKEN_SECURITY_FIX.md
+docs/E2E_TEST_REPORT.md
+docs/E2E_TEST_REPORT_v2.md
+docs/AGENTS.md
+docs/regression*
