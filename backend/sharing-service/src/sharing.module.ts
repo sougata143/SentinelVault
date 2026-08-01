@@ -13,10 +13,11 @@ import { HealthController } from './health.controller';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DATABASE_URL,
+      url: process.env.DATABASE_URL || 'postgres://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // TEMPORARY: Auto-create tables for initial setup. Will be replaced with migrations.
       logging: false,
+      retryAttempts: 2,
     }),
     // Rate-limit: 60 requests per 60 s per IP to prevent key enumeration
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),

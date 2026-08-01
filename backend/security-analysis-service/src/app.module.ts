@@ -12,10 +12,11 @@ import { JwtModule } from '@nestjs/jwt';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DATABASE_URL,
+      url: process.env.DATABASE_URL || 'postgres://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // TEMPORARY: Auto-create tables for initial setup. Will be replaced with migrations.
       logging: false,
+      retryAttempts: 2,
     }),
     ThrottlerModule.forRoot([{
       ttl: 60000,

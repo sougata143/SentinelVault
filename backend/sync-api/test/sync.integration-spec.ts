@@ -45,11 +45,13 @@ describe('SyncService Integration Tests (Version Conflicts & Pull/Push)', () => 
 
     syncService = moduleFixture.get<SyncService>(SyncService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-  });
+  }, 30000);
 
   afterAll(async () => {
-    await app.close();
-  });
+    if (app) {
+      await app.close();
+    }
+  }, 30000);
 
   beforeEach(async () => {
     await syncService.clear();
