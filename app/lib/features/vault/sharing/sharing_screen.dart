@@ -243,6 +243,8 @@ class _SharingScreenState extends State<SharingScreen> {
       });
       await _saveRecipients();
 
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Revoked $email and successfully rotated the Folder Key.'),

@@ -210,7 +210,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
     if (result != null && result.files.single.path != null) {
       final file = result.files.single;
-      final bytes = await file.bytes;
+      final bytes = file.bytes;
       
       if (bytes != null) {
         if (_selectedFormat == 'keepass_kdbx') {
@@ -221,6 +221,7 @@ class _ImportScreenState extends State<ImportScreen> {
           _fileContentController.text = utf8.decode(bytes);
         }
         
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Loaded: ${file.name}')),
         );
