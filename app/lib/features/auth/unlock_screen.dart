@@ -7,6 +7,7 @@ import '../../theme/theme.dart';
 import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
 import 'shamir_recovery_reconstruct_screen.dart';
+import 'master_password_setup_screen.dart';
 
 class UnlockScreen extends StatefulWidget {
   final String email;
@@ -109,6 +110,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _isFetchingKeys = false;
       });
     } catch (e) {
+      final errStr = e.toString();
+      if (errStr.contains('Vault key not found') || errStr.contains('Vault key not set') || errStr.contains('404')) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => MasterPasswordSetupScreen(
+                email: widget.email,
+                syncBaseUrl: widget.syncBaseUrl,
+                httpClient: widget.httpClient,
+              ),
+            ),
+          );
+        }
+        return;
+      }
       setState(() {
         _fetchErrorMessage = 'Failed to fetch vault credentials. Please check your connection.';
         _isFetchingKeys = false;
@@ -203,12 +219,30 @@ class _UnlockScreenState extends State<UnlockScreen> {
             betaDb.open(betaVaultKey);
             await DualVaultManager.instance.prepopulateDecoyItems(betaDb, betaVaultKey);
 
+            // Initialize VaultSyncManager (sync is bypassed due to isDuressMode=true)
+            VaultSyncManager.initialize(
+              localDb: betaDb,
+              api: HttpSyncApiClient(
+                baseUrl: widget.syncBaseUrl,
+                userId: widget.email,
+                httpClient: widget.httpClient,
+              ),
+            );
+            VaultSyncManager.instance.sync();
+
             // 4. Navigate — same transition as a normal unlock.
             navigated = true;
             if (mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
-                  builder: (_) => AppShell(db: betaDb, vaultKey: betaVaultKey),
+                  builder: (_) => AppShell(
+                    db: betaDb,
+                    vaultKey: betaVaultKey,
+                    currentEmail: widget.email,
+                    authClient: widget.authClient,
+                    syncBaseUrl: widget.syncBaseUrl,
+                    httpClient: widget.httpClient,
+                  ),
                 ),
                 (route) => false,
               );
@@ -250,11 +284,29 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final db = SqliteVaultDatabase.inMemory();
       db.open(vaultKey);
 
+      // Initialize VaultSyncManager and await initial remote sync pull
+      VaultSyncManager.initialize(
+        localDb: db,
+        api: HttpSyncApiClient(
+          baseUrl: widget.syncBaseUrl,
+          userId: widget.email,
+          httpClient: widget.httpClient,
+        ),
+      );
+      await VaultSyncManager.instance.sync();
+
       navigated = true;
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+            builder: (_) => AppShell(
+              db: db,
+              vaultKey: vaultKey,
+              currentEmail: widget.email,
+              authClient: widget.authClient,
+              syncBaseUrl: widget.syncBaseUrl,
+              httpClient: widget.httpClient,
+            ),
           ),
           (route) => false,
         );
@@ -303,10 +355,28 @@ class _UnlockScreenState extends State<UnlockScreen> {
           final db = SqliteVaultDatabase.inMemory();
           db.open(vaultKey);
 
+          // Initialize VaultSyncManager
+          VaultSyncManager.initialize(
+            localDb: db,
+            api: HttpSyncApiClient(
+              baseUrl: widget.syncBaseUrl,
+              userId: widget.email,
+              httpClient: widget.httpClient,
+            ),
+          );
+          VaultSyncManager.instance.sync();
+
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
-                builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+                builder: (_) => AppShell(
+                  db: db,
+                  vaultKey: vaultKey,
+                  currentEmail: widget.email,
+                  authClient: widget.authClient,
+                  syncBaseUrl: widget.syncBaseUrl,
+                  httpClient: widget.httpClient,
+                ),
               ),
               (route) => false,
             );
@@ -451,7 +521,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             if (mounted) {
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
-                                  builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+                                  builder: (_) => AppShell(
+                                    db: db,
+                                    vaultKey: vaultKey,
+                                    currentEmail: widget.email,
+                                    authClient: widget.authClient,
+                                    syncBaseUrl: widget.syncBaseUrl,
+                                    httpClient: widget.httpClient,
+                                  ),
                                 ),
                                 (route) => false,
                               );

@@ -1,3 +1,5 @@
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_do_not_use_in_production';
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, HttpStatus } from '@nestjs/common';
 import * as request from 'supertest';
@@ -115,11 +117,11 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
     await app.init();
 
     userRepository = moduleFixture.get<UserRepository>(UserRepository);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   beforeEach(async () => {
     await userRepository.clear();

@@ -30,7 +30,7 @@ export class KeyDirectoryController {
   // Publish or rotate the caller's public key bundle.
   @Post('keys')
   @HttpCode(HttpStatus.OK)
-  publishKeyBundle(
+  async publishKeyBundle(
     @CurrentUser() callerId: string,
     @Body() dto: PublishKeyBundleDto,
   ) {
@@ -38,7 +38,7 @@ export class KeyDirectoryController {
     if (dto.userId !== callerId) {
       return { ok: false, error: 'userId mismatch' };
     }
-    const bundle = this.svc.publishKeyBundle(dto);
+    const bundle = await this.svc.publishKeyBundle(dto);
     return {
       ok: true,
       keyFingerprint: bundle.keyFingerprint,
@@ -50,8 +50,8 @@ export class KeyDirectoryController {
   // Fetch another user's public key bundle.
   // IMPORTANT: callers MUST verify keyFingerprint out-of-band before trusting.
   @Get('keys/:userId')
-  getKeyBundle(@Param('userId') userId: string) {
-    const b = this.svc.getKeyBundle(userId);
+  async getKeyBundle(@Param('userId') userId: string) {
+    const b = await this.svc.getKeyBundle(userId);
     return {
       userId: b.userId,
       x25519PublicKey: b.x25519PublicKey,
@@ -67,22 +67,22 @@ export class KeyDirectoryController {
   // Publish per-recipient ciphertext-wrapped Folder Keys for a folder.
   @Post('wrapped-keys')
   @HttpCode(HttpStatus.OK)
-  publishWrappedKeys(
+  async publishWrappedKeys(
     @CurrentUser() callerId: string,
     @Body() dto: PublishWrappedKeysDto,
   ) {
-    this.svc.publishWrappedKeys(callerId, dto);
+    await this.svc.publishWrappedKeys(callerId, dto);
     return { ok: true };
   }
 
   // ── GET /key-directory/wrapped-keys/:folderId ─────────────────────────────
   // Fetch the calling user's own wrapped Folder Key for a folder.
   @Get('wrapped-keys/:folderId')
-  fetchWrappedKey(
+  async fetchWrappedKey(
     @CurrentUser() callerId: string,
     @Param('folderId') folderId: string,
   ) {
-    const record = this.svc.fetchWrappedKey(
+    const record = await this.svc.fetchWrappedKey(
       callerId,
       { folderId } satisfies FetchWrappedKeyDto,
     );
@@ -93,18 +93,18 @@ export class KeyDirectoryController {
   // Revoke a recipient and publish the new Folder Key version.
   @Delete('wrapped-keys/revoke')
   @HttpCode(HttpStatus.OK)
-  revokeRecipient(
+  async revokeRecipient(
     @CurrentUser() callerId: string,
     @Body() dto: RevokeRecipientDto,
   ) {
-    this.svc.revokeRecipient(callerId, dto);
+    await this.svc.revokeRecipient(callerId, dto);
     return { ok: true, newKeyVersion: dto.newKeyVersion };
   }
 
   // ── GET /key-directory/wrapped-keys/:folderId/version ────────────────────
   @Get('wrapped-keys/:folderId/version')
-  getCurrentVersion(@Param('folderId') folderId: string) {
-    const v = this.svc.getCurrentKeyVersion(folderId);
+  async getCurrentVersion(@Param('folderId') folderId: string) {
+    const v = await this.svc.getCurrentKeyVersion(folderId);
     return { folderId, keyVersion: v };
   }
 }

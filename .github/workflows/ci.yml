@@ -93,11 +93,38 @@ jobs:
 
   # ── NODE.js BACKEND SERVICES JOB ──────────────────────────────────────────
   backend-test:
-    name: Node.js Backend Tests
+    name: Node.js Backend Tests (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [auth-service, security-analysis-service, sync-api]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sentinelvault
+          POSTGRES_USER: sentinel_admin
+          POSTGRES_PASSWORD: sentinel_password_change_me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel_admin -d sentinelvault"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://sentinel_admin:sentinel_password_change_me@localhost:5432/sentinelvault
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: super_secret_jwt_key_do_not_use_in_production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

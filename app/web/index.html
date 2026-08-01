@@ -72,6 +72,11 @@
         'wasmSrpCalculateClientSession',
         'wasmShamirSplit',
         'wasmShamirCombine',
+        'wasmPqcGenerateKeypairs',
+        'wasmPqcHybridWrap',
+        'wasmPqcHybridUnwrap',
+        'wasmPqcSignInvitation',
+        'wasmPqcVerifyInvitation',
       ];
       for (const fn of fns) {
         if (typeof cryptoModule[fn] === 'function') {

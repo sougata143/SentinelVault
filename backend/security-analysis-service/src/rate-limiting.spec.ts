@@ -13,11 +13,13 @@ describe('Security Analysis Service Rate Limiting', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-  });
+  }, 30000);
 
   afterAll(async () => {
-    await app.close();
-  });
+    if (app) {
+      await app.close();
+    }
+  }, 30000);
 
   it('should return rate limiting headers on endpoints', async () => {
     const response = await request(app.getHttpServer())

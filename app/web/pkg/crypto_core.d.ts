@@ -7,6 +7,16 @@ export function wasmDeriveMasterKey(password: Uint8Array, salt: Uint8Array): Uin
 
 export function wasmEncryptAesGcm(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array): Uint8Array;
 
+export function wasmPqcGenerateKeypairs(): Uint8Array;
+
+export function wasmPqcHybridUnwrap(recipient_x25519_priv: Uint8Array, recipient_mlkem_dk: Uint8Array, ephem_x25519_pub: Uint8Array, mlkem_ct: Uint8Array, aes_nonce: Uint8Array, wrapped_fk: Uint8Array): Uint8Array;
+
+export function wasmPqcHybridWrap(recipient_x25519_pub: Uint8Array, recipient_mlkem_ek: Uint8Array, folder_key: Uint8Array): Uint8Array;
+
+export function wasmPqcSignInvitation(payload: Uint8Array, ed25519_priv: Uint8Array, mldsa_seed: Uint8Array): Uint8Array;
+
+export function wasmPqcVerifyInvitation(payload: Uint8Array, ed25519_pub: Uint8Array, mldsa_vk: Uint8Array, ed25519_sig: Uint8Array, mldsa_sig: Uint8Array): boolean;
+
 export function wasmShamirCombine(flat_shares: Uint8Array): Uint8Array;
 
 export function wasmShamirSplit(secret: Uint8Array, m: number, n: number): Uint8Array;
@@ -40,6 +50,11 @@ export interface InitOutput {
     readonly wasmDecryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly wasmDeriveMasterKey: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly wasmEncryptAesGcm: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly wasmPqcGenerateKeypairs: () => [number, number];
+    readonly wasmPqcHybridUnwrap: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];
+    readonly wasmPqcHybridWrap: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly wasmPqcSignInvitation: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly wasmPqcVerifyInvitation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number];
     readonly wasmShamirCombine: (a: number, b: number) => [number, number, number, number];
     readonly wasmShamirSplit: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly wasmSrpCalculateClientSession: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number, number, number];

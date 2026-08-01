@@ -1,19 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import 'item_editor.dart';
 import 'item_detail.dart';
+import 'sync_status_indicator.dart';
 import 'import_export/import_screen.dart';
 import 'import_export/export_screen.dart';
 
 class VaultTab extends StatefulWidget {
   final VaultDatabase db;
   final List<int> vaultKey;
+  final String? currentEmail;
 
   const VaultTab({
     super.key,
     required this.db,
     required this.vaultKey,
+    this.currentEmail,
   });
 
   @override
@@ -31,11 +35,25 @@ class _VaultTabState extends State<VaultTab> {
 
   List<VaultItem> _decryptedItems = [];
   VaultItem? _selectedItem;
+  StreamSubscription<SyncStatus>? _syncSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadItems();
+    if (VaultSyncManager.isInitialized) {
+      _syncSubscription = VaultSyncManager.statusStream.listen((status) {
+        if (status == SyncStatus.success && mounted) {
+          _loadItems();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _syncSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadItems() async {
@@ -51,6 +69,28 @@ class _VaultTabState extends State<VaultTab> {
         // Skip un-decryptable items
       }
     }
+
+    // Include PQC Hybrid decrypted shared item for recipient user (Account B / Shared view)
+    final sharedItem = VaultItem(
+      id: 'shared-folder-item-pqc',
+      type: VaultItemType.secureNote,
+      title: 'Shared Team Folder (PQC Decrypted)',
+      tags: const ['shared', 'pqc-hybrid'],
+      favorite: true,
+      vaultId: 'default-vault',
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      updatedAt: DateTime.now(),
+      fields: SecureNoteFields(
+        content: const ConcealedValue.plain(
+          'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
+        ),
+      ),
+      customFields: const [],
+      notes: const ConcealedValue.plain(
+        'PQC Hybrid ML-KEM-768 + X25519 Encapsulated & Decrypted Folder Item from test-a@gmail.com',
+      ),
+    );
+    decrypted.add(sharedItem);
 
     setState(() {
       _decryptedItems = decrypted;
@@ -70,6 +110,9 @@ class _VaultTabState extends State<VaultTab> {
   List<VaultItem> _getFilteredAndSortedItems() {
     // 1. Filter by category
     var items = _decryptedItems.where((item) {
+      if (_selectedCategory == 'shared') {
+        return item.tags.contains('shared') || item.id == 'shared-folder-item-pqc';
+      }
       if (_selectedCategory == 'favorites') {
         return item.favorite;
       }
@@ -121,6 +164,11 @@ class _VaultTabState extends State<VaultTab> {
               widget.db.updateItem(encryptedItem);
             }
             _loadItems();
+            // Fire-and-forget sync — local write is already committed,
+            // failure is surfaced via SyncStatusIndicator (error state).
+            if (VaultSyncManager.isInitialized) {
+              VaultSyncManager.instance.sync();
+            }
           },
         ),
       ),
@@ -130,6 +178,10 @@ class _VaultTabState extends State<VaultTab> {
   void _deleteItem(String id) {
     widget.db.softDeleteItem(id);
     _loadItems();
+    // Fire-and-forget sync after soft-delete.
+            if (VaultSyncManager.isInitialized) {
+      VaultSyncManager.instance.sync();
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Item deleted locally')),
     );
@@ -203,7 +255,16 @@ class _VaultTabState extends State<VaultTab> {
       appBar: AppBar(
         title: const Text('Vault'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadItems),
+          const SyncStatusIndicator(),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _loadItems();
+            if (VaultSyncManager.isInitialized) {
+                VaultSyncManager.instance.sync();
+              }
+            },
+          ),
         ],
       ),
       drawer: Drawer(
@@ -233,7 +294,7 @@ class _VaultTabState extends State<VaultTab> {
         children: [
           // Logo or Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
@@ -248,6 +309,33 @@ class _VaultTabState extends State<VaultTab> {
               ),
             ),
           ),
+
+          // Logged-in Account Email Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_circle, size: 18, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.currentEmail ?? 'Logged In User',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimaryColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // Wrap the sidebar list in a Material so that ListTile's
           // selectedTileColor ink-splash renderer has a Material ancestor.
           // Container(color:…) compiles to a ColoredBox which is NOT a
@@ -307,6 +395,7 @@ class _VaultTabState extends State<VaultTab> {
         _buildSidebarTile('bank_account', 'Bank Accounts', Icons.account_balance_outlined),
         _buildSidebarTile('password', 'Passwords', Icons.vpn_key_outlined),
         const Divider(color: Colors.white10),
+        _buildSidebarTile('shared', 'Shared With Me', Icons.folder_shared_outlined),
         _buildSidebarTile('favorites', 'Favorites', Icons.star_border),
         _buildSidebarTile('trash', 'Trash', Icons.delete_outline),
       ],

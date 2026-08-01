@@ -7,14 +7,20 @@
  *   2. The decoded payload contains the correct `sub` (user id) and `username`.
  *   3. jwt.verify() succeeds with the correct secret.
  *   4. jwt.verify() throws with an incorrect secret.
+ *   5. The `exp` claim is approximately 24 h in the future.
  *
- * These tests run entirely in-process — no Postgres, no Redis — using the
- * NestJS test harness with the in-memory UserRepository.
+ * These tests run entirely in-process — no Postgres, no Redis.
+ * The TypeORM Repository<User> and Repository<WebauthnCredential> are
+ * replaced by lightweight in-memory fakes via getRepositoryToken() so that
+ * UserRepository's @InjectRepository decorators resolve without a real DB.
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtModule, JwtService } from '@nestjs/jwt';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/auth/auth.service';
 import { UserRepository } from '../src/auth/user.repository';
+import { User } from '../src/auth/entities/user.entity';
+import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
 import { SrpServer, bigIntToBuffer, bufferToBigInt, sha256 } from '../src/auth/srp';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
@@ -29,7 +35,62 @@ jest.mock('@simplewebauthn/server', () => ({
 
 const TEST_SECRET = 'test-jwt-secret-at-least-32-bytes-long!!';
 
-// ── SRP client helpers (copied from integration spec) ──────────────────────
+// ── In-memory fakes for TypeORM repositories ──────────────────────────────
+
+/** Minimal stand-in for Repository<User> used by UserRepository. */
+class InMemoryUserRepo {
+  private store = new Map<string, User>();
+
+  createQueryBuilder(_alias?: string) {
+    const self = this;
+    const builder = {
+      _whereStr: '',
+      _whereParams: {} as Record<string, string>,
+      leftJoinAndSelect(_rel: string, _a: string) { return this; },
+      where(str: string, params: Record<string, string>) { this._whereStr = str; this._whereParams = params; return this; },
+      async getOne(): Promise<User | null> {
+        const uname = builder._whereParams['username'];
+        if (!uname) return null;
+        for (const u of self.store.values()) {
+          if (u.username.toLowerCase() === uname.toLowerCase()) return u;
+        }
+        return null;
+      },
+      delete() { return this; },
+      async execute() { self.store.clear(); },
+    };
+    return builder;
+  }
+
+  async save(entity: User): Promise<User> {
+    this.store.set(entity.id, entity);
+    return entity;
+  }
+}
+
+/** Minimal stand-in for Repository<WebauthnCredential>. */
+class InMemoryWebauthnRepo {
+  private store = new Map<string, WebauthnCredential>();
+
+  async findOne(opts: { where: { credentialID: string }; relations?: string[] }): Promise<WebauthnCredential | null> {
+    return this.store.get(opts.where.credentialID) ?? null;
+  }
+
+  async save(entity: WebauthnCredential): Promise<WebauthnCredential> {
+    this.store.set(entity.credentialID, entity);
+    return entity;
+  }
+
+  createQueryBuilder() {
+    const self = this;
+    return {
+      delete() { return this; },
+      async execute() { self.store.clear(); },
+    };
+  }
+}
+
+// ── SRP client helpers ──────────────────────────────────────────────────────
 
 async function computeClientX(user: string, pass: string, salt: Buffer): Promise<bigint> {
   const masterKeyBytes = Buffer.from(pass, 'utf-8');
@@ -95,7 +156,19 @@ describe('JWT token issued by AuthService', () => {
           signOptions: { expiresIn: '24h' },
         }),
       ],
-      providers: [AuthService, UserRepository],
+      providers: [
+        AuthService,
+        UserRepository,
+        // Provide fake in-memory repositories so no Postgres connection is needed
+        {
+          provide: getRepositoryToken(User),
+          useClass: InMemoryUserRepo,
+        },
+        {
+          provide: getRepositoryToken(WebauthnCredential),
+          useClass: InMemoryWebauthnRepo,
+        },
+      ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);

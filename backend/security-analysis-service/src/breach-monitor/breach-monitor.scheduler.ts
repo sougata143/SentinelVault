@@ -20,7 +20,7 @@ export class BreachMonitorScheduler {
    */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async runDailyBreachCheck(): Promise<void> {
-    const hashes = this.breachMonitorService.allOptedInHashes();
+    const hashes = await this.breachMonitorService.allOptedInHashes();
     this.logger.log(
       `Daily breach check starting for ${hashes.length} opted-in address(es).`,
     );

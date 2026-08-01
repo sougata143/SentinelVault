@@ -19,7 +19,7 @@ void main() {
         expect(body['verifier'], isNotEmpty);
         requestBodyChecked = true;
 
-        return http.Response(json.encode({'success': true}), 201);
+        return http.Response(json.encode({'success': true, 'token': 'mock-session-token'}), 201);
       });
 
       final client = AuthClient(baseUrl: 'http://localhost:3003', httpClient: mockClient);

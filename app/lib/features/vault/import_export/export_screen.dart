@@ -302,7 +302,7 @@ class _ExportScreenState extends State<ExportScreen> {
       // Web platform: use universal_html to trigger download
       final blob = html.Blob([bytes], mimeType);
       final url = html.Url.createObjectUrl(blob);
-      final anchor = html.AnchorElement(href: url)
+      html.AnchorElement(href: url)
         ..setAttribute('download', filename)
         ..click();
       html.Url.revokeObjectUrl(url);

@@ -277,5 +277,82 @@ void main() {
       expect(localItem!.version, equals(3));
       expect(localItem.encryptedBlob, equals('device_a_ciphertext'));
     });
+
+    test('5. Adding a login item and calling sync() results in a real push call with the encrypted blob', () async {
+      final now = DateTime.now().toUtc();
+
+      // Simulate a login item that was encrypted and inserted locally.
+      // The blob is opaque to the sync layer — sync just pushes ciphertext.
+      final loginItem = EncryptedVaultItem(
+        id: 'login-item-push-test',
+        encryptedBlob: 'aes256gcm:encrypted:login:alice@example.com',
+        nonce: 'nonce_login_push_001',
+        version: 1,
+        updatedAt: now,
+      );
+
+      // Insert locally (e.g. after ItemEditor saves)
+      localDb.insertItem(loginItem);
+
+      // Server is empty at this point
+      expect(api.serverStore.isEmpty, isTrue);
+      expect(api.pushCount, equals(0));
+
+      // Trigger sync (simulates what VaultSyncManager.instance.sync() does after insertItem)
+      syncManager.isOnline = true;
+      await syncManager.sync();
+
+      // Verify the encrypted blob reached the server
+      expect(api.pushCount, equals(1));
+      expect(api.pullCount, equals(1));
+      expect(api.serverStore.containsKey(loginItem.id), isTrue);
+      final pushed = api.serverStore[loginItem.id]!;
+      expect(pushed.encryptedBlob, equals(loginItem.encryptedBlob));
+      expect(pushed.nonce, equals(loginItem.nonce));
+      expect(pushed.version, equals(1));
+      // Status should be success after a clean push
+      expect(VaultSyncManager.currentStatus, equals(SyncStatus.success));
+    });
+
+    test('6. Item added on a second simulated device appears after sync on the first', () async {
+      final now = DateTime.now().toUtc();
+
+      // Set up a second (simulated) device: same API server, separate local DB
+      final device2Db = SqliteVaultDatabase.inMemory();
+      device2Db.open([]);
+      final device2SyncManager = VaultSyncManager(localDb: device2Db, api: api);
+
+      // Device 2 adds a new item offline, then syncs to server
+      final remoteItem = EncryptedVaultItem(
+        id: 'device2-only-item',
+        encryptedBlob: 'aes256gcm:encrypted:from_device_2',
+        nonce: 'nonce_device2_xyz',
+        version: 1,
+        updatedAt: now,
+      );
+      device2Db.insertItem(remoteItem);
+      device2SyncManager.isOnline = true;
+      await device2SyncManager.sync();
+
+      // Confirm server has device 2's item
+      expect(api.serverStore.containsKey(remoteItem.id), isTrue);
+
+      // Device 1 (syncManager) has never seen this item locally
+      expect(localDb.getItem(remoteItem.id), isNull);
+
+      // Device 1 syncs — should pull device 2's item from the server
+      syncManager.isOnline = true;
+      await syncManager.sync();
+
+      // Verify device 2's item is now in device 1's local DB
+      final pulled = localDb.getItem(remoteItem.id);
+      expect(pulled, isNotNull);
+      expect(pulled!.encryptedBlob, equals(remoteItem.encryptedBlob));
+      expect(pulled.nonce, equals(remoteItem.nonce));
+      expect(pulled.version, equals(1));
+      expect(VaultSyncManager.currentStatus, equals(SyncStatus.success));
+
+      device2Db.close();
+    });
   });
 }

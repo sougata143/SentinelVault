@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
-import '../../app_shell.dart';
 import 'login_screen.dart';
 import 'unlock_screen.dart';
 import '../../theme/theme.dart';

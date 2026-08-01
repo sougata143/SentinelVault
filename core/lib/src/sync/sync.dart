@@ -1,10 +1,26 @@
 /// Synchronisation and replication engine for SentinelVault.
 library core.sync;
 
+import 'dart:async';
 import 'dart:math';
 import '../models/models.dart';
 import '../database/vault_database.dart';
 import '../auth/vault_lock_manager.dart';
+
+/// Represents the current synchronisation status of the client vault.
+enum SyncStatus {
+  /// The sync engine is idle and not actively communicating with the server.
+  idle,
+
+  /// The sync engine is actively pulling or pushing items with the server.
+  syncing,
+
+  /// The last sync operation completed successfully.
+  success,
+
+  /// The last sync operation encountered an error.
+  error,
+}
 
 /// Manage sync state, uploads, downloads, and conflict resolution.
 class SyncEngine {
@@ -60,6 +76,52 @@ class VaultSyncManager {
   /// Toggle this to simulate network online/offline state.
   bool isOnline;
 
+  static VaultSyncManager? _instance;
+
+  /// Returns the global singleton instance of [VaultSyncManager].
+  static VaultSyncManager get instance {
+    if (_instance == null) {
+      throw StateError('VaultSyncManager has not been initialized. Call initialize() first.');
+    }
+    return _instance!;
+  }
+
+  /// Returns true if [VaultSyncManager] has been initialized via [initialize].
+  static bool get isInitialized => _instance != null;
+
+  /// Initializes the global [VaultSyncManager] singleton instance.
+  static void initialize({
+    required VaultDatabase localDb,
+    required SyncApiClient api,
+    bool isOnline = true,
+  }) {
+    _instance = VaultSyncManager(
+      localDb: localDb,
+      api: api,
+      isOnline: isOnline,
+    );
+  }
+
+  /// Resets the global [VaultSyncManager] instance and resets status to idle.
+  static void clear() {
+    _instance = null;
+    _setStatus(SyncStatus.idle);
+  }
+
+  static final StreamController<SyncStatus> _statusController = StreamController<SyncStatus>.broadcast();
+
+  /// Broadcast stream emitting updates when the [SyncStatus] changes.
+  static Stream<SyncStatus> get statusStream => _statusController.stream;
+  static SyncStatus _currentStatus = SyncStatus.idle;
+
+  /// Returns the current [SyncStatus] of the sync manager.
+  static SyncStatus get currentStatus => _currentStatus;
+
+  static void _setStatus(SyncStatus status) {
+    _currentStatus = status;
+    _statusController.add(status);
+  }
+
   /// Creates a new [VaultSyncManager].
   VaultSyncManager({
     required VaultDatabase localDb,
@@ -80,8 +142,11 @@ class VaultSyncManager {
     if (!isOnline || VaultLockManager.instance.isDuressMode) {
       // Offline-first: CRUD works with no network, sync is skipped until online.
       // Duress mode: sync is bypassed to protect the real vault and hide the decoy state.
+      _setStatus(SyncStatus.idle);
       return;
     }
+
+    _setStatus(SyncStatus.syncing);
 
     try {
       // 1. Pull remote items
@@ -138,6 +203,7 @@ class VaultSyncManager {
 
       if (itemsToPush.isEmpty) {
         // Everything in sync
+        _setStatus(SyncStatus.success);
         return;
       }
 
@@ -151,6 +217,7 @@ class VaultSyncManager {
             _localDb.hardDeleteItem(item.id);
           }
         }
+        _setStatus(SyncStatus.success);
       } else {
         // 5. Handle version conflicts (409) client-side
         for (final conflictItem in pushResult.conflictingItems) {
@@ -183,6 +250,7 @@ class VaultSyncManager {
       }
     } catch (e) {
       // Network error or other sync exception, fail gracefully
+      _setStatus(SyncStatus.error);
       return;
     }
   }
