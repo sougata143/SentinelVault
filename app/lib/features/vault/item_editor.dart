@@ -210,7 +210,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         return StatefulBuilder(
           builder: (context, setDlgState) {
             return AlertDialog(
-              title: const Text('Add Custom Field'),
+              backgroundColor: AppTheme.surfaceColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Add Custom Field', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -242,7 +244,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel'),
+                  child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -360,6 +362,61 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     }
   }
 
+  Widget _buildSectionCard({
+    required String title,
+    IconData? titleIcon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Row(
+              children: [
+                if (titleIcon != null) ...[
+                  Icon(titleIcon, size: 16, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Colors.white10),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_selectedType == null) {
@@ -373,6 +430,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           IconButton(
             icon: const Icon(Icons.check, color: AppTheme.primaryColor),
             onPressed: _save,
+            tooltip: 'Save Item',
           ),
         ],
       ),
@@ -381,85 +439,115 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            // Shared Core Info
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                prefixIcon: Icon(Icons.title),
-              ),
-              validator: (v) => v == null || v.isEmpty ? 'Title is required' : null,
+            // Core Overview Section
+            _buildSectionCard(
+              title: 'Item Details',
+              titleIcon: Icons.title,
+              children: [
+                TextFormField(
+                  controller: _titleController,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'e.g. GitHub, Personal Visa, Master Password',
+                    prefixIcon: Icon(Icons.title),
+                  ),
+                  validator: (v) => v == null || v.isEmpty ? 'Title is required' : null,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
 
-            // Type-Specific Subforms
+            // Type-Specific Sections
             ..._buildTypeSpecificForms(),
 
-            const Divider(color: Colors.white10, height: 40),
-            const Text(
-              'ADDITIONAL METADATA',
-              style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+            // Additional Metadata & Notes Section
+            _buildSectionCard(
+              title: 'Organization & Notes',
+              titleIcon: Icons.folder_outlined,
+              children: [
+                TextFormField(
+                  controller: _tagsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags (comma separated)',
+                    hintText: 'work, personal, banking',
+                    prefixIcon: Icon(Icons.tag_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _notesController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes',
+                    hintText: 'Secure notes or additional hints',
+                    prefixIcon: Icon(Icons.description_outlined),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    title: const Text('Add to Favorites', style: TextStyle(fontSize: 14)),
+                    value: _favorite,
+                    activeColor: AppTheme.primaryColor,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _favorite = val);
+                      }
+                    },
+                  ),
+                ),
+                if (_customFields.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'CUSTOM FIELDS',
+                    style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._customFields.map((cf) => ListTile(
+                        title: Text(cf.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        subtitle: Text(cf.type == 'concealed' ? '••••••••' : (cf.value.plaintext ?? '')),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
+                          onPressed: () => setState(() => _customFields.remove(cf)),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      )),
+                ],
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                    side: const BorderSide(color: AppTheme.primaryColor),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _addCustomField,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Custom Field'),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
 
-            // Tags
-            TextFormField(
-              controller: _tagsController,
-              decoration: const InputDecoration(
-                labelText: 'Tags (comma separated)',
-                prefixIcon: Icon(Icons.tag_outlined),
+            const SizedBox(height: 12),
+            // Primary Submit Button at bottom
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Notes
-            TextFormField(
-              controller: _notesController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Notes',
-                prefixIcon: Icon(Icons.description_outlined),
-                alignLabelWithHint: true,
+              icon: const Icon(Icons.lock_outlined),
+              label: Text(
+                _isEditing ? 'Save Changes' : 'Save Vault Item',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
+              onPressed: _save,
             ),
-            const SizedBox(height: 16),
-
-            // Favorite Toggle
-            CheckboxListTile(
-              title: const Text('Add to Favorites'),
-              value: _favorite,
-              activeColor: AppTheme.primaryColor,
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _favorite = val);
-                }
-              },
-            ),
-
-            // Custom fields list & addition
-            if (_customFields.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text('Custom Fields:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ..._customFields.map((cf) => ListTile(
-                    title: Text(cf.label),
-                    subtitle: Text(cf.type == 'concealed' ? '••••••••' : (cf.value.plaintext ?? '')),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
-                      onPressed: () => setState(() => _customFields.remove(cf)),
-                    ),
-                  )),
-            ],
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.primaryColor,
-                side: const BorderSide(color: AppTheme.primaryColor),
-              ),
-              onPressed: _addCustomField,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Custom Field'),
-            ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -489,6 +577,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   Widget _buildTypeTile(VaultItemType type, String label, IconData icon, Color color) {
     return Card(
       color: AppTheme.surfaceColor,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -497,9 +586,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),
@@ -525,404 +614,464 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     switch (_selectedType!) {
       case VaultItemType.login:
         return [
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _usernameController,
-            decoration: const InputDecoration(
-              labelText: 'Username / Email',
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Username is required' : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            key: const Key('password-field'),
-            controller: _passwordController,
-            obscureText: _obscureLoginPw,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              prefixIcon: const Icon(Icons.lock_outline),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(_obscureLoginPw ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                    onPressed: () => setState(() => _obscureLoginPw = !_obscureLoginPw),
-                    tooltip: 'Toggle visibility',
-                  ),
-                  IconButton(
-                    key: const Key('generate-button'),
-                    icon: const Icon(Icons.autorenew),
-                    onPressed: _generateAndSetPassword,
-                    tooltip: 'Generate secure password',
-                  ),
-                ],
-              ),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
-          ),
-          const SizedBox(height: 12),
-          // Password Strength Meter integration
-          AnimatedBuilder(
-            animation: _passwordController,
-            builder: (context, _) {
-              return PasswordStrengthMeter(
-                password: _passwordController.text,
-                userInputs: [
-                  _usernameController.text,
-                  _titleController.text,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // Websites (Add Multiple)
-          const Text(
-            'WEBSITE URLS',
-            style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-          ),
-          const SizedBox(height: 8),
-          if (_urls.isNotEmpty) ...[
-            ..._urls.map((url) => ListTile(
-                  title: Text(url, style: const TextStyle(fontSize: 13)),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: AppTheme.errorColor),
-                    onPressed: () => setState(() => _urls.remove(url)),
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                )),
-            const SizedBox(height: 8),
-          ],
-          Row(
+          _buildSectionCard(
+            title: 'Credentials',
+            titleIcon: Icons.key_outlined,
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _urlInputController,
-                  decoration: const InputDecoration(
-                    hintText: 'e.g. https://google.com',
-                    prefixIcon: Icon(Icons.link),
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username / Email',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Username is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('password-field'),
+                controller: _passwordController,
+                obscureText: _obscureLoginPw,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(_obscureLoginPw ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _obscureLoginPw = !_obscureLoginPw),
+                        tooltip: 'Toggle visibility',
+                      ),
+                      IconButton(
+                        key: const Key('generate-button'),
+                        icon: const Icon(Icons.autorenew, color: AppTheme.primaryColor),
+                        onPressed: _generateAndSetPassword,
+                        tooltip: 'Generate secure password',
+                      ),
+                    ],
                   ),
                 ),
+                validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                key: const Key('add-url-button'),
-                icon: const Icon(Icons.add, color: AppTheme.primaryColor),
-                onPressed: () {
-                  final url = _urlInputController.text.trim();
-                  if (url.isNotEmpty) {
-                    setState(() {
-                      _urls.add(url);
-                      _urlInputController.clear();
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // One-Time Password (OTP) Setup
-          const Text(
-            'ONE-TIME PASSWORD (TOTP)',
-            style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _otpController,
-                  decoration: const InputDecoration(
-                    labelText: 'TOTP Secret Key',
-                    prefixIcon: Icon(Icons.timer_outlined),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                key: const Key('scan-qr-button'),
-                icon: const Icon(Icons.qr_code_scanner_rounded),
-                onPressed: () {
-                  setState(() {
-                    _otpController.text = 'JBSWY3DPEHPK3PXP';
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Mock QR Code scanned successfully')),
+              const SizedBox(height: 12),
+              AnimatedBuilder(
+                animation: _passwordController,
+                builder: (context, _) {
+                  return PasswordStrengthMeter(
+                    password: _passwordController.text,
+                    userInputs: [
+                      _usernameController.text,
+                      _titleController.text,
+                    ],
                   );
                 },
-                tooltip: 'Scan QR Code (Mock)',
+              ),
+            ],
+          ),
+
+          _buildSectionCard(
+            title: 'Website URLs',
+            titleIcon: Icons.language,
+            children: [
+              if (_urls.isNotEmpty) ...[
+                ..._urls.map((url) => ListTile(
+                      title: Text(url, style: const TextStyle(fontSize: 13)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, color: AppTheme.errorColor),
+                        onPressed: () => setState(() => _urls.remove(url)),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    )),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _urlInputController,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. https://github.com',
+                        prefixIcon: Icon(Icons.link),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const Key('add-url-button'),
+                    icon: const Icon(Icons.add_circle_outline, color: AppTheme.primaryColor, size: 28),
+                    onPressed: () {
+                      final url = _urlInputController.text.trim();
+                      if (url.isNotEmpty) {
+                        setState(() {
+                          _urls.add(url);
+                          _urlInputController.clear();
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          _buildSectionCard(
+            title: 'One-Time Password (TOTP)',
+            titleIcon: Icons.timer_outlined,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _otpController,
+                      decoration: const InputDecoration(
+                        labelText: 'TOTP Secret Key',
+                        prefixIcon: Icon(Icons.timer_outlined),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const Key('scan-qr-button'),
+                    icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryColor),
+                    onPressed: () {
+                      setState(() {
+                        _otpController.text = 'JBSWY3DPEHPK3PXP';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Mock QR Code scanned successfully')),
+                      );
+                    },
+                    tooltip: 'Scan QR Code (Mock)',
+                  ),
+                ],
               ),
             ],
           ),
         ];
+
       case VaultItemType.creditCard:
         return [
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _ccHolderController,
-            decoration: const InputDecoration(
-              labelText: 'Cardholder Name',
-              prefixIcon: Icon(Icons.person),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Cardholder name is required' : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            key: const Key('cc-number-field'),
-            controller: _ccNumController,
-            obscureText: _obscureCcNum,
-            decoration: InputDecoration(
-              labelText: 'Card Number',
-              prefixIcon: const Icon(Icons.credit_card),
-              suffixIcon: IconButton(
-                icon: Icon(_obscureCcNum ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                onPressed: () => setState(() => _obscureCcNum = !_obscureCcNum),
-              ),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Card number is required' : null,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _ccBrand,
-            decoration: const InputDecoration(labelText: 'Brand'),
-            items: const [
-              DropdownMenuItem(value: 'visa', child: Text('Visa')),
-              DropdownMenuItem(value: 'mastercard', child: Text('Mastercard')),
-              DropdownMenuItem(value: 'amex', child: Text('Amex')),
-              DropdownMenuItem(value: 'discover', child: Text('Discover')),
-              DropdownMenuItem(value: 'other', child: Text('Other')),
-            ],
-            onChanged: (val) {
-              if (val != null) setState(() => _ccBrand = val);
-            },
-          ),
-          const SizedBox(height: 16),
-          Row(
+          _buildSectionCard(
+            title: 'Card Details',
+            titleIcon: Icons.credit_card,
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _ccCvvController,
-                  obscureText: _obscureCcCvv,
-                  decoration: InputDecoration(
-                    labelText: 'CVV',
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureCcCvv ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                      onPressed: () => setState(() => _obscureCcCvv = !_obscureCcCvv),
-                    ),
-                  ),
+              TextFormField(
+                controller: _ccHolderController,
+                decoration: const InputDecoration(
+                  labelText: 'Cardholder Name',
+                  prefixIcon: Icon(Icons.person),
                 ),
+                validator: (v) => v == null || v.isEmpty ? 'Cardholder name is required' : null,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _ccPinController,
-                  obscureText: _obscureCcPin,
-                  decoration: InputDecoration(
-                    labelText: 'PIN',
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureCcPin ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                      onPressed: () => setState(() => _obscureCcPin = !_obscureCcPin),
-                    ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('cc-number-field'),
+                controller: _ccNumController,
+                obscureText: _obscureCcNum,
+                decoration: InputDecoration(
+                  labelText: 'Card Number',
+                  prefixIcon: const Icon(Icons.credit_card),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureCcNum ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureCcNum = !_obscureCcNum),
                   ),
                 ),
+                validator: (v) => v == null || v.isEmpty ? 'Card number is required' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _ccBrand,
+                decoration: const InputDecoration(labelText: 'Brand'),
+                items: const [
+                  DropdownMenuItem(value: 'visa', child: Text('Visa')),
+                  DropdownMenuItem(value: 'mastercard', child: Text('Mastercard')),
+                  DropdownMenuItem(value: 'amex', child: Text('Amex')),
+                  DropdownMenuItem(value: 'discover', child: Text('Discover')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _ccBrand = val);
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _ccCvvController,
+                      obscureText: _obscureCcCvv,
+                      decoration: InputDecoration(
+                        labelText: 'CVV',
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureCcCvv ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                          onPressed: () => setState(() => _obscureCcCvv = !_obscureCcCvv),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _ccPinController,
+                      obscureText: _obscureCcPin,
+                      decoration: InputDecoration(
+                        labelText: 'PIN',
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureCcPin ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                          onPressed: () => setState(() => _obscureCcPin = !_obscureCcPin),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String?>(
-            key: const Key('cc-billing-address-dropdown'),
-            initialValue: _ccBillingAddressRef,
-            decoration: const InputDecoration(
-              labelText: 'Link Billing Address (Identity)',
-              prefixIcon: Icon(Icons.home_outlined),
-            ),
-            items: [
-              const DropdownMenuItem<String?>(
-                value: null,
-                child: Text('None (Use Default)'),
+
+          _buildSectionCard(
+            title: 'Billing Link',
+            titleIcon: Icons.home_outlined,
+            children: [
+              DropdownButtonFormField<String?>(
+                key: const Key('cc-billing-address-dropdown'),
+                initialValue: _ccBillingAddressRef,
+                decoration: const InputDecoration(
+                  labelText: 'Link Billing Address (Identity)',
+                  prefixIcon: Icon(Icons.home_outlined),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('None (Use Default)'),
+                  ),
+                  ..._identities.map((idItem) {
+                    final idFields = idItem.fields as IdentityFields;
+                    return DropdownMenuItem<String?>(
+                      value: idItem.id,
+                      child: Text('${idItem.title} (${idFields.firstName} ${idFields.lastName})'),
+                    );
+                  }),
+                ],
+                onChanged: (val) {
+                  setState(() {
+                    _ccBillingAddressRef = val;
+                  });
+                },
               ),
-              ..._identities.map((idItem) {
-                final idFields = idItem.fields as IdentityFields;
-                return DropdownMenuItem<String?>(
-                  value: idItem.id,
-                  child: Text('${idItem.title} (${idFields.firstName} ${idFields.lastName})'),
-                );
-              }),
             ],
-            onChanged: (val) {
-              setState(() {
-                _ccBillingAddressRef = val;
-              });
-            },
           ),
         ];
+
       case VaultItemType.identity:
         return [
-          const SizedBox(height: 16),
-          Row(
+          _buildSectionCard(
+            title: 'Personal Profile',
+            titleIcon: Icons.person_outline,
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _idFirstNameController,
-                  decoration: const InputDecoration(labelText: 'First Name'),
-                  validator: (v) => v == null || v.isEmpty ? 'First name is required' : null,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idFirstNameController,
+                      decoration: const InputDecoration(labelText: 'First Name'),
+                      validator: (v) => v == null || v.isEmpty ? 'First name is required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idLastNameController,
+                      decoration: const InputDecoration(labelText: 'Last Name'),
+                      validator: (v) => v == null || v.isEmpty ? 'Last name is required' : null,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _idLastNameController,
-                  decoration: const InputDecoration(labelText: 'Last Name'),
-                  validator: (v) => v == null || v.isEmpty ? 'Last name is required' : null,
-                ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _idBirthdateController,
+                decoration: const InputDecoration(labelText: 'Birthdate (YYYY-MM-DD)', prefixIcon: Icon(Icons.cake_outlined)),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _idGenderController,
+                decoration: const InputDecoration(labelText: 'Gender'),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _idBirthdateController,
-            decoration: const InputDecoration(labelText: 'Birthdate (YYYY-MM-DD)', prefixIcon: Icon(Icons.cake_outlined)),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _idGenderController,
-            decoration: const InputDecoration(labelText: 'Gender'),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _idStreetController,
-            decoration: const InputDecoration(labelText: 'Street Address', prefixIcon: Icon(Icons.home_outlined)),
-          ),
-          const SizedBox(height: 16),
-          Row(
+
+          _buildSectionCard(
+            title: 'Address',
+            titleIcon: Icons.home_outlined,
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _idCityController,
-                  decoration: const InputDecoration(labelText: 'City'),
-                ),
+              TextFormField(
+                controller: _idStreetController,
+                decoration: const InputDecoration(labelText: 'Street Address', prefixIcon: Icon(Icons.home_outlined)),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _idStateController,
-                  decoration: const InputDecoration(labelText: 'State/Province'),
-                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idCityController,
+                      decoration: const InputDecoration(labelText: 'City'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idStateController,
+                      decoration: const InputDecoration(labelText: 'State/Province'),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _idZipController,
-                  decoration: const InputDecoration(labelText: 'Zip/Postal Code'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _idCountryController,
-                  decoration: const InputDecoration(labelText: 'Country'),
-                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idZipController,
+                      decoration: const InputDecoration(labelText: 'Zip/Postal Code'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _idCountryController,
+                      decoration: const InputDecoration(labelText: 'Country'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ];
+
       case VaultItemType.secureNote:
         return [
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _noteContentController,
-            obscureText: _obscureNote,
-            maxLines: _obscureNote ? 1 : 6,
-            decoration: InputDecoration(
-              labelText: 'Secure Content',
-              alignLabelWithHint: true,
-              suffixIcon: IconButton(
-                icon: Icon(_obscureNote ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                onPressed: () => setState(() => _obscureNote = !_obscureNote),
+          _buildSectionCard(
+            title: 'Secure Note Content',
+            titleIcon: Icons.note_outlined,
+            children: [
+              TextFormField(
+                controller: _noteContentController,
+                obscureText: _obscureNote,
+                maxLines: _obscureNote ? 1 : 6,
+                decoration: InputDecoration(
+                  labelText: 'Secure Content',
+                  alignLabelWithHint: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureNote ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureNote = !_obscureNote),
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Secure content is required' : null,
               ),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Secure content is required' : null,
+            ],
           ),
         ];
+
       case VaultItemType.bankAccount:
         return [
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bankNameController,
-            decoration: const InputDecoration(labelText: 'Bank Name', prefixIcon: Icon(Icons.account_balance)),
-            validator: (v) => v == null || v.isEmpty ? 'Bank name is required' : null,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _bankAccType,
-            decoration: const InputDecoration(labelText: 'Account Type'),
-            items: const [
-              DropdownMenuItem(value: 'checking', child: Text('Checking')),
-              DropdownMenuItem(value: 'savings', child: Text('Savings')),
-              DropdownMenuItem(value: 'other', child: Text('Other')),
+          _buildSectionCard(
+            title: 'Bank & Account Details',
+            titleIcon: Icons.account_balance_outlined,
+            children: [
+              TextFormField(
+                controller: _bankNameController,
+                decoration: const InputDecoration(labelText: 'Bank Name', prefixIcon: Icon(Icons.account_balance)),
+                validator: (v) => v == null || v.isEmpty ? 'Bank name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _bankAccType,
+                decoration: const InputDecoration(labelText: 'Account Type'),
+                items: const [
+                  DropdownMenuItem(value: 'checking', child: Text('Checking')),
+                  DropdownMenuItem(value: 'savings', child: Text('Savings')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _bankAccType = val);
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bankAccNumController,
+                obscureText: _obscureBankAcc,
+                decoration: InputDecoration(
+                  labelText: 'Account Number',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureBankAcc ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureBankAcc = !_obscureBankAcc),
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Account number is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bankRoutingController,
+                obscureText: _obscureBankRouting,
+                decoration: InputDecoration(
+                  labelText: 'Routing Number',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureBankRouting ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureBankRouting = !_obscureBankRouting),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bankIbanController,
+                decoration: const InputDecoration(labelText: 'IBAN'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bankSwiftController,
+                decoration: const InputDecoration(labelText: 'SWIFT/BIC'),
+              ),
             ],
-            onChanged: (val) {
-              if (val != null) setState(() => _bankAccType = val);
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bankAccNumController,
-            obscureText: _obscureBankAcc,
-            decoration: InputDecoration(
-              labelText: 'Account Number',
-              suffixIcon: IconButton(
-                icon: Icon(_obscureBankAcc ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                onPressed: () => setState(() => _obscureBankAcc = !_obscureBankAcc),
-              ),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Account number is required' : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bankRoutingController,
-            obscureText: _obscureBankRouting,
-            decoration: InputDecoration(
-              labelText: 'Routing Number',
-              suffixIcon: IconButton(
-                icon: Icon(_obscureBankRouting ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                onPressed: () => setState(() => _obscureBankRouting = !_obscureBankRouting),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bankIbanController,
-            decoration: const InputDecoration(labelText: 'IBAN'),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bankSwiftController,
-            decoration: const InputDecoration(labelText: 'SWIFT/BIC'),
           ),
         ];
+
       case VaultItemType.password:
         return [
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _standalonePwController,
-            obscureText: _obscureStandalonePw,
-            decoration: InputDecoration(
-              labelText: 'Secret Password',
-              prefixIcon: const Icon(Icons.vpn_key),
-              suffixIcon: IconButton(
-                icon: Icon(_obscureStandalonePw ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                onPressed: () => setState(() => _obscureStandalonePw = !_obscureStandalonePw),
+          _buildSectionCard(
+            title: 'Standalone Secret',
+            titleIcon: Icons.vpn_key_outlined,
+            children: [
+              TextFormField(
+                controller: _standalonePwController,
+                obscureText: _obscureStandalonePw,
+                decoration: InputDecoration(
+                  labelText: 'Secret Password',
+                  prefixIcon: const Icon(Icons.vpn_key),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(_obscureStandalonePw ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _obscureStandalonePw = !_obscureStandalonePw),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.autorenew, color: AppTheme.primaryColor),
+                        onPressed: () {
+                          const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*()';
+                          final bytes = _crypto.generateRandomBytes(16);
+                          final generated = bytes.map((b) => chars[b % chars.length]).join();
+                          setState(() {
+                            _standalonePwController.text = generated;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
               ),
-            ),
-            validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
+            ],
           ),
         ];
     }
