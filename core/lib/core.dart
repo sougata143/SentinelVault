@@ -4,6 +4,7 @@
 library core;
 
 export 'src/crypto/crypto.dart';
+export 'src/crypto/native_crypto_bridge.dart';
 export 'src/crypto/srp.dart';
 export 'src/database/vault_database.dart';
 export 'src/models/models.dart';
