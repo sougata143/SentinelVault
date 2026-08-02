@@ -450,6 +450,52 @@ class _UnlockScreenState extends State<UnlockScreen> {
                       key: const Key('recovery-key-input-field'),
                       controller: controller,
                       enabled: !dialogLoading,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!dialogLoading && formKey.currentState!.validate()) {
+                          // trigger recovery key unlock
+                          setDialogState(() {
+                            dialogLoading = true;
+                            dialogError = null;
+                          });
+
+                          VaultCrypto().deriveRecoveryKdfKey(
+                            recoveryKey: controller.text,
+                            salt: _recoverySalt!,
+                          ).then((rkk) async {
+                            final vaultKey = await VaultCrypto().unwrapVaultKey(
+                              wrappedVaultKey: _recoveryWrappedKey!,
+                              masterKey: rkk,
+                            );
+                            VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
+                            final db = SqliteVaultDatabase.inMemory();
+                            db.open(vaultKey);
+                            if (dialogCtx.mounted) {
+                              Navigator.of(dialogCtx).pop();
+                            }
+                            if (mounted) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (_) => AppShell(
+                                    db: db,
+                                    vaultKey: vaultKey,
+                                    currentEmail: widget.email,
+                                    authClient: widget.authClient,
+                                    syncBaseUrl: widget.syncBaseUrl,
+                                    httpClient: widget.httpClient,
+                                  ),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          }).catchError((_) {
+                            setDialogState(() {
+                              dialogLoading = false;
+                              dialogError = 'Invalid Recovery Key or decryption failed';
+                            });
+                          });
+                        }
+                      },
                       style: const TextStyle(color: AppTheme.textPrimaryColor),
                       decoration: const InputDecoration(
                         labelText: 'Recovery Key',
@@ -711,6 +757,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           controller: _masterPasswordController,
                           obscureText: true,
                           enabled: _lockoutSecondsRemaining == 0 && !_isLoading,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!isButtonsDisabled) _handleUnlock();
+                          },
                           decoration: const InputDecoration(
                             labelText: 'Master Password',
                             prefixIcon: Icon(Icons.lock_outline, color: AppTheme.textSecondaryColor),
