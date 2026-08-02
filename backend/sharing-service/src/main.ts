@@ -10,10 +10,25 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(SharingModule);
 
   app.enableCors({
-    origin: (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:8080,http://localhost:8181,http://localhost:3000,http://localhost:4000,http://localhost:59468').split(',').map((o) => o.trim()),
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
 
+      const allowedEnvOrigins = process.env.CORS_ALLOWED_ORIGINS
+        ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+        : [];
+      if (allowedEnvOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+    credentials: true,
   });
 
   // Strict request-body validation
