@@ -55,12 +55,16 @@ void main() {
       expect(generatedPassword.length, equals(16));
 
       // Test Website URLs list interaction
+      await tester.ensureVisible(find.byKey(const Key('add-url-button')));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).at(3), 'https://github.com'); // Website input
       await tester.tap(find.byKey(const Key('add-url-button')));
       await tester.pump();
       expect(find.text('https://github.com'), findsOneWidget);
 
       // Test QR Scanner mock
+      await tester.ensureVisible(find.byKey(const Key('scan-qr-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('scan-qr-button')));
       await tester.pump();
       expect(find.text('JBSWY3DPEHPK3PXP'), findsOneWidget);

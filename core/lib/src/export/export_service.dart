@@ -63,114 +63,95 @@ class ExportService {
       }
 
       String row = '';
-      switch (f.runtimeType) {
-        case const (LoginFields):
-          final lf = f as LoginFields;
-          row = [
-            csv('login'),
-            csv(item.title),
-            csv(lf.username),
-            csv(lf.password.plaintext),
-            csv(lf.urls.join(' | ')),
-            '', '', '', '', '', '', '', '', '', '', '', '', '', '', // card/identity/bank empty
-            '',
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        case const (CreditCardFields):
-          final cf = f as CreditCardFields;
-          row = [
-            csv('credit_card'),
-            csv(item.title),
-            '', '', // username, password
-            '', // url
-            csv(cf.cardNumber.plaintext),
-            csv(cf.brand),
-            csv(cf.expiryMonth.toString()),
-            csv(cf.expiryYear.toString()),
-            csv(cf.cvv.plaintext),
-            csv(cf.cardholderName),
-            '', '', '', '', '', '', // identity fields
-            '', '', // bank fields
-            '',
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        case const (IdentityFields):
-          final id = f as IdentityFields;
-          row = [
-            csv('identity'),
-            csv(item.title),
-            '', '', '', // username, password, url
-            '', '', '', '', '', // card fields
-            csv('${id.firstName} ${id.lastName}'.trim()),
-            csv(id.address.street),
-            csv(id.address.city),
-            csv(id.address.state),
-            csv(id.address.zip),
-            csv(id.address.country),
-            '', '', // bank fields
-            '',
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        case const (SecureNoteFields):
-          final sn = f as SecureNoteFields;
-          row = [
-            csv('secure_note'),
-            csv(item.title),
-            ...List.filled(17, ''), // most fields empty
-            csv(sn.content.plaintext),
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        case const (BankAccountFields):
-          final ba = f as BankAccountFields;
-          row = [
-            csv('bank_account'),
-            csv(item.title),
-            '', '', '', // username, password, url
-            '', '', '', '', '', '', // card fields
-            '', '', '', '', '', '', // identity fields
-            csv(ba.bankName),
-            csv(ba.accountNumber.plaintext),
-            csv(ba.routingNumber.plaintext),
-            '',
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        case const (PasswordFields):
-          final pf = f as PasswordFields;
-          row = [
-            csv('password'),
-            csv(item.title),
-            '',
-            csv(pf.password.plaintext),
-            ...List.filled(18, ''),
-            csv(item.tags.join('|')),
-            csv(item.favorite.toString()),
-            csv(item.notes.plaintext),
-          ].join(',');
-          break;
-
-        default:
-          // Unknown type — output a row with only the title
-          row = [csv('unknown'), csv(item.title), ...List.filled(21, '')].join(',');
+      if (f is LoginFields) {
+        row = [
+          csv('login'),
+          csv(item.title),
+          csv(f.username),
+          csv(f.password.plaintext),
+          csv(f.urls.join(' | ')),
+          '', '', '', '', '', '', '', '', '', '', '', '', '', '', // card/identity/bank empty
+          '',
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is CreditCardFields) {
+        row = [
+          csv('credit_card'),
+          csv(item.title),
+          '', '', // username, password
+          '', // url
+          csv(f.cardNumber.plaintext),
+          csv(f.brand),
+          csv(f.expiryMonth.toString()),
+          csv(f.expiryYear.toString()),
+          csv(f.cvv.plaintext),
+          csv(f.cardholderName),
+          '', '', '', '', '', '', // identity fields
+          '', '', // bank fields
+          '',
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is IdentityFields) {
+        row = [
+          csv('identity'),
+          csv(item.title),
+          '', '', '', // username, password, url
+          '', '', '', '', '', // card fields
+          csv('${f.firstName} ${f.lastName}'.trim()),
+          csv(f.address.street),
+          csv(f.address.city),
+          csv(f.address.state),
+          csv(f.address.zip),
+          csv(f.address.country),
+          '', '', // bank fields
+          '',
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is SecureNoteFields) {
+        row = [
+          csv('secure_note'),
+          csv(item.title),
+          ...List.filled(17, ''), // most fields empty
+          csv(f.content.plaintext),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is BankAccountFields) {
+        row = [
+          csv('bank_account'),
+          csv(item.title),
+          '', '', '', // username, password, url
+          '', '', '', '', '', '', // card fields
+          '', '', '', '', '', '', // identity fields
+          csv(f.bankName),
+          csv(f.accountNumber.plaintext),
+          csv(f.routingNumber.plaintext),
+          '',
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is PasswordFields) {
+        row = [
+          csv('password'),
+          csv(item.title),
+          '',
+          csv(f.password.plaintext),
+          ...List.filled(18, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else {
+        // Unknown type — output a row with only the title
+        row = [csv('unknown'), csv(item.title), ...List.filled(21, '')].join(',');
       }
 
       buf.writeln(row);

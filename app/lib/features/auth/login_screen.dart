@@ -150,6 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         key: const Key('login-email-field'),
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: 'Email Address',
                           hintText: 'Enter your email',
@@ -167,6 +169,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         key: const Key('login-password-field'),
                         controller: _passwordController,
                         obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) {
+                          if (!_isLoading) _handleLogin();
+                        },
                         decoration: const InputDecoration(
                           labelText: 'Account Password',
                           hintText: 'Enter your password',

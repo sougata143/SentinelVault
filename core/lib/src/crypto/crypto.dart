@@ -18,8 +18,8 @@ class VaultCrypto {
   final Random _secureRandom;
 
   /// Creates a new instance of [VaultCrypto] with standard security parameters.
-  VaultCrypto()
-      : _bridge = NativeCryptoBridgeImpl(),
+  VaultCrypto({NativeCryptoBridge? bridge})
+      : _bridge = bridge ?? NativeCryptoBridgeImpl(),
         _secureRandom = Random.secure();
 
   /// Generates a list of cryptographically secure random bytes of [length].

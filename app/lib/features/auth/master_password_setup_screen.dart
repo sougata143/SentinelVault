@@ -230,6 +230,8 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
                         key: const Key('master-password-field'),
                         controller: _masterPasswordController,
                         obscureText: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: 'Master Password',
                           prefixIcon: Icon(Icons.lock_outline, color: AppTheme.textSecondaryColor),
@@ -254,6 +256,10 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
                         key: const Key('confirm-master-password-field'),
                         controller: _confirmMasterPasswordController,
                         obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) {
+                          if (!_isLoading) _handleCreateMasterPassword();
+                        },
                         decoration: const InputDecoration(
                           labelText: 'Confirm Master Password',
                           prefixIcon: Icon(Icons.lock_outline, color: AppTheme.textSecondaryColor),

@@ -6,7 +6,6 @@ import '../../theme/theme.dart';
 import '../settings/settings_screen.dart';
 import 'sharing/sharing_screen.dart';
 
-
 class ItemDetailPane extends StatefulWidget {
   final VaultItem? item;
   final VoidCallback? onDelete;
@@ -99,7 +98,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Text(item.title, style: const TextStyle(fontFamily: 'Outfit')),
+        title: Text(item.title, style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.teal),
@@ -130,7 +129,6 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               tooltip: 'Delete Item',
             ),
         ],
-
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
@@ -142,12 +140,12 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppTheme.warningColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: AppTheme.warningColor, size: 16),
+                  const Icon(Icons.warning_amber_rounded, color: AppTheme.warningColor, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -159,75 +157,126 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               ),
             ),
 
-          // Shared Header
-          Row(
-            children: [
-              _buildTypeIcon(item.type),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.type.toValue().toUpperCase(),
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.title,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+          // Shared Header Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              if (item.favorite)
-                const Icon(Icons.star, color: AppTheme.warningColor, size: 24),
-            ],
+              ],
+            ),
+            child: Row(
+              children: [
+                _buildTypeIcon(item.type),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.type.toValue().toUpperCase(),
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.title,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                if (item.favorite)
+                  const Icon(Icons.star, color: AppTheme.warningColor, size: 24),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Type specific fields
-          ..._buildTypeFields(item),
+          // Type specific fields card container
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _buildTypeFields(item),
+            ),
+          ),
 
           // Custom Fields Section
           if (item.customFields.isNotEmpty) ...[
-            const Divider(color: Colors.white10, height: 40),
-            const Text(
-              'CUSTOM FIELDS',
-              style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'CUSTOM FIELDS',
+                    style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 16),
+                  ...item.customFields.map((cf) => _buildDetailField(
+                        cf.label,
+                        cf.value.plaintext ?? '',
+                        isSecret: cf.type == 'concealed',
+                        obscureKey: 'cf_${cf.label}',
+                      )),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            ...item.customFields.map((cf) => _buildDetailField(
-                  cf.label,
-                  cf.value.plaintext ?? '',
-                  isSecret: cf.type == 'concealed',
-                  obscureKey: 'cf_${cf.label}',
-                )),
           ],
 
           // Notes Section
           if (item.notes.plaintext != null && item.notes.plaintext!.isNotEmpty) ...[
-            const Divider(color: Colors.white10, height: 40),
-            const Text(
-              'NOTES',
-              style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.02),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
-              child: Text(
-                item.notes.plaintext!,
-                style: const TextStyle(height: 1.5, fontSize: 13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'NOTES',
+                    style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    item.notes.plaintext!,
+                    style: const TextStyle(height: 1.5, fontSize: 14),
+                  ),
+                ],
               ),
             ),
           ],
@@ -269,8 +318,8 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Icon(icon, color: color, size: 28),
     );
@@ -338,7 +387,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12)),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -347,7 +396,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                   style: TextStyle(
                     fontFamily: obscured ? null : 'Inter',
                     fontSize: 15,
-                    fontWeight: obscured ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: obscured ? FontWeight.bold : FontWeight.w500,
                     letterSpacing: obscured ? 2.0 : 0.0,
                   ),
                 ),
@@ -359,7 +408,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                   tooltip: obscured ? 'Reveal' : 'Mask',
                 ),
               IconButton(
-                icon: const Icon(Icons.copy_outlined, size: 18),
+                icon: const Icon(Icons.copy_outlined, size: 18, color: AppTheme.primaryColor),
                 onPressed: () => _copyToClipboard(label, value),
                 tooltip: 'Copy to Clipboard',
               ),

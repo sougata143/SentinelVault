@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:core/core.dart';
 import '../../../theme/theme.dart';
 import 'package:universal_html/html.dart' as html show Blob, Url, AnchorElement;
@@ -28,12 +29,14 @@ class ExportScreen extends StatefulWidget {
   /// In the dev build this is a placeholder; in production it is stored
   /// alongside the wrapped vault key in local secure storage.
   final List<int> masterKeySalt;
+  final VaultCrypto? crypto;
 
   const ExportScreen({
     super.key,
     required this.vaultKey,
     required this.db,
     required this.masterKeySalt,
+    this.crypto,
   });
 
   @override
@@ -58,7 +61,13 @@ class _ExportScreenState extends State<ExportScreen> {
 
   // Export service
   final _exportService = ExportService();
-  final _crypto = VaultCrypto();
+  late final VaultCrypto _crypto;
+
+  @override
+  void initState() {
+    super.initState();
+    _crypto = widget.crypto ?? VaultCrypto();
+  }
 
   @override
   void dispose() {
@@ -204,7 +213,7 @@ class _ExportScreenState extends State<ExportScreen> {
     final filename = 'sentinelvault_backup_$date.svault';
 
     // Trigger download
-    _triggerDownload(filename: filename, bytes: bytes, mimeType: 'application/octet-stream');
+    await _triggerDownload(filename: filename, bytes: bytes, mimeType: 'application/octet-stream');
 
     // Log export — metadata only
     SecurityActivityLog.instance.logExport(
@@ -213,11 +222,13 @@ class _ExportScreenState extends State<ExportScreen> {
       timestamp: DateTime.now().toUtc(),
     );
 
-    setState(() {
-      _exportedCount = encryptedItems.length;
-      _exportFilename = filename;
-      _step = 3;
-    });
+    if (mounted) {
+      setState(() {
+        _exportedCount = encryptedItems.length;
+        _exportFilename = filename;
+        _step = 3;
+      });
+    }
   }
 
   Future<void> _runPlaintextExport() async {
@@ -265,7 +276,7 @@ class _ExportScreenState extends State<ExportScreen> {
     _reauthed = false; // consume the re-auth token — one export per verification
 
     // Trigger download
-    _triggerDownload(filename: filename, bytes: bytes, mimeType: 'text/plain');
+    await _triggerDownload(filename: filename, bytes: bytes, mimeType: 'text/plain');
 
     // Log export — metadata only, never content
     SecurityActivityLog.instance.logExport(
@@ -284,28 +295,41 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 
   /// Platform-agnostic download trigger.
-  /// On web: creates a data URI and clicks it programmatically.
-  /// On native: saves to downloads directory using path_provider.
-  void _triggerDownload({
+  /// On web: creates a data URI and clicks it programmatically via universal_html.
+  /// On native desktop/mobile: prompts user to save file via FilePicker.
+  Future<void> _triggerDownload({
     required String filename,
     required List<int> bytes,
     required String mimeType,
-  }) {
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-      // Native platforms: use path_provider to save to downloads directory
-      // For now, this is a placeholder - needs path_provider integration
-      // TODO: Implement native file save using path_provider
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export saved to Downloads: $filename')),
-      );
-    } else {
-      // Web platform: use universal_html to trigger download
+  }) async {
+    if (kIsWeb) {
+      // Web platform: use universal_html Blob & programmatic anchor click to trigger download
       final blob = html.Blob([bytes], mimeType);
       final url = html.Url.createObjectUrl(blob);
       html.AnchorElement(href: url)
         ..setAttribute('download', filename)
         ..click();
       html.Url.revokeObjectUrl(url);
+    } else {
+      // Desktop / Mobile platforms: open native Save File dialog
+      try {
+        final path = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Export File',
+          fileName: filename,
+          bytes: Uint8List.fromList(bytes),
+        );
+        if (path != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export saved to: $path')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to save export file: $e')),
+          );
+        }
+      }
     }
   }
 

@@ -150,6 +150,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         key: const Key('email-field'),
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: 'Email Address',
                           hintText: 'Enter your email',
@@ -170,6 +172,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         key: const Key('password-field'),
                         controller: _passwordController,
                         obscureText: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: 'Account Password',
                           hintText: 'Create a password',
@@ -190,6 +194,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         key: const Key('confirm-password-field'),
                         controller: _confirmPasswordController,
                         obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) {
+                          if (!_isLoading) _handleRegister();
+                        },
                         decoration: const InputDecoration(
                           labelText: 'Confirm Password',
                           hintText: 'Re-enter your password',

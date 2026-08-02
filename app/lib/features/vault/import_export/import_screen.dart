@@ -125,11 +125,13 @@ Future<void> encryptAndSave(
 class ImportScreen extends StatefulWidget {
   final List<int> vaultKey;
   final VaultDatabase db;
+  final VaultCrypto? crypto;
 
   const ImportScreen({
     super.key,
     required this.vaultKey,
     required this.db,
+    this.crypto,
   });
 
   @override
@@ -156,7 +158,13 @@ class _ImportScreenState extends State<ImportScreen> {
   List<ParsedItem> _parsedItems = [];
   bool _isSaving = false;
   int _savedCount = 0;
-  final _crypto = VaultCrypto();
+  late final VaultCrypto _crypto;
+
+  @override
+  void initState() {
+    super.initState();
+    _crypto = widget.crypto ?? VaultCrypto();
+  }
 
   @override
   void dispose() {
@@ -206,25 +214,33 @@ class _ImportScreenState extends State<ImportScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: extension != null ? FileType.custom : FileType.any,
       allowedExtensions: extension != null ? [extension] : null,
+      withData: true,
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result != null && result.files.isNotEmpty) {
       final file = result.files.single;
       final bytes = file.bytes;
-      
-      if (bytes != null) {
+
+      if (bytes != null && bytes.isNotEmpty) {
         if (_selectedFormat == 'keepass_kdbx') {
           // For KeePass, store as Base64 for the existing parser
           _fileContentController.text = base64Encode(bytes);
+          if (_keepassPasswordController.text.isNotEmpty) {
+            await _parseContent();
+          } else {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Loaded: ${file.name}. Enter master password and tap Parse.')),
+            );
+          }
         } else {
           // For text-based formats, decode as UTF-8
           _fileContentController.text = utf8.decode(bytes);
+
+          if (!mounted) return;
+          // Automatically proceed to preview screen
+          await _parseContent();
         }
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Loaded: ${file.name}')),
-        );
       }
     }
   }

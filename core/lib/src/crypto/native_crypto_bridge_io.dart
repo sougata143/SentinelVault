@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError;
+import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError, Cryptography, SecretKey, SecretBox, Mac, Argon2id;
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
@@ -267,12 +267,20 @@ DynamicLibrary _loadLibrary() {
     return DynamicLibrary.open('libcrypto_core.so');
   } else if (Platform.isWindows) {
     try {
-      final testPath = p.join(Directory.current.path, '..', 'native', 'crypto_core', 'target', 'release', 'crypto_core.dll');
-      if (FileSystemEntity.typeSync(testPath) != FileSystemEntityType.notFound) {
-        return DynamicLibrary.open(testPath);
+      final releasePath = p.join(Directory.current.path, '..', 'native', 'crypto_core', 'target', 'release', 'crypto_core.dll');
+      if (FileSystemEntity.typeSync(releasePath) != FileSystemEntityType.notFound) {
+        return DynamicLibrary.open(releasePath);
       }
-    } catch (_) {}
-    return DynamicLibrary.open('crypto_core.dll');
+      final debugPath = p.join(Directory.current.path, '..', 'native', 'crypto_core', 'target', 'debug', 'crypto_core.dll');
+      if (FileSystemEntity.typeSync(debugPath) != FileSystemEntityType.notFound) {
+        return DynamicLibrary.open(debugPath);
+      }
+      return DynamicLibrary.open('crypto_core.dll');
+    } catch (_) {
+      try {
+        return DynamicLibrary.process();
+      } catch (_) {}
+    }
   }
   throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
 }
@@ -306,25 +314,32 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   late final _PqcSignInvitationDart _pqcSignInvitationFn;
   late final _PqcVerifyInvitationDart _pqcVerifyInvitationFn;
 
+  bool _isBound = false;
+
   /// Creates a new [NativeCryptoBridgeImpl] and binds the Rust library symbols.
   NativeCryptoBridgeImpl() {
-    _lib = _loadLibrary();
-    _deriveMasterKeyFn = _lib.lookupFunction<_DeriveMasterKeyC, _DeriveMasterKeyDart>('derive_master_key');
-    _encryptAesGcmFn = _lib.lookupFunction<_EncryptDecryptAesGcmC, _EncryptDecryptAesGcmDart>('encrypt_aes_gcm');
-    _decryptAesGcmFn = _lib.lookupFunction<_EncryptDecryptAesGcmC, _EncryptDecryptAesGcmDart>('decrypt_aes_gcm');
-    _srpCalculateXFn = _lib.lookupFunction<_SrpCalculateXC, _SrpCalculateXDart>('srp_calculate_x');
-    _srpCalculateVerifierFn = _lib.lookupFunction<_SrpCalculateXC, _SrpCalculateXDart>('srp_calculate_verifier');
-    _srpGenerateClientEphemeralFn = _lib.lookupFunction<_SrpGenerateClientEphemeralC, _SrpGenerateClientEphemeralDart>('srp_generate_client_ephemeral');
-    _srpCalculateClientSessionFn = _lib.lookupFunction<_SrpCalculateClientSessionC, _SrpCalculateClientSessionDart>('srp_calculate_client_session');
-    _shamirSplitFn = _lib.lookupFunction<_ShamirSplitC, _ShamirSplitDart>('shamir_split');
-    _shamirCombineFn = _lib.lookupFunction<_ShamirCombineC, _ShamirCombineDart>('shamir_combine');
+    try {
+      _lib = _loadLibrary();
+      _deriveMasterKeyFn = _lib.lookupFunction<_DeriveMasterKeyC, _DeriveMasterKeyDart>('derive_master_key');
+      _encryptAesGcmFn = _lib.lookupFunction<_EncryptDecryptAesGcmC, _EncryptDecryptAesGcmDart>('encrypt_aes_gcm');
+      _decryptAesGcmFn = _lib.lookupFunction<_EncryptDecryptAesGcmC, _EncryptDecryptAesGcmDart>('decrypt_aes_gcm');
+      _srpCalculateXFn = _lib.lookupFunction<_SrpCalculateXC, _SrpCalculateXDart>('srp_calculate_x');
+      _srpCalculateVerifierFn = _lib.lookupFunction<_SrpCalculateXC, _SrpCalculateXDart>('srp_calculate_verifier');
+      _srpGenerateClientEphemeralFn = _lib.lookupFunction<_SrpGenerateClientEphemeralC, _SrpGenerateClientEphemeralDart>('srp_generate_client_ephemeral');
+      _srpCalculateClientSessionFn = _lib.lookupFunction<_SrpCalculateClientSessionC, _SrpCalculateClientSessionDart>('srp_calculate_client_session');
+      _shamirSplitFn = _lib.lookupFunction<_ShamirSplitC, _ShamirSplitDart>('shamir_split');
+      _shamirCombineFn = _lib.lookupFunction<_ShamirCombineC, _ShamirCombineDart>('shamir_combine');
 
-    // PQC Lookups
-    _pqcGenerateKeypairsFn = _lib.lookupFunction<_PqcGenerateKeypairsC, _PqcGenerateKeypairsDart>('pqc_generate_keypairs');
-    _pqcHybridWrapFn = _lib.lookupFunction<_PqcHybridWrapC, _PqcHybridWrapDart>('pqc_hybrid_wrap');
-    _pqcHybridUnwrapFn = _lib.lookupFunction<_PqcHybridUnwrapC, _PqcHybridUnwrapDart>('pqc_hybrid_unwrap');
-    _pqcSignInvitationFn = _lib.lookupFunction<_PqcSignInvitationC, _PqcSignInvitationDart>('pqc_sign_invitation');
-    _pqcVerifyInvitationFn = _lib.lookupFunction<_PqcVerifyInvitationC, _PqcVerifyInvitationDart>('pqc_verify_invitation');
+      // PQC Lookups
+      _pqcGenerateKeypairsFn = _lib.lookupFunction<_PqcGenerateKeypairsC, _PqcGenerateKeypairsDart>('pqc_generate_keypairs');
+      _pqcHybridWrapFn = _lib.lookupFunction<_PqcHybridWrapC, _PqcHybridWrapDart>('pqc_hybrid_wrap');
+      _pqcHybridUnwrapFn = _lib.lookupFunction<_PqcHybridUnwrapC, _PqcHybridUnwrapDart>('pqc_hybrid_unwrap');
+      _pqcSignInvitationFn = _lib.lookupFunction<_PqcSignInvitationC, _PqcSignInvitationDart>('pqc_sign_invitation');
+      _pqcVerifyInvitationFn = _lib.lookupFunction<_PqcVerifyInvitationC, _PqcVerifyInvitationDart>('pqc_verify_invitation');
+      _isBound = true;
+    } catch (_) {
+      _isBound = false;
+    }
   }
 
   @override
@@ -332,6 +347,20 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> password,
     required List<int> salt,
   }) async {
+    if (!_isBound) {
+      final algorithm = Argon2id(
+        memory: 65536,
+        parallelism: 4,
+        iterations: 3,
+        hashLength: 32,
+      );
+      final derivedKey = await algorithm.deriveKey(
+        secretKey: SecretKey(password),
+        nonce: salt,
+      );
+      final bytes = await derivedKey.extractBytes();
+      return Uint8List.fromList(bytes);
+    }
     return using((Arena arena) {
       final passwordPtr = password.toPointer(arena);
       final saltPtr = salt.toPointer(arena);
@@ -360,6 +389,12 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> key,
     required List<int> nonce,
   }) async {
+    if (!_isBound) {
+      final algorithm = Cryptography.instance.aesGcm(secretKeyLength: 32);
+      final secretKey = SecretKey(key);
+      final secretBox = await algorithm.encrypt(plaintext, secretKey: secretKey, nonce: nonce);
+      return Uint8List.fromList([...secretBox.cipherText, ...secretBox.mac.bytes]);
+    }
     return using((Arena arena) {
       final keyPtr = key.toPointer(arena);
       final noncePtr = nonce.toPointer(arena);
@@ -391,6 +426,15 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required List<int> key,
     required List<int> nonce,
   }) async {
+    if (!_isBound) {
+      final algorithm = Cryptography.instance.aesGcm(secretKeyLength: 32);
+      final secretKey = SecretKey(key);
+      final mac = Mac(ciphertextAndMac.sublist(ciphertextAndMac.length - 16));
+      final ciphertext = ciphertextAndMac.sublist(0, ciphertextAndMac.length - 16);
+      final secretBox = SecretBox(ciphertext, nonce: nonce, mac: mac);
+      final decrypted = await algorithm.decrypt(secretBox, secretKey: secretKey);
+      return Uint8List.fromList(decrypted);
+    }
     return using((Arena arena) {
       final keyPtr = key.toPointer(arena);
       final noncePtr = nonce.toPointer(arena);
