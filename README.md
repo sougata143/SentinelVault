@@ -1,4 +1,4 @@
-﻿# SentinelVault
+# SentinelVault
 
 SentinelVault is a hybrid, offline-first, zero-knowledge password manager and security analysis suite. It runs across Web, iOS, and Android from a unified Flutter codebase, backed by a shared Dart core package for client-side cryptography and data modeling, a native Rust cryptography core, and specialized NestJS backend microservices.
 
@@ -172,16 +172,32 @@ cd backend/sharing-service && npm install --legacy-peer-deps && SHARING_PORT=300
 ```
 
 ### 5. Running the Flutter App
+
+#### Local Development
 ```bash
 cd app
 flutter pub get
-flutter run
+flutter run -d chrome --web-port=8080
+```
+> Defaults point to local microservice endpoints (`AUTH_BASE_URL=http://localhost:3001`, `SYNC_BASE_URL=http://localhost:3002`, `SECURITY_BASE_URL=http://localhost:3003`, `SHARING_BASE_URL=http://localhost:3004`). Backend CORS dynamically supports any local dev port (e.g. 8080 or dynamic ports).
+
+#### Production & Custom Base URLs (`--dart-define`)
+Backend microservice URLs are configured at build/run time using Dart's compile-time environment variables (`ApiConfig`):
+
+```bash
+flutter build web --release \
+  --dart-define=AUTH_BASE_URL=https://api-auth.vault.example.com \
+  --dart-define=SYNC_BASE_URL=https://api-sync.vault.example.com \
+  --dart-define=SECURITY_BASE_URL=https://api-security.vault.example.com \
+  --dart-define=SHARING_BASE_URL=https://api-sharing.vault.example.com
 ```
 
-Build for web distribution:
-```bash
-flutter build web --release
-```
+| Environment Variable | Default Value | Description |
+|---|---|---|
+| `AUTH_BASE_URL` | `http://localhost:3001` | Base URL for `auth-service` (SRP-6a, login/register, session JWTs) |
+| `SYNC_BASE_URL` | `http://localhost:3002` | Base URL for `sync-api` (encrypted vault blobs & key envelopes) |
+| `SECURITY_BASE_URL` | `http://localhost:3003` | Base URL for `security-analysis-service` (reputation, breach monitor, AI insights) |
+| `SHARING_BASE_URL` | `http://localhost:3004` | Base URL for `sharing-service` (PQC key directory & folder share invites) |
 
 ---
 
