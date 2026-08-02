@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
 import 'duress_setup_screen.dart';
@@ -37,7 +38,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLock,
     this.onLogout,
     this.currentEmail = 'auditor@sentinelvault.io',
-    this.syncBaseUrl = 'http://localhost:3002',
+    this.syncBaseUrl = ApiConfig.syncBaseUrl,
     this.httpClient,
     this.isWebOverride = kIsWeb,
   });

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:core/core.dart';
+import '../../../config/api_config.dart';
 import 'fingerprint_verification_dialog.dart';
 
 
@@ -142,7 +143,7 @@ class _SharingScreenState extends State<SharingScreen> {
       // Post invitation to backend sharing service (port 3004) to persist in database
       try {
         await http.post(
-          Uri.parse('http://localhost:3004/invites'),
+          Uri.parse('${ApiConfig.sharingBaseUrl}/invites'),
           headers: {'Content-Type': 'application/json'},
           body: json.encode({
             'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',

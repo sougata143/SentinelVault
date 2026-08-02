@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
@@ -19,7 +20,7 @@ class UnlockScreen extends StatefulWidget {
     super.key,
     required this.email,
     this.authClient,
-    this.syncBaseUrl = 'http://localhost:3002',
+    this.syncBaseUrl = ApiConfig.syncBaseUrl,
     this.httpClient,
   });
 

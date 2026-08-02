@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:crypto/crypto.dart' as crypto_pkg;
+import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../breach_monitor/breach_monitor_tab.dart';
 import '../file_scanner/file_scanner_tab.dart';
@@ -35,8 +36,8 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
   bool _isLoadingBreaches = true;
   String _breachFilter = 'all'; // 'all' | 'critical'
 
-  final _insightsClient = AiInsightsClient();
-  final _breachMonitor = BackendBreachMonitor();
+  final _insightsClient = AiInsightsClient(backendUrl: ApiConfig.securityBaseUrl);
+  final _breachMonitor = BackendBreachMonitor(backendUrl: ApiConfig.securityBaseUrl);
 
   @override
   void initState() {

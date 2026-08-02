@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
+import 'config/api_config.dart';
 import 'theme/theme.dart';
 import 'features/vault/vault_tab.dart';
 import 'features/vault/sync_status_indicator.dart';
@@ -26,7 +27,7 @@ class AppShell extends StatefulWidget {
     this.currentEmail,
     this.authClient,
     this.autoLockTimeoutOverride,
-    this.syncBaseUrl = 'http://localhost:3002',
+    this.syncBaseUrl = ApiConfig.syncBaseUrl,
     this.httpClient,
   });
 
@@ -117,7 +118,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => LoginScreen(
-            authClient: widget.authClient ?? AuthClient(baseUrl: 'http://localhost:3001'),
+            authClient: widget.authClient ?? AuthClient(baseUrl: ApiConfig.authBaseUrl),
           ),
         ),
         (route) => false,

@@ -3,6 +3,7 @@ import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import 'login_screen.dart';
 import 'unlock_screen.dart';
+import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 
 /// Root route guard that enforces the correct auth/unlock flow.
@@ -19,8 +20,8 @@ class RouteGuard extends StatefulWidget {
   const RouteGuard({
     super.key,
     this.httpClient,
-    this.syncBaseUrl = 'http://localhost:3002',
-    this.authBaseUrl = 'http://localhost:3001',
+    this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.authBaseUrl = ApiConfig.authBaseUrl,
   });
 
   @override
