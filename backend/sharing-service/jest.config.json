@@ -2,6 +2,7 @@
   "preset": "ts-jest",
   "testEnvironment": "node",
   "testTimeout": 30000,
+  "testPathIgnorePatterns": ["/node_modules/", "/\\._"],
   "roots": ["<rootDir>/test"],
   "moduleFileExtensions": ["ts", "js", "json"],
   "transform": {

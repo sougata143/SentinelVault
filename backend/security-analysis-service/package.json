@@ -50,6 +50,10 @@
     "testMatch": [
       "**/*.spec.ts"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/\\._"
+    ],
     "moduleFileExtensions": [
       "ts",
       "js",
