@@ -13,6 +13,24 @@ export class AuthController {
     return await this.authService.register(body.username, body.salt, body.verifier);
   }
 
+  @Get('users/lookup')
+  public async lookupUser(
+    @Query('email') email?: string,
+    @Query('id') id?: string,
+  ): Promise<{ ok: boolean; userId?: string; email?: string }> {
+    if (email) {
+      const user = await this.authService.lookupUserByEmail(email);
+      if (!user) return { ok: false };
+      return { ok: true, userId: user.id, email: user.username };
+    }
+    if (id) {
+      const user = await this.authService.lookupUserById(id);
+      if (!user) return { ok: false };
+      return { ok: true, userId: user.id, email: user.username };
+    }
+    return { ok: false };
+  }
+
   @Post('login/step1')
   @HttpCode(HttpStatus.OK)
   public async loginStep1(

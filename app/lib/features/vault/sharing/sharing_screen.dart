@@ -45,6 +45,61 @@ class _SharingScreenState extends State<SharingScreen> {
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
     try {
+      final token = await _storage.read(key: 'session_token') ?? '';
+      if (token.isNotEmpty) {
+        final res = await http.get(
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/${widget.folderId}/recipients'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (res.statusCode == 200) {
+          final data = json.decode(res.body) as Map<String, dynamic>;
+          final List<dynamic> recs = data['recipients'] ?? [];
+          final List<Map<String, dynamic>> loaded = [];
+          for (final item in recs) {
+            final recUserId = item['recipientUserId'] as String;
+            String email = recUserId;
+            String fingerprint = 'Key Version V${item['keyVersion']} (Verified Active)';
+
+            try {
+              final userRes = await http.get(
+                Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?id=$recUserId'),
+              );
+              if (userRes.statusCode == 200) {
+                final uData = json.decode(userRes.body);
+                if (uData['email'] != null) {
+                  email = uData['email'];
+                }
+              }
+            } catch (_) {}
+
+            try {
+              final keyRes = await http.get(
+                Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys/$recUserId'),
+                headers: {'Authorization': 'Bearer $token'},
+              );
+              if (keyRes.statusCode == 200) {
+                final kData = json.decode(keyRes.body);
+                if (kData['keyFingerprint'] != null) {
+                  fingerprint = kData['keyFingerprint'];
+                }
+              }
+            } catch (_) {}
+
+            loaded.add({
+              'userId': recUserId,
+              'email': email,
+              'fingerprint': fingerprint,
+            });
+          }
+
+          if (loaded.isNotEmpty) {
+            _recipients = loaded;
+            await _saveRecipients();
+            return;
+          }
+        }
+      }
+
       final jsonStr = await _storage.read(key: _storageKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = json.decode(jsonStr);
@@ -80,19 +135,45 @@ class _SharingScreenState extends State<SharingScreen> {
 
     setState(() => _loading = true);
     try {
-      // 1. Simulate lookup of target user's key bundle from directory
-      // In production: GET /key-directory/keys/:userId (after finding userId from email)
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Simulating a fetched bundle:
+      // 1. Lookup target user ID by email via auth-service
+      final lookupRes = await http.get(
+        Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=${Uri.encodeComponent(email)}'),
+      );
+      if (lookupRes.statusCode != 200) {
+        throw Exception('User $email not found in directory');
+      }
+      final lookupData = json.decode(lookupRes.body) as Map<String, dynamic>;
+      if (lookupData['ok'] != true || lookupData['userId'] == null) {
+        throw Exception('User $email is not registered in SentinelVault');
+      }
+      final recipientUserId = lookupData['userId'] as String;
+
+      // Read JWT session token
+      final token = await _storage.read(key: 'session_token') ?? '';
+
+      // 2. Fetch target user's public key bundle from key-directory service
+      final keyRes = await http.get(
+        Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys/$recipientUserId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (keyRes.statusCode != 200) {
+        throw Exception('Public key bundle not found for user $email');
+      }
+      final keyData = json.decode(keyRes.body) as Map<String, dynamic>;
+
+Uint8List safeBase64Decode(String input) {
+  final clean = input.replaceAll('=', '').replaceAll(' ', '').trim();
+  return base64Url.decode(base64Url.normalize(clean));
+}
+
       final recipientBundle = PqcKeyBundle(
-        x25519Pub: Uint8List.fromList(List.generate(32, (i) => i)),
+        x25519Pub: safeBase64Decode(keyData['x25519PublicKey'] as String),
         x25519Priv: Uint8List(32),
-        ed25519Pub: Uint8List(32),
+        ed25519Pub: safeBase64Decode(keyData['ed25519PublicKey'] as String),
         ed25519Priv: Uint8List(32),
-        mlkemEk: Uint8List.fromList(List.generate(1184, (i) => i % 256)),
+        mlkemEk: safeBase64Decode(keyData['mlkemEncapsulationKey'] as String),
         mlkemDk: Uint8List(2400),
-        mldsaVk: Uint8List.fromList(List.generate(1952, (i) => i % 256)),
+        mldsaVk: safeBase64Decode(keyData['mldsaVerifyingKey'] as String),
         mldsaSeed: Uint8List(32),
       );
 
@@ -100,7 +181,7 @@ class _SharingScreenState extends State<SharingScreen> {
 
       if (!mounted) return;
 
-      // 2. Open out-of-band trust confirmation dialog (Strict security rule gate)
+      // 3. Open out-of-band trust confirmation dialog (Strict security rule gate)
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -116,22 +197,13 @@ class _SharingScreenState extends State<SharingScreen> {
         return;
       }
 
-      // 3. User confirmed fingerprint! Now sign invitation and encapsulate Folder Key.
-      // Generate keys for the sender (Alice)
-      final senderBundle = PqcKeyBundle(
-        x25519Pub: Uint8List(32),
-        x25519Priv: Uint8List(32),
-        ed25519Pub: Uint8List(32),
-        ed25519Priv: Uint8List.fromList(List.generate(32, (i) => i + 1)),
-        mlkemEk: Uint8List(1184),
-        mlkemDk: Uint8List(2400),
-        mldsaVk: Uint8List(1952),
-        mldsaSeed: Uint8List.fromList(List.generate(32, (i) => i + 2)),
-      );
+      // 4. User confirmed fingerprint! Perform PQC hybrid wrapping using sender keys & recipient public keys.
+      final bridge = getNativeCryptoBridge();
+      final senderBundle = await bridge.pqcGenerateKeypairs();
 
       final invitePayload = await _sharingManager.createSignedInvitation(
         folderId: widget.folderId,
-        recipientUserId: '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
+        recipientUserId: recipientUserId,
         senderUserId: widget.senderUserId,
         ed25519Priv: senderBundle.ed25519Priv,
         mldsaSeed: senderBundle.mldsaSeed,
@@ -140,22 +212,32 @@ class _SharingScreenState extends State<SharingScreen> {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
-      // Post invitation to backend sharing service (port 3004) to persist in database
-      try {
-        await http.post(
-          Uri.parse('${ApiConfig.sharingBaseUrl}/invites'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
-            'recipientUserId': '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
-            'signedPayload': invitePayload['signedPayload'],
-            'ed25519Signature': invitePayload['ed25519Signature'],
-            'mldsaSignature': invitePayload['mldsaSignature'],
-            'wrappedFolderKeyPayload': json.encode(invitePayload['wrappedFolderKey']),
-          }),
-        );
-      } catch (_) {
-        // HTTP API notification fallback
+      final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
+
+      // 5. Post wrapped key to DB-backed POST /key-directory/wrapped-keys endpoint
+      final pubWrappedRes = await http.post(
+        Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
+          'keyVersion': '1',
+          'recipients': [
+            {
+              'recipientUserId': recipientUserId,
+              'ephemeralX25519PublicKey': wrappedKeyData['ephemeralX25519PublicKey'],
+              'mlkemCiphertext': wrappedKeyData['mlkemCiphertext'],
+              'aesNonce': wrappedKeyData['aesNonce'],
+              'wrappedFolderKey': wrappedKeyData['wrappedFolderKey'],
+            }
+          ],
+        }),
+      );
+
+      if (pubWrappedRes.statusCode != 200) {
+        throw Exception('Failed to publish wrapped key: HTTP ${pubWrappedRes.statusCode}');
       }
 
       if (!mounted) return;
@@ -163,7 +245,7 @@ class _SharingScreenState extends State<SharingScreen> {
       _emailController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully created sharing invitation for $email!'),
+          content: Text('Successfully shared folder with $email!'),
           backgroundColor: Colors.teal.shade800,
         ),
       );
@@ -171,7 +253,7 @@ class _SharingScreenState extends State<SharingScreen> {
       // Add to local list and save to persistent storage
       setState(() {
         _recipients.add({
-          'userId': 'recipient-${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
+          'userId': recipientUserId,
           'email': email,
           'fingerprint': safetyNumber,
         });
@@ -275,88 +357,99 @@ class _SharingScreenState extends State<SharingScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'PQC Hybrid Zero-Knowledge Folder Sharing',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Vault folders are shared securely using classical (X25519) and post-quantum (ML-KEM-768) hybrid wrapping. Keys are rotatable upon recipient revocation.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Invite user by email',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.email),
-                          ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight > 48.0 ? constraints.maxHeight - 48.0 : 0.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'PQC Hybrid Zero-Knowledge Folder Sharing',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: _inviteRecipient,
-                        icon: const Icon(Icons.share),
-                        label: const Text('Add Recipient'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade800,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Vault folders are shared securely using classical (X25519) and post-quantum (ML-KEM-768) hybrid wrapping. Keys are rotatable upon recipient revocation.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Active Share Recipients',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _recipients.isEmpty
-                        ? const Center(child: Text('This folder is not currently shared with anyone.'))
-                        : ListView.builder(
-                            itemCount: _recipients.length,
-                            itemBuilder: (ctx, index) {
-                              final rec = _recipients[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.teal.shade100,
-                                    child: Icon(Icons.person, color: Colors.teal.shade900),
-                                  ),
-                                  title: Text(rec['email'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Key Fingerprint: ${rec['fingerprint'] as String}',
-                                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
-                                    onPressed: () => _revokeRecipient(rec['userId'] as String, rec['email'] as String),
-                                  ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _emailController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Invite user by email',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.email),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _inviteRecipient,
+                              icon: const Icon(Icons.share),
+                              label: const Text('Add Recipient'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal.shade800,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Active Share Recipients',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        _recipients.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24.0),
+                                child: Center(child: Text('This folder is not currently shared with anyone.')),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _recipients.length,
+                                itemBuilder: (ctx, index) {
+                                  final rec = _recipients[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.teal.shade100,
+                                        child: Icon(Icons.person, color: Colors.teal.shade900),
+                                      ),
+                                      title: Text(rec['email'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Key Fingerprint: ${rec['fingerprint'] as String}',
+                                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
+                                        onPressed: () => _revokeRecipient(rec['userId'] as String, rec['email'] as String),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
     );
   }

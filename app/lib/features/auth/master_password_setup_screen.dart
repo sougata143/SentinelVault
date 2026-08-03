@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../../app_shell.dart';
+import '../vault/sharing/pqc_sharing_service.dart';
 
 class MasterPasswordSetupScreen extends StatefulWidget {
   final String email;
@@ -100,6 +102,9 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
 
       // Set VaultLockManager session and unlock state
       VaultLockManager.instance.unlock(masterKey, vaultKey);
+
+      // Ensure PQC key bundle exists and is published to Key Directory
+      unawaited(PqcSharingService.ensureKeysPublished(widget.email));
 
       if (mounted) {
         showDialog(

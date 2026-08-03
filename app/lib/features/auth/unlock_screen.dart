@@ -9,6 +9,7 @@ import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
 import 'shamir_recovery_reconstruct_screen.dart';
 import 'master_password_setup_screen.dart';
+import '../vault/sharing/pqc_sharing_service.dart';
 
 class UnlockScreen extends StatefulWidget {
   final String email;
@@ -300,6 +301,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
         ),
       );
       await VaultSyncManager.instance.sync();
+
+      // Ensure PQC key bundle exists and is published to Key Directory
+      unawaited(PqcSharingService.ensureKeysPublished(widget.email));
+      // Sync any PQC folders shared with this user
+      unawaited(PqcSharingService.syncSharedFoldersWithMe());
 
       navigated = true;
       if (mounted) {

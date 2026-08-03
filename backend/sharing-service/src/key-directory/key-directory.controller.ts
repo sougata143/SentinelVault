@@ -101,6 +101,22 @@ export class KeyDirectoryController {
     return { ok: true, newKeyVersion: dto.newKeyVersion };
   }
 
+  // ── GET /key-directory/my-shares ──────────────────────────────────────────
+  // List all active wrapped folder keys shared with the calling user.
+  @Get('my-shares')
+  async listMyShares(@CurrentUser() callerId: string) {
+    const shares = await this.svc.listMyShares(callerId);
+    return { ok: true, shares };
+  }
+
+  // ── GET /key-directory/wrapped-keys/:folderId/recipients ─────────────────
+  // List all active recipients for a folder's current key version.
+  @Get('wrapped-keys/:folderId/recipients')
+  async listRecipientsForFolder(@Param('folderId') folderId: string) {
+    const recipients = await this.svc.listRecipientsForFolder(folderId);
+    return { ok: true, folderId, recipients };
+  }
+
   // ── GET /key-directory/wrapped-keys/:folderId/version ────────────────────
   @Get('wrapped-keys/:folderId/version')
   async getCurrentVersion(@Param('folderId') folderId: string) {
