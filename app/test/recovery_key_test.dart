@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,10 +57,9 @@ class _MappedFakeVaultCrypto extends VaultCrypto {
   final Map<String, List<int>> _recoveryKdfKeyMap;
 
   _MappedFakeVaultCrypto({
-    required Map<String, List<int>> masterKeyMap,
-    required Map<String, List<int>> recoveryKdfKeyMap,
-  })  : _masterKeyMap = masterKeyMap,
-        _recoveryKdfKeyMap = recoveryKdfKeyMap;
+    required this._masterKeyMap,
+    required this._recoveryKdfKeyMap,
+  });
 
   @override
   Future<List<int>> deriveMasterKey({
@@ -109,7 +107,6 @@ class _AlwaysFakeVaultCrypto extends VaultCrypto {
 // ---------------------------------------------------------------------------
 void main() {
   group('Recovery Key Integration Tests', () {
-    final saltBytes      = _fromHex(_saltHex);
     final vaultKeyBytes  = _fromHex(_vaultKeyHex);
     final masterKeyBytes = _fromHex(_masterKeyHex);
 

@@ -50,12 +50,9 @@ void main() {
       items.add(await item.encrypt(vaultKey, crypto));
     }
 
-    print('--> Generated 300 items. Attempting bulk push...');
     try {
-      final res = await syncApiClient.push(items);
-      print('--> Bulk push result success: ${res.success}');
-    } catch (e, st) {
-      print('--> Bulk push FAILED: $e\n$st');
+      await syncApiClient.push(items);
+    } catch (_) {
     }
 
     client.close();

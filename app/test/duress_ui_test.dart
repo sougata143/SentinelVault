@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +26,6 @@ List<int> _fromHex(String hex) {
 const _alphaSaltHex     = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _betaSaltHex      = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const _alphaVaultKeyHex = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
-const _betaVaultKeyHex  = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
 const _alphaWrappedHex  = '4403f17b405d6d970c5d60eba5f02f8f12e05f2c0ad67df07b91d43bf5d315fb7d6f558d9263e9f904aff5f95af3167febb98bce58d8532fb893e57d';
 const _betaWrappedHex   = '924e6957922c5b926c0c39b431a4a6ed1e007a90ff9fd5db6de888f538011897892ac7d960a7aeff10d99af02aba35fabf12b6b39539a66ba908dcf1';
 const _alphaMasterKeyHex = '3cc086df393d23170947cd6be88ba74c0542b490fd54fcc65cf2f8a55c2ab0d7';
@@ -77,19 +75,16 @@ class FakeVaultCrypto extends VaultCrypto {
 void main() {
   group('Duress / Decoy Vault UI Tests', () {
     // Pre-decode all fixture values — zero KDF computation
-    final alphaSalt      = _fromHex(_alphaSaltHex);
-    final betaSalt       = _fromHex(_betaSaltHex);
     final alphaVaultKey  = _fromHex(_alphaVaultKeyHex);
     final alphaMasterKey = _fromHex(_alphaMasterKeyHex);
-    final duressKdfKey   = _fromHex(_duressKdfKeyHex);
 
     // Build a FakeVaultCrypto that maps password+salt → pre-computed key
     late FakeVaultCrypto fakeCrypto;
 
     setUp(() {
       fakeCrypto = FakeVaultCrypto({
-        '${_masterPassword}_${_alphaSaltHex}': _fromHex(_alphaMasterKeyHex),
-        '${_duressPassword}_${_betaSaltHex}':  _fromHex(_duressKdfKeyHex),
+        '${_masterPassword}_$_alphaSaltHex': _fromHex(_alphaMasterKeyHex),
+        '${_duressPassword}_$_betaSaltHex':  _fromHex(_duressKdfKeyHex),
       });
     });
 

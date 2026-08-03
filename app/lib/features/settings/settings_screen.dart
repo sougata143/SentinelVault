@@ -247,7 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             }
                             _checkRecoveryStatus();
                           } catch (e, stack) {
-                            print('UPLOAD ERROR: $e\n$stack');
+                            debugPrint('UPLOAD ERROR: $e\n$stack');
                             setDialogState(() {
                               uploadLoading = false;
                               uploadError = 'Failed to upload Recovery Key. Please try again.';
