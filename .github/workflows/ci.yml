@@ -91,11 +91,28 @@ jobs:
         run: flutter test --exclude-tags=e2e
         working-directory: app
 
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSL -o osv-scanner \
+            "$(curl -sSL https://api.github.com/repos/google/osv-scanner/releases/latest \
+              | grep browser_download_url \
+              | grep '_linux_amd64"' \
+              | grep -v '.sbom' \
+              | head -n 1 \
+              | cut -d '"' -f 4)"
+          chmod +x osv-scanner
+          echo "$PWD" >> $GITHUB_PATH
+
+      - name: SCA — Scan Dart Dependencies
+        run: osv-scanner -r .
+        continue-on-error: true
+
   # ── NODE.js BACKEND SERVICES JOB ──────────────────────────────────────────
   backend-test:
     name: Node.js Backend Tests (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [auth-service, security-analysis-service, sync-api]
     services:
@@ -200,6 +217,21 @@ jobs:
           echo "CC_aarch64_linux_android=${NDK_BIN}/aarch64-linux-android21-clang" >> $GITHUB_ENV
           echo "AR_aarch64_linux_android=${NDK_BIN}/llvm-ar" >> $GITHUB_ENV
 
+      - name: Install cargo-audit
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: cargo install cargo-audit --locked
+
+      - name: SCA — cargo audit
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: cargo audit
+        working-directory: native/crypto_core
+        continue-on-error: true
+
+      - name: SAST — cargo clippy
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: native/crypto_core
+
       # Host tests run on the native architecture only.
       # Skip them for cross-compile-only targets (Android, iOS) because the
       # compiled binaries cannot execute on the x86_64/aarch64-apple host.
@@ -221,3 +253,24 @@ jobs:
             cargo build --release --target ${{ matrix.target }}
           fi
         working-directory: native/crypto_core
+
+  # ── SONARQUBE CLOUD SCAN JOB ───────────────────────────────────────────────
+  sonarqube-scan:
+    name: SonarQube Cloud Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+

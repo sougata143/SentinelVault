@@ -56,7 +56,7 @@ class PqcSharingService {
       // Resolve userId by email
       final lookupRes = await http.get(
         Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=${Uri.encodeComponent(userEmail)}'),
-      );
+      ).timeout(const Duration(milliseconds: 200), onTimeout: () => http.Response('{}', 408));
       if (lookupRes.statusCode != 200) return;
       final lookupData = json.decode(lookupRes.body) as Map<String, dynamic>;
       if (lookupData['ok'] != true || lookupData['userId'] == null) return;
@@ -79,7 +79,7 @@ class PqcSharingService {
           'mldsaVerifyingKey': base64Url.encode(bundle.mldsaVk),
           'keyFingerprint': fingerprint,
         }),
-      );
+      ).timeout(const Duration(milliseconds: 200), onTimeout: () => http.Response('{}', 408));
     } catch (_) {
       // Background publish fallback
     }
@@ -101,7 +101,7 @@ class PqcSharingService {
       final res = await http.get(
         Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/my-shares'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(milliseconds: 200), onTimeout: () => http.Response('{}', 408));
 
       if (res.statusCode != 200) return [];
       final data = json.decode(res.body) as Map<String, dynamic>;
