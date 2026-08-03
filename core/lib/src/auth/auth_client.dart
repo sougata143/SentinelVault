@@ -52,7 +52,9 @@ class AuthClient {
       final verifier = await SrpClient.calculateVerifier(email, passwordBytes, salt);
 
       final saltHex = salt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final verifierHex = verifier.toRadixString(16);
+      final verifierHex = SrpClient.bigIntToBytesPadded(verifier, 256)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join();
 
       final url = Uri.parse('$baseUrl/auth/register');
       final response = await _httpClient.post(
@@ -99,7 +101,9 @@ class AuthClient {
     try {
       // 1. Generate client ephemeral values A and secret a
       final ephemeral = SrpClient.generateClientEphemeral(aRandomBytes);
-      final aHex = ephemeral.publicValue.toRadixString(16);
+      final aHex = SrpClient.bigIntToBytesPadded(ephemeral.publicValue, 256)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join();
 
       // 2. Post to login step 1
       final step1Url = Uri.parse('$baseUrl/auth/login/step1');
