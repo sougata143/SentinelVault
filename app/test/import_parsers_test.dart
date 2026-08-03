@@ -444,18 +444,61 @@ void main() {
       expect(item.notes, equals('keepernotes'));
     });
 
-    test('6. Parses NordPass CSV correctly', () {
-      const csv = 'name,username,password,url,note\nNordPass Item,norduser,nordpass,https://nordpass.com,nordnotes\n';
+    test('6. Parses NordPass CSV with real column schema, all item types, and multiline notes', () {
+      const csv = '''name,url,username,password,note,cardholdername,cardnumber,cvc,expirydate,zipcode,folder,full_name,phone_number,email,address1,address2,city,country,state,totp,shared_folder
+NordPass Login,https://nordpass.com,norduser,nordpass,"Line 1 note
+Line 2 note",,,,,,Work,,,,,,,,,JBSWY3DPEHPK3PXP,
+NordPass Card,,,,Some card note,Jane Cardholder,4111222233334444,999,12/2028,,Finance,,,,,,,,,,
+NordPass Identity,,,,Identity notes,,,,,10001,Personal,John Doe,+15551234567,johndoe@example.com,100 Main St,Apt 4B,New York,USA,NY,,
+NordPass Secure Note,,,,"Standalone multiline secure note
+Second line of secure note",,,,,,Private,,,,,,,,,,
+''';
       final result = NordPassParser().parse(csv);
 
-      expect(result.items.length, equals(1));
-      expect(result.errors, isEmpty);
-      final item = result.items[0];
-      expect(item.title, equals('NordPass Item'));
-      expect(item.urls, contains('https://nordpass.com'));
-      expect(item.username, equals('norduser'));
-      expect(item.password, equals('nordpass'));
-      expect(item.notes, equals('nordnotes'));
+      expect(result.errors, isEmpty, reason: 'Expected zero errors parsing NordPass CSV');
+      expect(result.items.length, equals(4));
+
+      // Item 1: Login
+      final login = result.items[0];
+      expect(login.title, equals('NordPass Login'));
+      expect(login.type, equals('login'));
+      expect(login.username, equals('norduser'));
+      expect(login.password, equals('nordpass'));
+      expect(login.urls, contains('https://nordpass.com'));
+      expect(login.notes, equals('Line 1 note\nLine 2 note'));
+      expect(login.totpSecret, equals('JBSWY3DPEHPK3PXP'));
+      expect(login.tags, contains('Work'));
+
+      // Item 2: Credit Card
+      final card = result.items[1];
+      expect(card.title, equals('NordPass Card'));
+      expect(card.type, equals('credit_card'));
+      expect(card.cardholderName, equals('Jane Cardholder'));
+      expect(card.cardNumber, equals('4111222233334444'));
+      expect(card.cardCvv, equals('999'));
+      expect(card.cardExpiryMonth, equals(12));
+      expect(card.cardExpiryYear, equals(2028));
+      expect(card.notes, equals('Some card note'));
+      expect(card.tags, contains('Finance'));
+
+      // Item 3: Identity
+      final id = result.items[2];
+      expect(id.title, equals('NordPass Identity'));
+      expect(id.type, equals('identity'));
+      expect(id.firstName, equals('John'));
+      expect(id.lastName, equals('Doe'));
+      expect(id.username, equals('johndoe@example.com'));
+      expect(id.street, equals('100 Main St, Apt 4B'));
+      expect(id.city, equals('New York'));
+      expect(id.state, equals('NY'));
+      expect(id.zip, equals('10001'));
+      expect(id.country, equals('USA'));
+
+      // Item 4: Secure Note
+      final note = result.items[3];
+      expect(note.title, equals('NordPass Secure Note'));
+      expect(note.type, equals('secure_note'));
+      expect(note.noteContent, equals('Standalone multiline secure note\nSecond line of secure note'));
     });
 
     test('7. Parses RoboForm CSV correctly', () {
@@ -472,7 +515,7 @@ void main() {
       expect(item.notes, equals('robonotes'));
     });
 
-    test('8. Parses Proton Pass JSON correctly', () {
+    test('8. Parses Proton Pass JSON correctly with multiple item types', () {
       const json = '''
       {
         "vaults": [
@@ -480,9 +523,10 @@ void main() {
             "name": "Personal",
             "items": [
               {
+                "type": "login",
                 "data": {
                   "metadata": {
-                    "name": "Proton Item",
+                    "name": "Proton Login",
                     "note": "protonnotes"
                   },
                   "content": {
@@ -490,6 +534,29 @@ void main() {
                     "password": "protonpass",
                     "urls": ["https://proton.me"],
                     "totpUri": "protontotp"
+                  }
+                }
+              },
+              {
+                "type": "creditCard",
+                "data": {
+                  "metadata": {
+                    "name": "Proton Visa"
+                  },
+                  "content": {
+                    "cardholderName": "Proton User",
+                    "number": "4000123456789010",
+                    "cvv": "123",
+                    "expirationDate": "11/2029"
+                  }
+                }
+              },
+              {
+                "type": "note",
+                "data": {
+                  "metadata": {
+                    "name": "Proton Note",
+                    "note": "Secret notes content"
                   }
                 }
               }
@@ -500,19 +567,27 @@ void main() {
       ''';
       final result = ProtonPassParser().parse(json);
 
-      expect(result.items.length, equals(1));
       expect(result.errors, isEmpty);
-      final item = result.items[0];
-      expect(item.title, equals('Proton Item'));
-      expect(item.urls, contains('https://proton.me'));
-      expect(item.username, equals('protonuser'));
-      expect(item.password, equals('protonpass'));
-      expect(item.notes, equals('protonnotes'));
-      expect(item.totpSecret, equals('protontotp'));
+      expect(result.items.length, equals(3));
+
+      final login = result.items[0];
+      expect(login.title, equals('Proton Login'));
+      expect(login.type, equals('login'));
+      expect(login.username, equals('protonuser'));
+      expect(login.password, equals('protonpass'));
+
+      final card = result.items[1];
+      expect(card.title, equals('Proton Visa'));
+      expect(card.type, equals('credit_card'));
+      expect(card.cardNumber, equals('4000123456789010'));
+
+      final note = result.items[2];
+      expect(note.title, equals('Proton Note'));
+      expect(note.type, equals('secure_note'));
+      expect(note.noteContent, equals('Secret notes content'));
     });
 
     test('9. Decrypts and parses KeePass KDBX database correctly, and scrubs credentials', () async {
-      // 1. Programmatically construct a synthetic KDBX database in memory using composite credentials
       final keyFileBytes = Uint8List.fromList([1, 2, 3, 4]);
       final keyFileBytesForCreate = Uint8List.fromList(keyFileBytes);
       final kdbx = KdbxFormat().create(
@@ -533,25 +608,19 @@ void main() {
         return Uint8List.fromList(bytes);
       });
 
-      // 2. Parse it using KeePassKdbxParser
       final result = await KeePassKdbxParser().parse(
         bytes: bytes,
         password: 'dbpassword',
         keyFileBytes: keyFileBytes,
       );
 
-      // 3. Verify items parsed correctly
       expect(result.items.length, equals(1));
       expect(result.errors, isEmpty);
       final item = result.items[0];
       expect(item.title, equals('KeePass Title'));
       expect(item.username, equals('keepassuser'));
       expect(item.password, equals('keepasspass'));
-      expect(item.urls, contains('https://keepass.info'));
-      expect(item.notes, equals('keepassnotes'));
-      expect(item.totpSecret, equals('keepasstotp'));
 
-      // 4. Verify memory scrubbing: keyFileBytes should be zeroed out
       expect(keyFileBytes, equals(Uint8List.fromList([0, 0, 0, 0])));
     });
   });

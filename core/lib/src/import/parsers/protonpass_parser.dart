@@ -32,7 +32,6 @@ class ProtonPassParser {
       return ImportResult(items: items, errors: errors);
     }
 
-    // Check if it's the nested "vaults" structure
     if (decoded.containsKey('vaults')) {
       final vaults = decoded['vaults'];
       if (vaults is List) {
@@ -53,7 +52,6 @@ class ProtonPassParser {
         }
       }
     } else if (decoded.containsKey('items')) {
-      // Flat items list inside map
       final flatItems = decoded['items'];
       if (flatItems is List) {
         for (var i = 0; i < flatItems.length; i++) {
@@ -64,7 +62,6 @@ class ProtonPassParser {
         }
       }
     } else {
-      // Treat the map itself as a single item
       _parseItemMap(decoded, items, errors, 'root');
     }
 
@@ -82,23 +79,22 @@ class ProtonPassParser {
       final metadata = data?['metadata'] as Map<String, dynamic>?;
       final content = data?['content'] as Map<String, dynamic>?;
 
-      // Extract Title
+      // Type String from metadata, data, or root
+      final typeStr = (metadata?['type'] ?? data?['type'] ?? itemMap['type'] ?? '').toString().toLowerCase();
+
+      // Title
       final title = metadata?['name'] ?? itemMap['name'] ?? itemMap['title'];
       if (title == null || (title is String && title.trim().isEmpty)) {
         errors.add(ParsedError(sourceRef: srcRef, reason: 'Missing item title.'));
         return;
       }
 
-      // Extract Notes
+      // Notes
       final notes = metadata?['note'] ?? metadata?['notes'] ?? itemMap['note'] ?? itemMap['notes'];
 
-      // Extract Username
+      // Extract Username, Password, TOTP
       final username = content?['username'] ?? itemMap['username'] ?? itemMap['email'];
-
-      // Extract Password
       final password = content?['password'] ?? itemMap['password'];
-
-      // Extract TOTP
       final totp = content?['totpUri'] ?? content?['totp'] ?? itemMap['totp'] ?? itemMap['otp'];
 
       // Extract URLs
@@ -119,6 +115,51 @@ class ProtonPassParser {
         }
       }
 
+      // 1. Note / Secure Note
+      if (typeStr == 'note' || (notes != null && password == null && username == null && urls.isEmpty && typeStr != 'creditcard')) {
+        items.add(ParsedItem(
+          title: title.toString().trim(),
+          type: 'secure_note',
+          noteContent: notes?.toString().trim(),
+          notes: null,
+          favorite: itemMap['favorite'] == true || itemMap['fav'] == true,
+        ));
+        return;
+      }
+
+      // 2. Credit Card
+      if (typeStr == 'creditcard' || typeStr == 'card') {
+        final cardholder = content?['cardholderName'] ?? itemMap['cardholderName'];
+        final number = content?['number'] ?? itemMap['number'];
+        final cvv = content?['cvv'] ?? itemMap['cvv'];
+        final expDate = content?['expirationDate'] ?? itemMap['expirationDate'];
+
+        int? expMonth;
+        int? expYear;
+        if (expDate != null) {
+          final parts = expDate.toString().split(RegExp(r'[/.-]'));
+          if (parts.length >= 2) {
+            expMonth = int.tryParse(parts[0].trim());
+            final yr = int.tryParse(parts[1].trim());
+            if (yr != null) expYear = yr < 100 ? 2000 + yr : yr;
+          }
+        }
+
+        items.add(ParsedItem(
+          title: title.toString().trim(),
+          type: 'credit_card',
+          cardholderName: cardholder?.toString().trim(),
+          cardNumber: number?.toString().trim(),
+          cardCvv: cvv?.toString().trim(),
+          cardExpiryMonth: expMonth,
+          cardExpiryYear: expYear,
+          notes: notes?.toString().trim(),
+          favorite: itemMap['favorite'] == true || itemMap['fav'] == true,
+        ));
+        return;
+      }
+
+      // 3. Login / Alias (Default)
       items.add(ParsedItem(
         title: title.toString().trim(),
         type: 'login',
