@@ -1,4 +1,5 @@
 /// Shared CSV parsing helpers for import parsers.
+library;
 
 /// Parses [content] into a list of CSV rows, respecting RFC 4180 double-quoted
 /// fields that may contain newlines, commas, or escaped quotes (`""`).

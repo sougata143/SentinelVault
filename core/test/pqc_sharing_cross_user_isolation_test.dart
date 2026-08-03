@@ -84,10 +84,15 @@ void main() {
 
       final rotatedFolderKey = Uint8List.fromList(List.generate(32, (i) => i ^ 0xAA));
 
-      // Re-wrap rotated folder key for Bob ONLY
+      // Re-wrap rotated folder key for Owner (account1) and remaining recipient (Bob)
       final rotatedWraps = await sharing.rotateFolderKey(
         newFolderKey: rotatedFolderKey,
         remainingRecipientsKeys: [
+          {
+            'userId': 'owner@sentinelvault.local',
+            'x25519Pub': account1.x25519Pub,
+            'mlkemEk': account1.mlkemEk,
+          },
           {
             'userId': 'bob@sentinelvault.local',
             'x25519Pub': account2.x25519Pub,
@@ -95,6 +100,15 @@ void main() {
           },
         ],
       );
+
+      // Owner (account1) can decrypt rotated key
+      final ownerWrap = rotatedWraps.firstWhere((w) => w['recipientUserId'] == 'owner@sentinelvault.local');
+      final ownerRecovered = await sharing.unwrapFolderKey(
+        wrappedKeyData: ownerWrap,
+        recipientX25519Priv: account1.x25519Priv,
+        recipientMlkemDk: account1.mlkemDk,
+      );
+      expect(ownerRecovered, equals(rotatedFolderKey), reason: 'Owner Account 1 must be able to decrypt rotated Folder Key');
 
       final bobWrap = rotatedWraps.firstWhere((w) => w['recipientUserId'] == 'bob@sentinelvault.local');
 
