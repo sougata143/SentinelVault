@@ -80,19 +80,40 @@ class _SharingScreenState extends State<SharingScreen> {
 
     setState(() => _loading = true);
     try {
-      // 1. Simulate lookup of target user's key bundle from directory
-      // In production: GET /key-directory/keys/:userId (after finding userId from email)
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Simulating a fetched bundle:
+      // 1. Lookup target user ID by email via auth-service
+      final lookupRes = await http.get(
+        Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=${Uri.encodeComponent(email)}'),
+      );
+      if (lookupRes.statusCode != 200) {
+        throw Exception('User $email not found in directory');
+      }
+      final lookupData = json.decode(lookupRes.body) as Map<String, dynamic>;
+      if (lookupData['ok'] != true || lookupData['userId'] == null) {
+        throw Exception('User $email is not registered in SentinelVault');
+      }
+      final recipientUserId = lookupData['userId'] as String;
+
+      // Read JWT session token
+      final token = await _storage.read(key: 'session_token') ?? '';
+
+      // 2. Fetch target user's public key bundle from key-directory service
+      final keyRes = await http.get(
+        Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys/$recipientUserId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (keyRes.statusCode != 200) {
+        throw Exception('Public key bundle not found for user $email');
+      }
+      final keyData = json.decode(keyRes.body) as Map<String, dynamic>;
+
       final recipientBundle = PqcKeyBundle(
-        x25519Pub: Uint8List.fromList(List.generate(32, (i) => i)),
+        x25519Pub: base64Url.decode(keyData['x25519PublicKey'] as String),
         x25519Priv: Uint8List(32),
-        ed25519Pub: Uint8List(32),
+        ed25519Pub: base64Url.decode(keyData['ed25519PublicKey'] as String),
         ed25519Priv: Uint8List(32),
-        mlkemEk: Uint8List.fromList(List.generate(1184, (i) => i % 256)),
+        mlkemEk: base64Url.decode(keyData['mlkemEncapsulationKey'] as String),
         mlkemDk: Uint8List(2400),
-        mldsaVk: Uint8List.fromList(List.generate(1952, (i) => i % 256)),
+        mldsaVk: base64Url.decode(keyData['mldsaVerifyingKey'] as String),
         mldsaSeed: Uint8List(32),
       );
 
@@ -100,7 +121,7 @@ class _SharingScreenState extends State<SharingScreen> {
 
       if (!mounted) return;
 
-      // 2. Open out-of-band trust confirmation dialog (Strict security rule gate)
+      // 3. Open out-of-band trust confirmation dialog (Strict security rule gate)
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -116,22 +137,13 @@ class _SharingScreenState extends State<SharingScreen> {
         return;
       }
 
-      // 3. User confirmed fingerprint! Now sign invitation and encapsulate Folder Key.
-      // Generate keys for the sender (Alice)
-      final senderBundle = PqcKeyBundle(
-        x25519Pub: Uint8List(32),
-        x25519Priv: Uint8List(32),
-        ed25519Pub: Uint8List(32),
-        ed25519Priv: Uint8List.fromList(List.generate(32, (i) => i + 1)),
-        mlkemEk: Uint8List(1184),
-        mlkemDk: Uint8List(2400),
-        mldsaVk: Uint8List(1952),
-        mldsaSeed: Uint8List.fromList(List.generate(32, (i) => i + 2)),
-      );
+      // 4. User confirmed fingerprint! Perform PQC hybrid wrapping using sender keys & recipient public keys.
+      final bridge = getNativeCryptoBridge();
+      final senderBundle = await bridge.pqcGenerateKeypairs();
 
       final invitePayload = await _sharingManager.createSignedInvitation(
         folderId: widget.folderId,
-        recipientUserId: '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
+        recipientUserId: recipientUserId,
         senderUserId: widget.senderUserId,
         ed25519Priv: senderBundle.ed25519Priv,
         mldsaSeed: senderBundle.mldsaSeed,
@@ -140,22 +152,32 @@ class _SharingScreenState extends State<SharingScreen> {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
-      // Post invitation to backend sharing service (port 3004) to persist in database
-      try {
-        await http.post(
-          Uri.parse('${ApiConfig.sharingBaseUrl}/invites'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
-            'recipientUserId': '4c2ef4dc-b634-4b7c-a13d-4494347d5688',
-            'signedPayload': invitePayload['signedPayload'],
-            'ed25519Signature': invitePayload['ed25519Signature'],
-            'mldsaSignature': invitePayload['mldsaSignature'],
-            'wrappedFolderKeyPayload': json.encode(invitePayload['wrappedFolderKey']),
-          }),
-        );
-      } catch (_) {
-        // HTTP API notification fallback
+      final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
+
+      // 5. Post wrapped key to DB-backed POST /key-directory/wrapped-keys endpoint
+      final pubWrappedRes = await http.post(
+        Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
+          'keyVersion': '1',
+          'recipients': [
+            {
+              'recipientUserId': recipientUserId,
+              'ephemeralX25519PublicKey': wrappedKeyData['ephemeralX25519PublicKey'],
+              'mlkemCiphertext': wrappedKeyData['mlkemCiphertext'],
+              'aesNonce': wrappedKeyData['aesNonce'],
+              'wrappedFolderKey': wrappedKeyData['wrappedFolderKey'],
+            }
+          ],
+        }),
+      );
+
+      if (pubWrappedRes.statusCode != 200) {
+        throw Exception('Failed to publish wrapped key: HTTP ${pubWrappedRes.statusCode}');
       }
 
       if (!mounted) return;
@@ -163,7 +185,7 @@ class _SharingScreenState extends State<SharingScreen> {
       _emailController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully created sharing invitation for $email!'),
+          content: Text('Successfully shared folder with $email!'),
           backgroundColor: Colors.teal.shade800,
         ),
       );
@@ -171,7 +193,7 @@ class _SharingScreenState extends State<SharingScreen> {
       // Add to local list and save to persistent storage
       setState(() {
         _recipients.add({
-          'userId': 'recipient-${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
+          'userId': recipientUserId,
           'email': email,
           'fingerprint': safetyNumber,
         });

@@ -13,6 +13,16 @@ export class AuthController {
     return await this.authService.register(body.username, body.salt, body.verifier);
   }
 
+  @Get('users/lookup')
+  public async lookupUser(
+    @Query('email') email: string,
+  ): Promise<{ ok: boolean; userId?: string; email?: string }> {
+    if (!email) return { ok: false };
+    const user = await this.authService.lookupUserByEmail(email);
+    if (!user) return { ok: false };
+    return { ok: true, userId: user.id, email: user.username };
+  }
+
   @Post('login/step1')
   @HttpCode(HttpStatus.OK)
   public async loginStep1(

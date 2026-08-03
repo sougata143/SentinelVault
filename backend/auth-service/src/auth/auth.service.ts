@@ -56,6 +56,12 @@ export class AuthService {
     this.serverSecret = crypto.randomBytes(32);
   }
 
+  public async lookupUserByEmail(email: string): Promise<{ id: string; username: string } | null> {
+    const user = await this.userRepository.findByUsername(email);
+    if (!user || !user.id) return null;
+    return { id: user.id, username: user.username };
+  }
+
   /**
    * Registers a new user.
    */
