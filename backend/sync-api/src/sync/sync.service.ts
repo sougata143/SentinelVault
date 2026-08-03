@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { EncryptedVaultItem } from './entities/encrypted-vault-item.entity';
 import { VaultKey } from './entities/vault-key.entity';
 
@@ -11,6 +11,7 @@ export interface EncryptedVaultItemDto {
   version: number;
   updatedAt: string;
   isDeleted: boolean;
+  folderId?: string;
 }
 
 @Injectable()
@@ -22,14 +23,41 @@ export class SyncService {
     private readonly vaultKeyRepository: Repository<VaultKey>,
   ) { }
 
-
   /**
-   * Retrieves all encrypted vault items for a specific user.
+   * Retrieves all encrypted vault items for a specific user,
+   * plus items belonging to folders shared with this user.
    */
   public async pull(userId: string): Promise<EncryptedVaultItemDto[]> {
-    const items = await this.vaultItemRepository.find({
-      where: { userId: userId.toLowerCase() },
-    });
+    const normalizedUserId = userId.toLowerCase();
+
+    // Query active shared folders for recipient
+    let sharedFolderIds: string[] = [];
+    try {
+      const recipientShares = await this.vaultItemRepository.manager.query(
+        `SELECT "folderId" FROM wrapped_key_recipients WHERE "recipientUserId" = $1 AND "revokedAt" IS NULL`,
+        [normalizedUserId],
+      );
+      if (Array.isArray(recipientShares)) {
+        sharedFolderIds = recipientShares.map((r: any) => r.folderId).filter(Boolean);
+      }
+    } catch (_) {
+      // Table may not exist in minimal test setups
+    }
+
+    let items: EncryptedVaultItem[];
+    if (sharedFolderIds.length > 0) {
+      items = await this.vaultItemRepository.find({
+        where: [
+          { userId: normalizedUserId },
+          { folderId: In(sharedFolderIds) },
+        ],
+      });
+    } else {
+      items = await this.vaultItemRepository.find({
+        where: { userId: normalizedUserId },
+      });
+    }
+
     return items.map((item: EncryptedVaultItem) => ({
       id: item.id,
       encryptedBlob: item.encryptedBlob,
@@ -37,6 +65,7 @@ export class SyncService {
       version: item.version,
       updatedAt: item.updatedAt.toISOString(),
       isDeleted: item.isDeleted,
+      folderId: item.folderId,
     }));
   }
 
@@ -56,7 +85,7 @@ export class SyncService {
     // 1. Detect conflicts first (transactional check)
     for (const item of items) {
       const existing = await this.vaultItemRepository.findOne({
-        where: { id: item.id, userId: normalizedUserId },
+        where: { id: item.id },
       });
       if (existing) {
         if (item.version < existing.version) {
@@ -67,6 +96,7 @@ export class SyncService {
             version: existing.version,
             updatedAt: existing.updatedAt.toISOString(),
             isDeleted: existing.isDeleted,
+            folderId: existing.folderId,
           });
         } else if (item.version === existing.version) {
           // If versions are equal, conflict if contents/metadata differ
@@ -82,6 +112,7 @@ export class SyncService {
               version: existing.version,
               updatedAt: existing.updatedAt.toISOString(),
               isDeleted: existing.isDeleted,
+              folderId: existing.folderId,
             });
           }
         }
@@ -95,7 +126,7 @@ export class SyncService {
     // 2. Save items if no conflicts detected
     for (const item of items) {
       const existing = await this.vaultItemRepository.findOne({
-        where: { id: item.id, userId: normalizedUserId },
+        where: { id: item.id },
       });
       if (existing) {
         // Update existing
@@ -104,6 +135,7 @@ export class SyncService {
         existing.version = item.version;
         existing.updatedAt = new Date(item.updatedAt);
         existing.isDeleted = item.isDeleted;
+        if (item.folderId) existing.folderId = item.folderId;
         await this.vaultItemRepository.save(existing);
       } else {
         // Insert new
@@ -115,6 +147,7 @@ export class SyncService {
           version: item.version,
           updatedAt: new Date(item.updatedAt),
           isDeleted: item.isDeleted,
+          folderId: item.folderId,
         });
         await this.vaultItemRepository.save(newItem);
       }

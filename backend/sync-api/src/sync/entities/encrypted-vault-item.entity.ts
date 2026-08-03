@@ -21,6 +21,10 @@ export class EncryptedVaultItem {
   @Index() // Index for efficient user lookups
   userId!: string; // References User.id from auth-service
 
+  @Column({ type: 'uuid', nullable: true })
+  @Index()
+  folderId?: string;
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
 

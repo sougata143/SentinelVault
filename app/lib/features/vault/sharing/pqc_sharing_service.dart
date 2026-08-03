@@ -10,6 +10,9 @@ class PqcSharingService {
   static final _bridge = getNativeCryptoBridge();
   static final _sharingManager = PqcSharingManager(_bridge);
 
+  /// In-memory cache of unwrapped folder keys mapped by folderId
+  static final Map<String, Uint8List> unwrappedFolderKeys = {};
+
   /// Ensures the current user has PQC keys generated locally and published to key-directory.
   static Future<void> ensureKeysPublished(String userEmail) async {
     try {
@@ -115,6 +118,8 @@ class PqcSharingService {
             recipientX25519Priv: x25519Priv,
             recipientMlkemDk: mlkemDk,
           );
+
+          unwrappedFolderKeys[folderId] = recoveredFolderKey;
 
           unwrappedShares.add({
             'folderId': folderId,

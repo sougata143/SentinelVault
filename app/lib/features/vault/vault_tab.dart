@@ -7,6 +7,7 @@ import 'item_detail.dart';
 import 'sync_status_indicator.dart';
 import 'import_export/import_screen.dart';
 import 'import_export/export_screen.dart';
+import 'sharing/pqc_sharing_service.dart';
 
 class VaultTab extends StatefulWidget {
   final VaultDatabase db;
@@ -61,17 +62,34 @@ class _VaultTabState extends State<VaultTab> {
   }
 
   Future<void> _loadItems() async {
+    try {
+      await PqcSharingService.syncSharedFoldersWithMe();
+    } catch (_) {}
+
     final encItems = widget.db.getAllItems();
     final List<VaultItem> decrypted = [];
 
     for (final item in encItems) {
       if (item.isDeleted && _selectedCategory != 'trash') continue;
+
+      // 1. Try decrypting with user's own vault key
       try {
         final dec = await VaultItem.decrypt(item, widget.vaultKey, VaultCrypto());
         decrypted.add(dec);
-      } catch (_) {
-        // Skip un-decryptable items
+        continue;
+      } catch (_) {}
+
+      // 2. Try decrypting with unwrapped shared folder keys
+      bool folderDecrypted = false;
+      for (final entry in PqcSharingService.unwrappedFolderKeys.entries) {
+        try {
+          final dec = await VaultItem.decrypt(item, entry.value, VaultCrypto());
+          decrypted.add(dec);
+          folderDecrypted = true;
+          break;
+        } catch (_) {}
       }
+      if (folderDecrypted) continue;
     }
 
     setState(() {
