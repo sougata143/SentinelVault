@@ -75,8 +75,23 @@ class _MappedFakeVaultCrypto extends VaultCrypto {
     required String recoveryKey,
     required List<int> salt,
   }) async {
-    final key = '${recoveryKey}_${_toHex(salt)}';
-    return _recoveryKdfKeyMap[key] ?? List<int>.filled(32, 0x99);
+    final cleaned = recoveryKey.replaceAll('-', '').replaceAll(' ', '').toUpperCase();
+    final keyWithHyphens = '${recoveryKey}_${_toHex(salt)}';
+    final keyCleaned = '${cleaned}_${_toHex(salt)}';
+    return _recoveryKdfKeyMap[keyWithHyphens] ??
+        _recoveryKdfKeyMap[keyCleaned] ??
+        List<int>.filled(32, 0x99);
+  }
+
+  @override
+  Future<List<int>> unwrapVaultKey({
+    required List<int> wrappedVaultKey,
+    required List<int> masterKey,
+  }) async {
+    if (masterKey.every((b) => b == 0x99 || b == 0xFF)) {
+      throw Exception('Invalid Recovery Key or decryption failed');
+    }
+    return _fromHex(_vaultKeyHex);
   }
 }
 
@@ -96,6 +111,13 @@ class _AlwaysFakeVaultCrypto extends VaultCrypto {
   Future<List<int>> deriveRecoveryKdfKey({
     required String recoveryKey,
     required List<int> salt,
+  }) async =>
+      _dummyKey;
+
+  @override
+  Future<List<int>> unwrapVaultKey({
+    required List<int> wrappedVaultKey,
+    required List<int> masterKey,
   }) async =>
       _dummyKey;
 }
@@ -133,6 +155,7 @@ void main() {
           },
           recoveryKdfKeyMap: {
             '${_recoveryKey}_$_recoverySaltHex': recoveryKdfKey,
+            '${_recoveryKey.replaceAll('-', '')}_$_recoverySaltHex': recoveryKdfKey,
             'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567_$_recoverySaltHex':
                 List<int>.filled(32, 0xFF),
           },
@@ -186,11 +209,7 @@ void main() {
           'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567',
         );
         await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
-        await tester.pump();
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         expect(find.text('Invalid Recovery Key or decryption failed'), findsOneWidget);
 
@@ -200,11 +219,12 @@ void main() {
           _recoveryKey,
         );
         await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
+        // First pump: fires tap → doSubmit runs all microtasks (fake-instant crypto),
+        // sets dialogLoading=false, pops dialog, calls pushAndRemoveUntil — all
+        // before any frame is painted.
         await tester.pump();
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 500));
-        });
-        await tester.pumpAndSettle();
+        // Second pump: renders the resulting frame (AppShell route, dialog gone).
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Dialog closed, vault unlocked, AppShell shown
         expect(find.byType(AlertDialog), findsNothing);
@@ -282,10 +302,6 @@ void main() {
 
         // Tap upload — FakeVaultCrypto returns instantly
         await tester.tap(uploadBtn);
-        await tester.pump();
-        await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 200));
-        });
         await tester.pumpAndSettle();
 
         // Dialog must be dismissed

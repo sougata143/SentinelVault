@@ -458,6 +458,28 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
                 final db = SqliteVaultDatabase.inMemory();
                 db.open(vaultKey);
+                // Stop the spinner BEFORE touching the navigation stack so the
+                // CircularProgressIndicator's AnimationController is disposed
+                // cleanly by a normal widget rebuild rather than by a forced
+                // route tear-down mid-tick.
+                //
+                // With fake (instant) crypto in tests, every setDialogState call
+                // in this function fires inside one microtask batch before any
+                // frame renders, so Flutter coalesces true→false and the spinner
+                // is never installed at all — no AnimationController, no assertion.
+                //
+                // In production (real Argon2id), the spinner is visible during the
+                // derivation wait and is removed here cleanly before navigation.
+                setDialogState(() => dialogLoading = false);
+
+                // pushAndRemoveUntil with (route)=>false removes ALL routes including
+                // the dialog route without playing a pop/exit animation. This means
+                // the dialog widget is deactivated immediately — controller.dispose()
+                // at the end of _showRecoveryDialog fires only after the dialog is
+                // fully gone, preventing use-after-dispose on the TextFormField.
+                // Do NOT call Navigator.of(dialogCtx).pop() here: that would resolve
+                // showDialog's await early and call controller.dispose() while the
+                // dialog's exit animation is still rebuilding the TextFormField.
                 if (mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
@@ -559,7 +581,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
         );
       },
     );
-    controller.dispose();
+    // Defer controller disposal to the next post-frame callback.
+    //
+    // When pushAndRemoveUntil removes the dialog route, this await resolves
+    // synchronously — but the dialog widget is still in the element tree and
+    // will be deactivated during the NEXT frame's build phase.
+    // TextFormField.dispose() (called during deactivation) tries to remove
+    // its ChangeNotifier listener from the controller; if controller.dispose()
+    // fires first, that listener-removal hits a disposed ChangeNotifier and
+    // throws "TextEditingController was used after being disposed".
+    //
+    // addPostFrameCallback fires at the END of the next frame, after all
+    // element deactivations and disposes have run — safe to destroy now.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
   }
 
   @override
