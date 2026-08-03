@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:uuid/uuid.dart';
 import '../../theme/theme.dart';
+import 'sharing/pqc_sharing_service.dart';
 
 class ItemEditorScreen extends StatefulWidget {
   final VaultItem? item;
