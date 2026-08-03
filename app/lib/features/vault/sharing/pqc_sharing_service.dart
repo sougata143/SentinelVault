@@ -39,14 +39,14 @@ class PqcSharingService {
         final mldsaVkStr = await _storage.read(key: 'pqc_mldsa_vk') ?? '';
 
         bundle = PqcKeyBundle(
-          x25519Pub: base64Url.decode(x25519PubStr),
-          x25519Priv: base64Url.decode(x25519PrivStr),
-          ed25519Pub: base64Url.decode(ed25519PubStr),
-          ed25519Priv: base64Url.decode(ed25519PrivStr),
-          mlkemEk: base64Url.decode(mlkemEkStr),
-          mlkemDk: base64Url.decode(mlkemDkStr),
-          mldsaVk: base64Url.decode(mldsaVkStr),
-          mldsaSeed: base64Url.decode(mldsaSeedStr),
+          x25519Pub: base64Url.decode(base64Url.normalize(x25519PubStr)),
+          x25519Priv: base64Url.decode(base64Url.normalize(x25519PrivStr)),
+          ed25519Pub: base64Url.decode(base64Url.normalize(ed25519PubStr)),
+          ed25519Priv: base64Url.decode(base64Url.normalize(ed25519PrivStr)),
+          mlkemEk: base64Url.decode(base64Url.normalize(mlkemEkStr)),
+          mlkemDk: base64Url.decode(base64Url.normalize(mlkemDkStr)),
+          mldsaVk: base64Url.decode(base64Url.normalize(mldsaVkStr)),
+          mldsaSeed: base64Url.decode(base64Url.normalize(mldsaSeedStr)),
         );
       }
 

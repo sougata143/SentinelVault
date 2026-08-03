@@ -162,13 +162,13 @@ class _SharingScreenState extends State<SharingScreen> {
       final keyData = json.decode(keyRes.body) as Map<String, dynamic>;
 
       final recipientBundle = PqcKeyBundle(
-        x25519Pub: base64Url.decode(keyData['x25519PublicKey'] as String),
+        x25519Pub: base64Url.decode(base64Url.normalize(keyData['x25519PublicKey'] as String)),
         x25519Priv: Uint8List(32),
-        ed25519Pub: base64Url.decode(keyData['ed25519PublicKey'] as String),
+        ed25519Pub: base64Url.decode(base64Url.normalize(keyData['ed25519PublicKey'] as String)),
         ed25519Priv: Uint8List(32),
-        mlkemEk: base64Url.decode(keyData['mlkemEncapsulationKey'] as String),
+        mlkemEk: base64Url.decode(base64Url.normalize(keyData['mlkemEncapsulationKey'] as String)),
         mlkemDk: Uint8List(2400),
-        mldsaVk: base64Url.decode(keyData['mldsaVerifyingKey'] as String),
+        mldsaVk: base64Url.decode(base64Url.normalize(keyData['mldsaVerifyingKey'] as String)),
         mldsaSeed: Uint8List(32),
       );
 
