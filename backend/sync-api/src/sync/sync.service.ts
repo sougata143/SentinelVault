@@ -34,14 +34,14 @@ export class SyncService {
     let sharedFolderIds: string[] = [];
     try {
       const recipientShares = await this.vaultItemRepository.manager.query(
-        `SELECT "folderId" FROM wrapped_key_recipients WHERE "recipientUserId" = $1 AND "revokedAt" IS NULL`,
+        `SELECT "folderId" FROM wrapped_key_recipients WHERE "recipientUserId"::text = $1 AND "revokedAt" IS NULL`,
         [normalizedUserId],
       );
       if (Array.isArray(recipientShares)) {
         sharedFolderIds = recipientShares.map((r: any) => r.folderId).filter(Boolean);
       }
-    } catch (_) {
-      // Table may not exist in minimal test setups
+    } catch (err) {
+      // Table may not exist in minimal unit test setups
     }
 
     let items: EncryptedVaultItem[];
