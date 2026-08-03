@@ -194,7 +194,7 @@ dependencies = [
  "num-traits",
  "rand",
  "sha2",
- "sharks",
+ "blahaj",
  "signature 3.0.0",
  "wasm-bindgen",
  "x25519-dalek",

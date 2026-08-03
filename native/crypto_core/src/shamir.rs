@@ -12,10 +12,10 @@ use zeroize::Zeroize;
 /// # Returns
 /// A `Vec` of `n` share blobs. Each blob is: `[x_coordinate (1 byte)] ++ [y values (secret.len() bytes)]`.
 /// This encoding is sufficient for reconstruction and is identical to the wire format
-/// produced by the `sharks` crate's `Share::from_bytes` / `Into<Vec<u8>>` round-trip.
+/// produced by the `blahaj` crate's `Share::try_from` / `Into<Vec<u8>>` round-trip.
 ///
 /// # Security invariant
-/// - The `sharks` crate generates polynomial coefficients via `rand_chacha::ChaCha20Rng`
+/// - The `blahaj` crate generates polynomial coefficients via `rand_chacha::ChaCha20Rng`
 ///   seeded from the OS entropy source (`rand::rngs::OsRng`), so shares are
 ///   information-theoretically secure: any subset of fewer than `m` shares reveals
 ///   zero information about the secret.
