@@ -120,7 +120,9 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   }, 30000);
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   }, 30000);
 
   beforeEach(async () => {
