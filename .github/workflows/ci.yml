@@ -93,19 +93,32 @@ jobs:
 
       - name: Install OSV-Scanner
         run: |
-          curl -sSL -o osv-scanner \
-            "$(curl -sSL https://api.github.com/repos/google/osv-scanner/releases/latest \
-              | grep browser_download_url \
-              | grep '_linux_amd64"' \
-              | grep -v '.sbom' \
-              | head -n 1 \
-              | cut -d '"' -f 4)"
+          # Pinned to v2.4.0 (2026-06-18) — update this tag when upgrading.
+          # -f makes curl exit non-zero on HTTP errors (4xx/5xx) instead of
+          # silently saving an error page as if it were the binary.
+          OSV_VERSION="v2.4.0"
+          OSV_URL="https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          SHA_URL="https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_SHA256SUMS"
+
+          curl -fsSL -o osv-scanner "${OSV_URL}"
+          curl -fsSL -o osv-scanner_SHA256SUMS "${SHA_URL}"
+
+          # Verify SHA-256 checksum against the published sums file.
+          grep "osv-scanner_linux_amd64" osv-scanner_SHA256SUMS | sha256sum --check --status || \
+            { echo "ERROR: SHA-256 checksum mismatch — aborting install" >&2; exit 1; }
+
+          # Sanity-check: confirm the downloaded file is actually an ELF binary,
+          # not an HTML/JSON error page saved silently by a redirected curl.
+          file osv-scanner | grep -q ELF || \
+            { echo "ERROR: Downloaded file is not a valid ELF binary — download likely failed" >&2; exit 1; }
+
           chmod +x osv-scanner
           echo "$PWD" >> $GITHUB_PATH
 
       - name: SCA — Scan Dart Dependencies
         run: osv-scanner -r .
         continue-on-error: true
+
 
   # ── NODE.js BACKEND SERVICES JOB ──────────────────────────────────────────
   backend-test:
