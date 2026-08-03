@@ -167,11 +167,19 @@ export class KeyDirectoryService {
       );
     }
 
-    await this.publishWrappedKeys(ownerUserId, {
-      folderId: dto.folderId,
-      keyVersion: dto.newKeyVersion,
-      recipients: dto.remainingRecipients,
-    });
+    // Mark prior recipient rows for this recipient as revoked
+    await this.recipientRepo.update(
+      { folderId: dto.folderId, recipientUserId: dto.recipientUserId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
+
+    if (dto.remainingRecipients && dto.remainingRecipients.length > 0) {
+      await this.publishWrappedKeys(ownerUserId, {
+        folderId: dto.folderId,
+        keyVersion: dto.newKeyVersion,
+        recipients: dto.remainingRecipients,
+      });
+    }
   }
 
   /**
