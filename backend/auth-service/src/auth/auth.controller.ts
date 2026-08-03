@@ -15,12 +15,20 @@ export class AuthController {
 
   @Get('users/lookup')
   public async lookupUser(
-    @Query('email') email: string,
+    @Query('email') email?: string,
+    @Query('id') id?: string,
   ): Promise<{ ok: boolean; userId?: string; email?: string }> {
-    if (!email) return { ok: false };
-    const user = await this.authService.lookupUserByEmail(email);
-    if (!user) return { ok: false };
-    return { ok: true, userId: user.id, email: user.username };
+    if (email) {
+      const user = await this.authService.lookupUserByEmail(email);
+      if (!user) return { ok: false };
+      return { ok: true, userId: user.id, email: user.username };
+    }
+    if (id) {
+      const user = await this.authService.lookupUserById(id);
+      if (!user) return { ok: false };
+      return { ok: true, userId: user.id, email: user.username };
+    }
+    return { ok: false };
   }
 
   @Post('login/step1')

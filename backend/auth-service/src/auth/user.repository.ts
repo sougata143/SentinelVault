@@ -70,6 +70,15 @@ export class UserRepository {
   }
 
   /**
+   * Finds a user record by their stable UUID id.
+   */
+  public async findById(id: string): Promise<UserRecord | null> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) return null;
+    return this.mapUserToRecord(user);
+  }
+
+  /**
    * Saves or updates a user record.
    * If the record has no `id` yet, a new UUID v4 is generated and persisted.
    * Returns the saved record with `id` guaranteed to be populated.

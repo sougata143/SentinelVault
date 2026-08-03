@@ -45,6 +45,61 @@ class _SharingScreenState extends State<SharingScreen> {
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
     try {
+      final token = await _storage.read(key: 'session_token') ?? '';
+      if (token.isNotEmpty) {
+        final res = await http.get(
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/${widget.folderId}/recipients'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (res.statusCode == 200) {
+          final data = json.decode(res.body) as Map<String, dynamic>;
+          final List<dynamic> recs = data['recipients'] ?? [];
+          final List<Map<String, dynamic>> loaded = [];
+          for (final item in recs) {
+            final recUserId = item['recipientUserId'] as String;
+            String email = recUserId;
+            String fingerprint = 'Key Version V${item['keyVersion']} (Verified Active)';
+
+            try {
+              final userRes = await http.get(
+                Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?id=$recUserId'),
+              );
+              if (userRes.statusCode == 200) {
+                final uData = json.decode(userRes.body);
+                if (uData['email'] != null) {
+                  email = uData['email'];
+                }
+              }
+            } catch (_) {}
+
+            try {
+              final keyRes = await http.get(
+                Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys/$recUserId'),
+                headers: {'Authorization': 'Bearer $token'},
+              );
+              if (keyRes.statusCode == 200) {
+                final kData = json.decode(keyRes.body);
+                if (kData['keyFingerprint'] != null) {
+                  fingerprint = kData['keyFingerprint'];
+                }
+              }
+            } catch (_) {}
+
+            loaded.add({
+              'userId': recUserId,
+              'email': email,
+              'fingerprint': fingerprint,
+            });
+          }
+
+          if (loaded.isNotEmpty) {
+            _recipients = loaded;
+            await _saveRecipients();
+            return;
+          }
+        }
+      }
+
       final jsonStr = await _storage.read(key: _storageKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = json.decode(jsonStr);

@@ -215,4 +215,49 @@ export class KeyDirectoryService {
       .getOne();
     return row?.keyVersion ?? null;
   }
+
+  /**
+   * Returns all active recipients for the latest key version of a folder.
+   */
+  async listRecipientsForFolder(folderId: string): Promise<Array<{ recipientUserId: string; keyVersion: string; createdAt: Date }>> {
+    const latestVersion = await this.getCurrentKeyVersion(folderId);
+    if (!latestVersion) return [];
+
+    const rows = await this.recipientRepo.find({
+      where: {
+        folderId,
+        keyVersion: latestVersion,
+        revokedAt: IsNull(),
+      },
+    });
+
+    return rows.map((r) => ({
+      recipientUserId: r.recipientUserId,
+      keyVersion: r.keyVersion,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /**
+   * Returns all active shares for the calling recipient user across all folders.
+   */
+  async listMyShares(callerUserId: string): Promise<Array<{ folderId: string; keyVersion: string; record: WrappedKeyRecordDto }>> {
+    const rows = await this.recipientRepo
+      .createQueryBuilder('r')
+      .where('r.recipientUserId = :callerUserId', { callerUserId })
+      .andWhere('r.revokedAt IS NULL')
+      .getMany();
+
+    return rows.map((r) => ({
+      folderId: r.folderId,
+      keyVersion: r.keyVersion,
+      record: {
+        recipientUserId: r.recipientUserId,
+        ephemeralX25519PublicKey: r.ephemeralX25519PublicKey,
+        mlkemCiphertext: r.mlkemCiphertext,
+        aesNonce: r.aesNonce,
+        wrappedFolderKey: r.wrappedFolderKey,
+      },
+    }));
+  }
 }
