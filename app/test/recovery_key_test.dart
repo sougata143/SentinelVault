@@ -187,7 +187,7 @@ void main() {
           find.byKey(const Key('recovery-key-input-field')),
           'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567',
         );
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
         await tester.pump();
         await tester.runAsync(() async {
           await Future.delayed(const Duration(milliseconds: 200));
@@ -201,7 +201,7 @@ void main() {
           find.byKey(const Key('recovery-key-input-field')),
           _recoveryKey,
         );
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
         await tester.pump();
         await tester.runAsync(() async {
           await Future.delayed(const Duration(milliseconds: 200));
