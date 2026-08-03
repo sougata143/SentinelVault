@@ -207,20 +207,39 @@ class VaultSyncManager {
         return;
       }
 
-      // 4. Push local updates to remote
-      final pushResult = await _api.push(itemsToPush);
+      // 4. Push local updates to remote in chunks of 50.
+      //    A single payload of 300+ encrypted blobs can exceed the server's
+      //    body-size limit (HTTP 413). Chunking caps each request at ~2-4 MB
+      //    and is also more resilient to transient network failures.
+      const chunkSize = 50;
+      final List<EncryptedVaultItem> conflictingItems = [];
+      bool anyConflict = false;
 
-      if (pushResult.success) {
-        // Clean up soft-deleted items locally once they are confirmed on server
-        for (final item in itemsToPush) {
-          if (item.isDeleted) {
-            _localDb.hardDeleteItem(item.id);
+      for (int offset = 0; offset < itemsToPush.length; offset += chunkSize) {
+        final chunk = itemsToPush.sublist(
+          offset,
+          (offset + chunkSize).clamp(0, itemsToPush.length),
+        );
+        final chunkResult = await _api.push(chunk);
+
+        if (chunkResult.success) {
+          // Clean up soft-deleted items locally once confirmed on server
+          for (final item in chunk) {
+            if (item.isDeleted) {
+              _localDb.hardDeleteItem(item.id);
+            }
           }
+        } else {
+          anyConflict = true;
+          conflictingItems.addAll(chunkResult.conflictingItems);
         }
+      }
+
+      if (!anyConflict) {
         _setStatus(SyncStatus.success);
       } else {
         // 5. Handle version conflicts (409) client-side
-        for (final conflictItem in pushResult.conflictingItems) {
+        for (final conflictItem in conflictingItems) {
           final localItem = _localDb.getItem(conflictItem.id);
           if (localItem == null) {
             _localDb.insertItem(conflictItem);
