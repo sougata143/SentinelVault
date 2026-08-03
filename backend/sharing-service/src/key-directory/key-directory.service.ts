@@ -17,7 +17,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import {
   PublishKeyBundleDto,
   PublishWrappedKeysDto,
@@ -151,50 +151,42 @@ export class KeyDirectoryService {
 
   /**
    * Fetches the wrapped Folder Key record for the authenticated calling user.
-   * Returns the requested version, or the latest if not specified.
+   * Returns the requested version, or the latest active version for the caller if not specified.
    *
-   * Security: each recipient only receives their own wrapped record —
-   * the server never returns another user's wrapped copy.
+   * Security: each recipient only receives their own active wrapped record
+   * (where wrapped_key_recipients.recipientUserId = callerUserId AND revokedAt IS NULL) —
+   * uninvited or revoked users are rejected with NotFoundException.
    */
   async fetchWrappedKey(
     callerUserId: string,
     dto: FetchWrappedKeyDto,
   ): Promise<WrappedKeyRecordDto> {
-    let targetKeyVersion: string;
+    let record: WrappedKeyRecipient | null;
 
     if (dto.keyVersion !== undefined) {
-      // Verify the requested version exists
-      const version = await this.versionRepo.findOne({
-        where: { folderId: dto.folderId, keyVersion: dto.keyVersion },
+      record = await this.recipientRepo.findOne({
+        where: {
+          recipientUserId: callerUserId,
+          folderId: dto.folderId,
+          keyVersion: dto.keyVersion,
+          revokedAt: IsNull(),
+        },
       });
-      if (!version) {
-        throw new NotFoundException(
-          `Key version ${dto.keyVersion} not found for folder ${dto.folderId}`,
-        );
-      }
-      targetKeyVersion = dto.keyVersion;
     } else {
-      // Fetch the latest version
-      const latest = await this.getCurrentKeyVersion(dto.folderId);
-      if (latest === null) {
-        throw new NotFoundException(
-          `No wrapped keys found for folder ${dto.folderId}`,
-        );
-      }
-      targetKeyVersion = latest;
+      // Find the latest active key version specifically for this calling user
+      record = await this.recipientRepo
+        .createQueryBuilder('r')
+        .where('r.recipientUserId = :callerUserId', { callerUserId })
+        .andWhere('r.folderId = :folderId', { folderId: dto.folderId })
+        .andWhere('r.revokedAt IS NULL')
+        .orderBy('r.keyVersion', 'DESC')
+        .limit(1)
+        .getOne();
     }
 
-    // Fetch the specific recipient row — enforces per-caller security
-    const record = await this.recipientRepo.findOne({
-      where: {
-        recipientUserId: callerUserId,
-        folderId: dto.folderId,
-        keyVersion: targetKeyVersion,
-      },
-    });
     if (!record) {
       throw new NotFoundException(
-        `No wrapped key found for caller in folder ${dto.folderId} version ${targetKeyVersion}`,
+        `No active wrapped key found for caller in folder ${dto.folderId}`,
       );
     }
 

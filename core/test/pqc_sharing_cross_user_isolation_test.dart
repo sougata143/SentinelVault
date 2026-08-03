@@ -18,7 +18,7 @@ void main() {
       sharing = PqcSharingManager(bridge);
     });
 
-    test('Shared item wrapped from Account 1 to Account 2 cannot be decrypted by Account 3', () async {
+    test('Shared item wrapped from Account 1 to Account 2 is visible to Account 2 but NOT Account 3', () async {
       // Account 1: test-a@sentinelvault.local (Sender)
       final account1 = await bridge.pqcGenerateKeypairs();
       const account1UserId = 'test-a@sentinelvault.local';
@@ -45,7 +45,7 @@ void main() {
         recipientMlkemEk: account2.mlkemEk,
       );
 
-      // 3. Positive verification: Account 2 accepts invite and successfully unwraps Folder Key
+      // 3. POSITIVE VERIFICATION: Intended recipient (Account 2 - test-b) accepts & unwraps
       final isVerifiedForAccount2 = await sharing.verifyInvitation(
         signedPayloadB64: invite['signedPayload'] as String,
         ed25519SigB64: invite['ed25519Signature'] as String,
@@ -53,16 +53,16 @@ void main() {
         senderEd25519Pub: account1.ed25519Pub,
         senderMldsaVk: account1.mldsaVk,
       );
-      expect(isVerifiedForAccount2, isTrue);
+      expect(isVerifiedForAccount2, isTrue, reason: 'Legitimate recipient test-b must pass signature verification');
 
       final recoveredFolderKeyByAccount2 = await sharing.unwrapFolderKey(
         wrappedKeyData: invite['wrappedFolderKey'] as Map<String, dynamic>,
         recipientX25519Priv: account2.x25519Priv,
         recipientMlkemDk: account2.mlkemDk,
       );
-      expect(recoveredFolderKeyByAccount2, equals(folderKey));
+      expect(recoveredFolderKeyByAccount2, equals(folderKey), reason: 'Legitimate recipient test-b must be able to decrypt the Folder Key');
 
-      // 4. Negative verification: Account 3 (test-a@sentinelvault.local) attempts to unwrap Account 2's wrapped key payload
+      // 4. NEGATIVE VERIFICATION: Uninvited third party (Account 3 - test-a@sentinelvault.local) attempts unwrap
       expect(
         () => sharing.unwrapFolderKey(
           wrappedKeyData: invite['wrappedFolderKey'] as Map<String, dynamic>,
@@ -70,7 +70,51 @@ void main() {
           recipientMlkemDk: account3.mlkemDk,
         ),
         throwsA(anything),
-        reason: 'Account 3 (uninvited) must not be able to decrypt Folder Key wrapped for Account 2',
+        reason: 'Account 3 (test-a@sentinelvault.local - uninvited) MUST NOT be able to decrypt Folder Key wrapped for test-b',
+      );
+    });
+
+    test('Rotated Folder Key remains accessible to remaining recipients but fails for revoked recipient', () async {
+      // Account 1: Owner
+      final account1 = await bridge.pqcGenerateKeypairs();
+      // Account 2: Remaining recipient (Bob)
+      final account2 = await bridge.pqcGenerateKeypairs();
+      // Account 3: Revoked recipient (Charlie)
+      final account3 = await bridge.pqcGenerateKeypairs();
+
+      final rotatedFolderKey = Uint8List.fromList(List.generate(32, (i) => i ^ 0xAA));
+
+      // Re-wrap rotated folder key for Bob ONLY
+      final rotatedWraps = await sharing.rotateFolderKey(
+        newFolderKey: rotatedFolderKey,
+        remainingRecipientsKeys: [
+          {
+            'userId': 'bob@sentinelvault.local',
+            'x25519Pub': account2.x25519Pub,
+            'mlkemEk': account2.mlkemEk,
+          },
+        ],
+      );
+
+      final bobWrap = rotatedWraps.firstWhere((w) => w['recipientUserId'] == 'bob@sentinelvault.local');
+
+      // Bob (remaining recipient) can decrypt rotated key
+      final bobRecovered = await sharing.unwrapFolderKey(
+        wrappedKeyData: bobWrap,
+        recipientX25519Priv: account2.x25519Priv,
+        recipientMlkemDk: account2.mlkemDk,
+      );
+      expect(bobRecovered, equals(rotatedFolderKey), reason: 'Remaining recipient Bob must be able to decrypt rotated Folder Key');
+
+      // Charlie (revoked recipient) cannot decrypt Bob's wrapped key
+      expect(
+        () => sharing.unwrapFolderKey(
+          wrappedKeyData: bobWrap,
+          recipientX25519Priv: account3.x25519Priv,
+          recipientMlkemDk: account3.mlkemDk,
+        ),
+        throwsA(anything),
+        reason: 'Revoked recipient Charlie MUST NOT be able to decrypt rotated Folder Key wrapped for Bob',
       );
     });
   });
