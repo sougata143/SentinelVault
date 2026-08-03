@@ -51,6 +51,7 @@ class HttpSyncApiClient implements SyncApiClient {
         version: jsonItem['version'] as int,
         updatedAt: DateTime.parse(jsonItem['updatedAt'] as String).toUtc(),
         isDeleted: jsonItem['isDeleted'] as bool? ?? false,
+        folderId: jsonItem['folderId'] as String?,
       );
     }).toList();
   }
@@ -65,6 +66,7 @@ class HttpSyncApiClient implements SyncApiClient {
       'version': item.version,
       'updatedAt': item.updatedAt.toIso8601String(),
       'isDeleted': item.isDeleted,
+      if (item.folderId != null) 'folderId': item.folderId,
     }).toList();
 
     final response = await _httpClient.post(
@@ -85,6 +87,7 @@ class HttpSyncApiClient implements SyncApiClient {
           version: jsonItem['version'] as int,
           updatedAt: DateTime.parse(jsonItem['updatedAt'] as String).toUtc(),
           isDeleted: jsonItem['isDeleted'] as bool? ?? false,
+          folderId: jsonItem['folderId'] as String?,
         );
       }).toList();
       return SyncPushResult.conflict(conflicts);

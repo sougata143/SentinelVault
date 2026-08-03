@@ -176,6 +176,7 @@ class VaultSyncManager {
                 version: localItem.version + 1,
                 updatedAt: DateTime.now().toUtc(),
                 isDeleted: resolvedItem.isDeleted,
+                folderId: resolvedItem.folderId,
               );
               _localDb.updateItem(finalItem);
             }

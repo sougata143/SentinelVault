@@ -115,18 +115,19 @@ export class KeyDirectoryService {
     ownerUserId: string,
     dto: PublishWrappedKeysDto,
   ): Promise<void> {
-    // Monotonic version check — new version must be strictly greater than latest
-    const latestVersion = await this.getCurrentKeyVersion(dto.folderId);
-    if (latestVersion !== null && dto.keyVersion <= latestVersion) {
-      throw new ConflictException(
-        `Key version ${dto.keyVersion} is not greater than current version ${latestVersion}`,
-      );
+    // Monotonic version check — auto-increment if version is <= latest
+    const latestVersionStr = await this.getCurrentKeyVersion(dto.folderId);
+    const latestVersionNum = latestVersionStr !== null ? parseInt(latestVersionStr, 10) : 0;
+    let targetVersion = parseInt(dto.keyVersion, 10);
+    if (isNaN(targetVersion) || (latestVersionStr !== null && targetVersion <= latestVersionNum)) {
+      targetVersion = latestVersionNum + 1;
     }
+    const finalVersionStr = targetVersion.toString();
 
     // Insert the new version row
     const version = this.versionRepo.create({
       folderId: dto.folderId,
-      keyVersion: dto.keyVersion,
+      keyVersion: finalVersionStr,
       publishedAt: new Date(),
     });
     await this.versionRepo.save(version);
@@ -136,7 +137,7 @@ export class KeyDirectoryService {
       this.recipientRepo.create({
         recipientUserId: rec.recipientUserId,
         folderId: dto.folderId,
-        keyVersion: dto.keyVersion,
+        keyVersion: finalVersionStr,
         ephemeralX25519PublicKey: rec.ephemeralX25519PublicKey,
         mlkemCiphertext: rec.mlkemCiphertext,
         aesNonce: rec.aesNonce,
@@ -166,11 +167,19 @@ export class KeyDirectoryService {
       );
     }
 
-    await this.publishWrappedKeys(ownerUserId, {
-      folderId: dto.folderId,
-      keyVersion: dto.newKeyVersion,
-      recipients: dto.remainingRecipients,
-    });
+    // Mark prior recipient rows for this recipient as revoked
+    await this.recipientRepo.update(
+      { folderId: dto.folderId, recipientUserId: dto.recipientUserId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
+
+    if (dto.remainingRecipients && dto.remainingRecipients.length > 0) {
+      await this.publishWrappedKeys(ownerUserId, {
+        folderId: dto.folderId,
+        keyVersion: dto.newKeyVersion,
+        recipients: dto.remainingRecipients,
+      });
+    }
   }
 
   /**

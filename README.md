@@ -269,6 +269,84 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and `de
 
 ---
 
+## 🤝 Step-by-Step Guide for PQC Zero-Knowledge Folder Sharing
+
+SentinelVault uses a hybrid classical (X25519) + post-quantum (ML-KEM-768) zero-knowledge architecture for sharing folders between users.
+
+### How PQC Zero-Knowledge Folder Sharing Works
+1. **PQC Public Key Bundle Registration**: Each user generates and publishes their X25519, Ed25519, ML-KEM-768, and ML-DSA-65 public key bundle to `sharing-service` (`POST /key-directory/keys`).
+2. **Deterministic Folder Key Derivation**: Every folder (e.g. `work-passwords`, `family-vault`, `nvskjndvs`, or **any custom string input by the user**) is automatically converted into a deterministic 36-character PostgreSQL UUID via `getFolderUuid(folderName)`. There are **zero hardcoded values** — users can input any folder string they choose.
+3. **PQC Hybrid Key Wrapping**: The sender unwraps/generates a 32-byte Folder Key, wraps it using the recipient's ML-KEM-768 encapsulation key + X25519 ephemeral key, signs it with ML-DSA-65 + Ed25519, and posts the wrapped key record to `sharing-service` (`POST /key-directory/wrapped-keys`).
+4. **Shared Item Encryption**: Items created inside or assigned to a shared folder are encrypted on the client using the **Shared Folder Key** (derived via HMAC-SHA256 from the master vault key and cached in `PqcSharingService.unwrappedFolderKeys`).
+5. **Recipient Sync & Unwrapping**: Upon recipient login, `PqcSharingService.syncSharedFoldersWithMe()` fetches `GET /key-directory/my-shares`, unwraps the Folder Key using ML-KEM-768 decapsulation key + X25519 private key, and `sync-api` returns all shared folder items for local decryption.
+
+---
+
+### Step-by-Step Manual Testing Procedure (Fresh Database Setup)
+
+#### Step 1: Truncate Database Tables (Optional Fresh Start)
+If you want to perform a clean, empty-state test, run the following SQL commands in DBeaver or psql:
+```sql
+TRUNCATE TABLE wrapped_key_recipients CASCADE;
+TRUNCATE TABLE wrapped_key_versions CASCADE;
+TRUNCATE TABLE encrypted_vault_items CASCADE;
+```
+
+#### Step 2: Launch Application
+- Ensure Docker containers are running (`sentinelvault-db`, `sentinelvault-sharing`, `sentinelvault-sync`, `sentinelvault-auth`).
+- Start Flutter web (using `web-server` to avoid debug timeouts):
+  ```bash
+  cd app
+  flutter run -d web-server --web-port=8080
+  ```
+
+#### Step 3: Register / Login as Sender (`test-a@sentinelvault.local`)
+1. Open `http://localhost:8080` in Chrome.
+2. Log in (or register) as **`test-a@sentinelvault.local`** (Password: `TestAccountPassword123!`).
+3. Unlock the vault using Master Password **`TestMasterPassword456!`**.
+4. The client automatically generates and publishes `test-a@sentinelvault.local`'s PQC public key bundle to `sharing-service`.
+
+#### Step 4: Create a Shared Item & Assign to Folder
+1. Click **`+` (Add Item)** button in the vault screen.
+2. Enter item details:
+   - **Title**: `Personal Shared Credentials`
+   - **Username**: `sougata_shared`
+   - **Password**: `SecretPqcPass123!`
+3. Scroll down to **Organization & Notes**.
+4. In **Folder / Shared Section Name or ID**, enter **ANY custom folder name** (e.g. `work-passwords`, `my-shared-folder`, `nvskjndvs`, etc.).
+5. Click **Save Item** (`✓`).
+   *(The item is encrypted under the shared folder key derived for that folder name).*
+
+#### Step 5: Invite Recipient (`test-b@sentinelvault.local`)
+1. Open **Sharing** for that item or folder.
+2. Under **Invite user by email**, type **`test-b@sentinelvault.local`** and click **Add Recipient**.
+3. Verify and confirm the Safety Number / Key Fingerprint dialog.
+   *(The PQC wrapped Folder Key is published to `sharing-service` under the folder's deterministic UUID).*
+
+#### Step 6: Log Out
+1. Click **Logout** in the left sidebar to clear memory keys and session token.
+
+#### Step 7: Log In as Recipient (`test-b@sentinelvault.local`)
+1. Log in as **`test-b@sentinelvault.local`** (Password: `TestAccountPassword123!`).
+2. Unlock the vault using Master Password **`TestMasterPassword456!`**.
+3. The app automatically runs `PqcSharingService.syncSharedFoldersWithMe()`, retrieves the wrapped key from `sharing-service`, and unwraps the folder key using ML-KEM-768.
+4. `VaultSyncManager.sync()` pulls the encrypted item from `sync-api`.
+
+#### Step 8: Verification
+1. Click **All Items** or **Shared With Me** in the sidebar.
+2. **`Personal Shared Credentials`** appears in the list pane!
+3. Click the item to view decrypted credentials (`sougata_shared` / `SecretPqcPass123!`).
+
+#### Step 9: Test Recipient Revocation (Optional)
+1. Log out of `test-b@sentinelvault.local` and log back in as **`test-a@sentinelvault.local`**.
+2. Open Sharing for **`nvskjndvs`**.
+3. Click the red **`-`** (Revoke) icon next to `test-b@sentinelvault.local` and confirm.
+   *(The backend sets `revokedAt = NOW()` for `test-b@sentinelvault.local` and rotates the Folder Key).*
+4. In DBeaver, query `SELECT "recipientUserId", "folderId", "revokedAt" FROM wrapped_key_recipients;` to confirm `revokedAt` is populated.
+5. Log back in as **`test-b@sentinelvault.local`** — `test-b@sentinelvault.local` can no longer access new items or future updates in that folder.
+
+---
+
 ## 🔮 Future Scope
 
 - **Post-Quantum Account Auth Hardening**: SRP-6a and WebAuthn/passkey signatures are asymmetric/discrete-log-based and theoretically vulnerable to a future quantum computer, unlike the vault''s symmetric-only encryption chain. Bounded in severity today (compromise would grant account-level access only, never vault contents) but worth revisiting once post-quantum variants of these protocols mature.

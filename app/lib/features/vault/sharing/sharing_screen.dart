@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:core/core.dart';
 import '../../../config/api_config.dart';
 import 'fingerprint_verification_dialog.dart';
+import 'pqc_sharing_service.dart';
 
 
 class SharingScreen extends StatefulWidget {
@@ -212,7 +213,23 @@ Uint8List safeBase64Decode(String input) {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
+      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
       final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
+
+      int nextVersion = 1;
+      try {
+        final versionRes = await http.get(
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$targetFolderId/version'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (versionRes.statusCode == 200) {
+          final vData = json.decode(versionRes.body) as Map<String, dynamic>;
+          final curr = vData['keyVersion'];
+          if (curr != null) {
+            nextVersion = (int.tryParse(curr.toString()) ?? 0) + 1;
+          }
+        }
+      } catch (_) {}
 
       // 5. Post wrapped key to DB-backed POST /key-directory/wrapped-keys endpoint
       final pubWrappedRes = await http.post(
@@ -222,8 +239,8 @@ Uint8List safeBase64Decode(String input) {
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
-          'keyVersion': '1',
+          'folderId': targetFolderId,
+          'keyVersion': nextVersion.toString(),
           'recipients': [
             {
               'recipientUserId': recipientUserId,
@@ -239,6 +256,8 @@ Uint8List safeBase64Decode(String input) {
       if (pubWrappedRes.statusCode != 200) {
         throw Exception('Failed to publish wrapped key: HTTP ${pubWrappedRes.statusCode}');
       }
+
+      PqcSharingService.unwrappedFolderKeys[targetFolderId] = Uint8List.fromList(widget.currentFolderKey);
 
       if (!mounted) return;
 
@@ -298,6 +317,9 @@ Uint8List safeBase64Decode(String input) {
 
     setState(() => _loading = true);
     try {
+      final token = await _storage.read(key: 'session_token') ?? '';
+      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
+
       // 1. Generate new cryptographically independent Folder Key
       final newFolderKey = Uint8List.fromList(List.generate(32, (i) => i ^ 0xAA));
 
@@ -316,8 +338,39 @@ Uint8List safeBase64Decode(String input) {
 
       if (!mounted) return;
 
-      // In production: DELETE /key-directory/wrapped-keys/revoke with wraps
-      await Future.delayed(const Duration(milliseconds: 500));
+      int nextVersion = 1;
+      try {
+        final versionRes = await http.get(
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$targetFolderId/version'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (versionRes.statusCode == 200) {
+          final vData = json.decode(versionRes.body) as Map<String, dynamic>;
+          final curr = vData['keyVersion'];
+          if (curr != null) {
+            nextVersion = (int.tryParse(curr.toString()) ?? 0) + 1;
+          }
+        }
+      } catch (_) {}
+
+      // 4. Call DELETE /key-directory/wrapped-keys/revoke to set revokedAt = NOW() in database
+      final revokeRes = await http.delete(
+        Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/revoke'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'folderId': targetFolderId,
+          'recipientUserId': userId,
+          'newKeyVersion': nextVersion.toString(),
+          'remainingRecipients': [],
+        }),
+      );
+
+      if (revokeRes.statusCode != 200) {
+        throw Exception('Failed to revoke recipient: HTTP ${revokeRes.statusCode}');
+      }
 
       if (!mounted) return;
 

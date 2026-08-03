@@ -1,7 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:uuid/uuid.dart';
 import '../../theme/theme.dart';
+import 'sharing/pqc_sharing_service.dart';
 
 class ItemEditorScreen extends StatefulWidget {
   final VaultItem? item;
@@ -42,6 +44,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   // Shared Fields
   final _titleController = TextEditingController();
   final _tagsController = TextEditingController();
+  final _folderController = TextEditingController();
   final _notesController = TextEditingController();
   bool _favorite = false;
   final List<CustomField> _customFields = [];
@@ -122,6 +125,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   void _populateFromItem(VaultItem item) {
     _titleController.text = item.title;
     _tagsController.text = item.tags.join(', ');
+    _folderController.text = item.vaultId;
     _notesController.text = item.notes.plaintext ?? '';
     _favorite = item.favorite;
     _customFields.addAll(item.customFields);
@@ -340,13 +344,18 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         .where((s) => s.isNotEmpty)
         .toList();
 
+    final folderText = _folderController.text.trim();
+    final targetVaultId = folderText.isNotEmpty
+        ? getFolderUuid(folderText)
+        : (widget.item?.vaultId.isNotEmpty == true ? getFolderUuid(widget.item!.vaultId) : '');
+
     final item = VaultItem(
       id: widget.item?.id ?? const Uuid().v4(),
       type: _selectedType!,
       title: _titleController.text,
       tags: tags,
       favorite: _favorite,
-      vaultId: widget.item?.vaultId ?? '',
+      vaultId: targetVaultId,
       createdAt: widget.item?.createdAt ?? DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
       fields: fields,
@@ -354,8 +363,17 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       notes: ConcealedValue.plain(_notesController.text),
     );
 
-    // Encrypt under the vault key
-    final encryptedItem = await item.encrypt(widget.vaultKey, _crypto);
+    List<int> encryptionKey = widget.vaultKey;
+    if (targetVaultId.isNotEmpty) {
+      if (PqcSharingService.unwrappedFolderKeys.containsKey(targetVaultId)) {
+        encryptionKey = PqcSharingService.unwrappedFolderKeys[targetVaultId]!;
+      } else {
+        encryptionKey = deriveFolderKey(widget.vaultKey, targetVaultId);
+        PqcSharingService.unwrappedFolderKeys[targetVaultId] = Uint8List.fromList(encryptionKey);
+      }
+    }
+
+    final encryptedItem = await item.encrypt(encryptionKey, _crypto);
     widget.onSave(encryptedItem);
     if (mounted) {
       Navigator.of(context).pop();
@@ -465,6 +483,15 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
               title: 'Organization & Notes',
               titleIcon: Icons.folder_outlined,
               children: [
+                TextFormField(
+                  controller: _folderController,
+                  decoration: const InputDecoration(
+                    labelText: 'Folder / Shared Section Name or ID (optional)',
+                    hintText: 'e.g. sdvdlvkndl, nvskjndvs',
+                    prefixIcon: Icon(Icons.folder_open_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _tagsController,
                   decoration: const InputDecoration(

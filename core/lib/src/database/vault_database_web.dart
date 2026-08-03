@@ -64,6 +64,7 @@ class SqliteVaultDatabase implements VaultDatabase {
       version: item.version + 1,
       updatedAt: DateTime.now().toUtc(),
       isDeleted: true,
+      folderId: item.folderId,
     );
   }
 
