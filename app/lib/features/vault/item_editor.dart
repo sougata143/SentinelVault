@@ -346,7 +346,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       title: _titleController.text,
       tags: tags,
       favorite: _favorite,
-      vaultId: widget.item?.vaultId ?? '',
+      vaultId: widget.item?.vaultId.isNotEmpty == true ? getFolderUuid(widget.item!.vaultId) : '',
       createdAt: widget.item?.createdAt ?? DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
       fields: fields,
