@@ -1,3 +1,4 @@
+import '../csv_helpers.dart';
 import '../import_result.dart';
 
 /// Parses a generic CSV export with a user-provided column mapping.
@@ -5,10 +6,6 @@ import '../import_result.dart';
 /// [columnMapping] maps target field names to actual CSV column headers.
 /// Supported target field names:
 ///   'title', 'username', 'password', 'url', 'notes', 'totp', 'favorite'
-///
-/// Items missing a 'title' are flagged as errors.
-/// Columns present in the CSV but not in [columnMapping] are flagged as
-/// unmapped warnings — never silently dropped.
 class GenericCsvParser {
   /// The user-provided map that links CSV headers (values) to standard vault fields (keys).
   final Map<String, String> columnMapping;
@@ -21,13 +18,13 @@ class GenericCsvParser {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];
 
-    final lines = _splitLines(csvContent);
-    if (lines.isEmpty) {
+    final rows = parseCsvRows(csvContent);
+    if (rows.isEmpty) {
       errors.add(const ParsedError(sourceRef: 'root', reason: 'Empty CSV file.'));
       return ImportResult(items: items, errors: errors);
     }
 
-    final header = _parseCsvRow(lines[0]);
+    final header = rows[0];
     final colIndex = {for (var i = 0; i < header.length; i++) header[i].trim().toLowerCase(): i};
 
     // Check for unmapped columns — flag but continue
@@ -43,12 +40,6 @@ class GenericCsvParser {
       }
     }
 
-    // Build reverse mapping: CSV column name → target field name
-    final reverseMapping = <String, String>{};
-    for (final entry in columnMapping.entries) {
-      reverseMapping[entry.value.trim().toLowerCase()] = entry.key;
-    }
-
     String? getField(List<String> row, String targetField) {
       final csvCol = columnMapping[targetField];
       if (csvCol == null) return null;
@@ -58,13 +49,14 @@ class GenericCsvParser {
       return val.isEmpty ? null : val;
     }
 
-    for (var i = 1; i < lines.length; i++) {
-      if (lines[i].trim().isEmpty) continue;
-      final row = _parseCsvRow(lines[i]);
+    for (var i = 1; i < rows.length; i++) {
+      final row = rows[i];
+      if (row.isEmpty || row.every((f) => f.trim().isEmpty)) continue;
       final srcRef = 'row[$i]';
 
       try {
-        final title = getField(row, 'title');
+        var title = getField(row, 'title');
+        title ??= getField(row, 'url');
         if (title == null) {
           errors.add(ParsedError(
             sourceRef: srcRef,
@@ -81,7 +73,7 @@ class GenericCsvParser {
 
         items.add(ParsedItem(
           title: title,
-          type: 'login', // Generic CSV always maps to login
+          type: 'login',
           username: getField(row, 'username'),
           password: getField(row, 'password'),
           urls: urls,
@@ -95,37 +87,5 @@ class GenericCsvParser {
     }
 
     return ImportResult(items: items, errors: errors);
-  }
-
-  List<String> _splitLines(String content) {
-    return content
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .split('\n');
-  }
-
-  List<String> _parseCsvRow(String row) {
-    final fields = <String>[];
-    final buf = StringBuffer();
-    var inQuotes = false;
-
-    for (var i = 0; i < row.length; i++) {
-      final ch = row[i];
-      if (ch == '"') {
-        if (inQuotes && i + 1 < row.length && row[i + 1] == '"') {
-          buf.write('"');
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch == ',' && !inQuotes) {
-        fields.add(buf.toString());
-        buf.clear();
-      } else {
-        buf.write(ch);
-      }
-    }
-    fields.add(buf.toString());
-    return fields;
   }
 }

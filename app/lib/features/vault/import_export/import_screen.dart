@@ -271,14 +271,16 @@ class _ImportScreenState extends State<ImportScreen> {
             'url': 'url',
             'username': 'username',
             'password': 'password',
+            'notes': 'note',
           }).parse(content);
           break;
         case 'firefox_csv':
           result = const GenericCsvParser(columnMapping: {
-            'title': 'url',
+            'title': 'name',
             'url': 'url',
             'username': 'username',
             'password': 'password',
+            'notes': 'note',
           }).parse(content);
           break;
         case 'safari_csv':

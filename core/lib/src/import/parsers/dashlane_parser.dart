@@ -1,23 +1,22 @@
+import '../csv_helpers.dart';
 import '../import_result.dart';
 
 /// Parses a Dashlane CSV export into [ImportResult].
 class DashlaneParser {
-  /// Parses a Dashlane CSV file [csvContent] containing accounts, logins, and passwords
-  /// into an [ImportResult] containing parsed vault items and errors.
+  /// Parses a Dashlane CSV file [csvContent] into an [ImportResult].
   ImportResult parse(String csvContent) {
     final items = <ParsedItem>[];
     final errors = <ParsedError>[];
 
-    final lines = _splitLines(csvContent);
-    if (lines.isEmpty) {
+    final rows = parseCsvRows(csvContent);
+    if (rows.isEmpty) {
       errors.add(const ParsedError(sourceRef: 'root', reason: 'Empty CSV file.'));
       return ImportResult(items: items, errors: errors);
     }
 
-    final header = _parseCsvRow(lines[0]);
+    final header = rows[0];
     final colIndex = {for (var i = 0; i < header.length; i++) header[i].trim().toLowerCase(): i};
 
-    // Helper to find column index from a list of candidate names
     int? findCol(List<String> candidates) {
       for (final c in candidates) {
         final idx = colIndex[c.toLowerCase()];
@@ -33,6 +32,9 @@ class DashlaneParser {
     final notesIdx = findCol(const ['notes', 'note', 'category']);
     final totpIdx = findCol(const ['otpsecret', 'totp', 'otp']);
 
+    final cardNumberIdx = findCol(const ['cardnumber', 'number']);
+    final cardholderIdx = findCol(const ['cardholdername', 'cardholder']);
+
     if (titleIdx == null) {
       errors.add(const ParsedError(
         sourceRef: 'header',
@@ -41,9 +43,9 @@ class DashlaneParser {
       return ImportResult(items: items, errors: errors);
     }
 
-    for (var i = 1; i < lines.length; i++) {
-      if (lines[i].trim().isEmpty) continue;
-      final row = _parseCsvRow(lines[i]);
+    for (var i = 1; i < rows.length; i++) {
+      final row = rows[i];
+      if (row.isEmpty || row.every((f) => f.trim().isEmpty)) continue;
       final srcRef = 'row[$i]';
 
       try {
@@ -60,16 +62,48 @@ class DashlaneParser {
         }
 
         final url = getVal(urlIdx);
+        final username = getVal(usernameIdx);
+        final password = getVal(passwordIdx);
+        final notes = getVal(notesIdx);
+        final totp = getVal(totpIdx);
+        final cardNumber = getVal(cardNumberIdx);
+        final cardholder = getVal(cardholderIdx);
+
+        // Credit Card detection
+        if (cardNumber != null || cardholder != null) {
+          items.add(ParsedItem(
+            title: title,
+            type: 'credit_card',
+            cardholderName: cardholder,
+            cardNumber: cardNumber,
+            notes: notes,
+            favorite: false,
+          ));
+          continue;
+        }
+
+        // Secure Note detection
+        if (notes != null && password == null && username == null && url == null) {
+          items.add(ParsedItem(
+            title: title,
+            type: 'secure_note',
+            noteContent: notes,
+            notes: null,
+            favorite: false,
+          ));
+          continue;
+        }
+
         final urls = url != null ? [url] : <String>[];
 
         items.add(ParsedItem(
           title: title,
           type: 'login',
-          username: getVal(usernameIdx),
-          password: getVal(passwordIdx),
+          username: username,
+          password: password,
           urls: urls,
-          totpSecret: getVal(totpIdx),
-          notes: getVal(notesIdx),
+          totpSecret: totp,
+          notes: notes,
           favorite: false,
         ));
       } catch (e) {
@@ -78,37 +112,5 @@ class DashlaneParser {
     }
 
     return ImportResult(items: items, errors: errors);
-  }
-
-  List<String> _splitLines(String content) {
-    return content
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .split('\n');
-  }
-
-  List<String> _parseCsvRow(String row) {
-    final fields = <String>[];
-    final buf = StringBuffer();
-    var inQuotes = false;
-
-    for (var i = 0; i < row.length; i++) {
-      final ch = row[i];
-      if (ch == '"') {
-        if (inQuotes && i + 1 < row.length && row[i + 1] == '"') {
-          buf.write('"');
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch == ',' && !inQuotes) {
-        fields.add(buf.toString());
-        buf.clear();
-      } else {
-        buf.write(ch);
-      }
-    }
-    fields.add(buf.toString());
-    return fields;
   }
 }

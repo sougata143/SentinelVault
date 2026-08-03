@@ -4,10 +4,6 @@ import '../import_result.dart';
 /// Parses a 1Password `.1pux` export (specifically the `export.data` JSON
 /// extracted from the archive) into [ImportResult].
 ///
-/// A `.1pux` file is a ZIP archive. The app layer is responsible for
-/// extracting the `export.data` file and passing its content as [jsonContent].
-/// This parser operates on the string only — never on a file path.
-///
 /// Supported category UUIDs:
 ///   001 = Login, 002 = Credit Card, 003 = Secure Note,
 ///   004 = Identity, 005 = Password
@@ -77,17 +73,55 @@ class OnePasswordParser {
     final fav = (raw['favIndex'] as int? ?? 0) > 0;
     final details = raw['details'] as Map<String, dynamic>? ?? {};
     final sections = details['sections'] as List<dynamic>? ?? [];
-    final notes = details['notes'] as String?;
+    final topFields = details['fields'] as List<dynamic>? ?? [];
+    final notes = (details['notesPlain'] as String?) ?? (details['notes'] as String?);
 
-    // Helper to find a field value across sections by field id
-    String? findField(String id) {
+    List<Map<String, dynamic>> getAllFields() {
+      final all = <Map<String, dynamic>>[];
+      for (final f in topFields) {
+        if (f is Map<String, dynamic>) all.add(f);
+      }
       for (final sec in sections) {
         final fields = (sec as Map<String, dynamic>)['fields'] as List<dynamic>? ?? [];
         for (final f in fields) {
-          final fm = f as Map<String, dynamic>;
-          if (fm['id'] == id || fm['title'] == id) {
-            final v = fm['value'] as Map<String, dynamic>?;
-            return v?['string'] as String? ?? v?['concealed'] as String?;
+          if (f is Map<String, dynamic>) all.add(f);
+        }
+      }
+      return all;
+    }
+
+    final allFields = getAllFields();
+
+    String? findField(String idOrTitle) {
+      final target = idOrTitle.toLowerCase();
+      for (final fm in allFields) {
+        final fid = (fm['id'] as String? ?? '').toLowerCase();
+        final ftitle = (fm['title'] as String? ?? '').toLowerCase();
+        final flabel = (fm['label'] as String? ?? '').toLowerCase();
+
+        if (fid == target || ftitle == target || flabel == target) {
+          final v = fm['value'];
+          if (v is Map<String, dynamic>) {
+            return v['string'] as String? ?? v['concealed'] as String? ?? v['totp'] as String?;
+          } else if (v is String) {
+            return v;
+          }
+        }
+      }
+      return null;
+    }
+
+    String? findTotp() {
+      for (final fm in allFields) {
+        final type = (fm['type'] as String? ?? '').toUpperCase();
+        final id = (fm['id'] as String? ?? '').toLowerCase();
+        final title = (fm['title'] as String? ?? '').toLowerCase();
+        if (type == 'OTP' || id.contains('totp') || id.contains('one-time') || title.contains('totp') || title.contains('one-time')) {
+          final v = fm['value'];
+          if (v is Map<String, dynamic>) {
+            return v['totp'] as String? ?? v['string'] as String? ?? v['concealed'] as String?;
+          } else if (v is String) {
+            return v;
           }
         }
       }
@@ -99,14 +133,13 @@ class OnePasswordParser {
         final loginFields = details['loginFields'] as List<dynamic>? ?? [];
         String? username;
         String? password;
-        String? totp;
         for (final lf in loginFields) {
           final lfm = lf as Map<String, dynamic>;
           final designation = lfm['designation'] as String?;
           if (designation == 'username') username = lfm['value'] as String?;
           if (designation == 'password') password = lfm['value'] as String?;
         }
-        totp = findField('TOTP') ?? findField('one-time password');
+        final totp = findTotp();
         return ParsedItem(
           title: title,
           type: 'login',
@@ -122,12 +155,12 @@ class OnePasswordParser {
         return ParsedItem(
           title: title,
           type: 'credit_card',
-          cardholderName: findField('cardholder'),
-          cardNumber: findField('ccnum'),
-          cardBrand: findField('type'),
-          cardExpiryMonth: int.tryParse(findField('expiry_mm') ?? ''),
-          cardExpiryYear: int.tryParse(findField('expiry_yy') ?? ''),
-          cardCvv: findField('cvv'),
+          cardholderName: findField('cardholder') ?? findField('cardholder name'),
+          cardNumber: findField('ccnum') ?? findField('number'),
+          cardBrand: findField('type') ?? findField('brand'),
+          cardExpiryMonth: int.tryParse(findField('expiry_mm') ?? findField('expiry month') ?? ''),
+          cardExpiryYear: int.tryParse(findField('expiry_yy') ?? findField('expiry year') ?? ''),
+          cardCvv: findField('cvv') ?? findField('code'),
           cardPin: findField('pin'),
           notes: notes,
           favorite: fav,
@@ -145,14 +178,14 @@ class OnePasswordParser {
         return ParsedItem(
           title: title,
           type: 'identity',
-          firstName: findField('firstname'),
-          lastName: findField('lastname'),
+          firstName: findField('firstname') ?? findField('first name'),
+          lastName: findField('lastname') ?? findField('last name'),
           birthdate: findField('birthdate'),
-          gender: findField('sex'),
-          street: findField('address1'),
+          gender: findField('sex') ?? findField('gender'),
+          street: findField('address1') ?? findField('street'),
           city: findField('city'),
           state: findField('state'),
-          zip: findField('zip'),
+          zip: findField('zip') ?? findField('postal code'),
           country: findField('country'),
           notes: notes,
           favorite: fav,
