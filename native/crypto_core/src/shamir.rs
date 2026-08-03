@@ -37,7 +37,7 @@ pub fn split_secret(secret: &[u8], m: u8, n: u8) -> Result<Vec<Vec<u8>>, &'stati
 
     let shares: Vec<Vec<u8>> = dealer
         .take(n as usize)
-        .map(Vec::<u8>::from)
+        .map(|share| Vec::<u8>::from(&share))
         .collect();
 
     Ok(shares)
