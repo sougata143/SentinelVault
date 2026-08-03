@@ -42,7 +42,10 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   let app: INestApplication;
   let userRepository: UserRepository;
 
-  const username = 'test_user';
+  function getUniqueUser(prefix = 'user'): string {
+    return `${prefix}_${crypto.randomBytes(6).toString('hex')}`;
+  }
+
   const password = 'super_secure_master_password_derived_key'; // represented as derived master key bytes
 
   // SRP-6a Client math simulator for integration tests
@@ -120,7 +123,9 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   }, 30000);
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   }, 30000);
 
   beforeEach(async () => {
@@ -138,6 +143,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   });
 
   it('register -> login successfully (SRP-6a mutual auth)', async () => {
+    const username = getUniqueUser('srp');
     const saltBytes = crypto.randomBytes(16);
     const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -194,6 +200,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   });
 
   it('TOTP MFA flow: setup -> enable -> mfa login verification', async () => {
+    const username = getUniqueUser('totp');
     const saltBytes = crypto.randomBytes(16);
     const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -299,6 +306,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   });
 
   it('WebAuthn MFA flow: register -> login flow', async () => {
+    const username = getUniqueUser('webauthn');
     const saltBytes = crypto.randomBytes(16);
     const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -388,6 +396,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   });
 
   it('login with wrong password rejected', async () => {
+    const username = getUniqueUser('wrong_pass');
     const saltBytes = crypto.randomBytes(16);
     const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -438,6 +447,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   });
 
   it('account lockout after 5 failed attempts', async () => {
+    const username = getUniqueUser('lockout');
     const saltBytes = crypto.randomBytes(16);
     const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -502,6 +512,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
 
   describe('Primary Passkey Authentication Tests', () => {
     it('register passkey -> primary login options -> verify login successfully', async () => {
+      const username = getUniqueUser('passkey_reg');
       const saltBytes = crypto.randomBytes(16);
       const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -564,6 +575,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
     });
 
     it('rejects primary passkey login when assertion is invalid/tampered', async () => {
+      const username = getUniqueUser('passkey_rej');
       const saltBytes = crypto.randomBytes(16);
       const regParams = await computeClientRegister(username, password, saltBytes);
 
@@ -630,6 +642,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
     });
 
     it('usernameless passkey login options and verification works', async () => {
+      const username = getUniqueUser('passkey_anon');
       const saltBytes = crypto.randomBytes(16);
       const regParams = await computeClientRegister(username, password, saltBytes);
 

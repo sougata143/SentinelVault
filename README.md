@@ -68,7 +68,7 @@ A cross-platform Flutter application providing:
 A platform-agnostic Dart package managing local databases (SQLite), the Dart-side crypto interface (delegating to the native Rust core), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`, sync client).
 
 ### 3. Native Crypto Core (`native/crypto_core/`)
-A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir''s Secret Sharing, and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
+A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secret Sharing (via `blahaj` — an audited GF(256) SSS implementation that resolves RUSTSEC-2024-0398), and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
 
 ### 4. Backend Services (`backend/`)
 - **auth-service** (`:3001`): Account authentication via SRP-6a (zero-knowledge), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Issues HS256 JWTs with 24 h expiry. TypeORM-backed Postgres persistence for user records — verified to survive service restarts.
@@ -239,11 +239,17 @@ done
 ```
 
 ### CI Pipeline
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and `develop`:
-- **flutter-analyze**: `flutter analyze` on both `app/` and `core/` — must report zero issues
-- **flutter-test**: `flutter test` on `app/`
-- **core-tests**: `dart test` on `core/`
-- **backend-test**: Full Jest suites for all four NestJS services; Postgres 16 + Redis 7 service containers are spun up automatically in CI matching the local `docker-compose.yml` configuration
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR to `main` and `develop`. All matrix jobs use `fail-fast: false` so a single-leg failure does not cancel sibling legs.
+
+| Job | What it does |
+|---|---|
+| **flutter-checks** | `flutter analyze` + `flutter test` on `app/` and `core/`; runs `osv-scanner` for Dart SCA |
+| **rust-crypto-test** | Three matrix legs (`aarch64-apple-ios`, `aarch64-linux-android`, `wasm32-unknown-unknown`): `cargo clippy`, `cargo test`, `cargo build --release`, and `cargo audit` |
+| **backend-integration** | Full Jest suites for all NestJS microservices in parallel via matrix; Postgres 15 + Redis 7 service containers provisioned automatically |
+| **sonarqube-analysis** | SonarQube Cloud static analysis via `sonarsource/sonarqube-scan-action@v6` |
+| **codeql-security** | GitHub CodeQL semantic analysis |
+
+Action versions: `actions/checkout@v5`, `actions/setup-java@v5`, `actions/setup-node@v5`, `actions/cache@v5`, `sonarsource/sonarqube-scan-action@v6`.
 
 ---
 
@@ -257,7 +263,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and `de
 - **Independent Lock vs. Logout**: Lock clears key material from memory but preserves the session; Logout clears both.
 - **Biometric Quick-Unlock & OS-Backed Secure Storage**: `flutter_secure_storage` for session tokens; the biometric-cached Vault Key is protected via a non-exportable, biometric-required hardware key (Secure Enclave on iOS via `kSecAccessControlBiometryCurrentSet`, Android Keystore with `setUserAuthenticationRequired(true)` and StrongBox where available). Devices lacking hardware-backed secure storage have quick-unlock disabled automatically; new biometric enrollment invalidates the cache and falls back to manual Master Password entry. Not offered on Web, which has no equivalent hardware to back it.
 - **Emergency Kit Recovery Key**: Offline-first recovery via dual key-wrapping — a client-side-generated recovery key derives a second wrapping key for the Vault Key, persisted as ciphertext via the sync API. Regenerating invalidates prior recovery keys.
-- **Shamir''s Secret Sharing Recovery (M-of-N)**: The Emergency Kit recovery key can additionally be split into N shares (threshold M, range 3–10) via an audited GF(256) SSS implementation in the native Rust core, for distributed recovery across trusted contacts.
+- **Shamir's Secret Sharing Recovery (M-of-N)**: The Emergency Kit recovery key can additionally be split into N shares (threshold M, range 3–10) via the `blahaj` crate — an audited GF(256) Shamir Secret Sharing implementation in the native Rust core that addresses RUSTSEC-2024-0398 (polynomial coefficient bias present in the predecessor `sharks` crate), used for distributed recovery across trusted contacts.
 - **FIDO2/WebAuthn Passkey Authentication**: Standard WebAuthn registration/login for the Account Password, supporting platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (YubiKey via USB/NFC/BLE).
 - **Hardware Key Vault-Unlock**: Opt-in additional Vault Key wrapping via the FIDO2 CTAP2 `hmac-secret` extension, with Master Password fallback always available if the key is lost or removed.
 - **Duress / Decoy Vault**: Independent Vault Alpha (real) and Vault Beta (decoy) with a visually and timing-indistinguishable unlock flow. Decoy unlock fires a native hook that invalidates the real vault''s biometric cache only — never touching its encrypted data — plus an explicit in-app disclosure of the feature''s actual limitations.

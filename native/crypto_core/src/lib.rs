@@ -24,8 +24,12 @@ fn secure_copy(ptr: *const u8, len: usize) -> SecureBuffer {
 // =========================================================================
 
 // 1. Argon2id Key Derivation
+/// # Safety
+///
+/// Caller must ensure `password_ptr` is valid for `password_len` bytes, `salt_ptr` is valid
+/// for `salt_len` bytes, and `output_ptr` points to a writable buffer of at least 32 bytes.
 #[no_mangle]
-pub extern "C" fn derive_master_key(
+pub unsafe extern "C" fn derive_master_key(
     password_ptr: *const u8,
     password_len: usize,
     salt_ptr: *const u8,
@@ -55,8 +59,13 @@ pub extern "C" fn derive_master_key(
 }
 
 // 2. AES-256-GCM Encrypt
+/// # Safety
+///
+/// Caller must ensure `key_ptr` is valid for `key_len` bytes (must be 32), `nonce_ptr` is valid
+/// for `nonce_len` bytes (must be 12), `plaintext_ptr` is valid for `plaintext_len` bytes, and
+/// `output_ptr` points to a writable buffer of at least `plaintext_len + 16` bytes.
 #[no_mangle]
-pub extern "C" fn encrypt_aes_gcm(
+pub unsafe extern "C" fn encrypt_aes_gcm(
     key_ptr: *const u8,
     key_len: usize,
     nonce_ptr: *const u8,
@@ -100,8 +109,13 @@ pub const FFI_ERR_INVALID_LENGTH: i32 = -2;
 pub const FFI_ERR_CRYPTO_FAILURE: i32 = -3;
 
 // 3. AES-256-GCM Decrypt
+/// # Safety
+///
+/// Caller must ensure `key_ptr` is valid for `key_len` bytes (must be 32), `nonce_ptr` is valid
+/// for `nonce_len` bytes (must be 12), `ciphertext_ptr` is valid for `ciphertext_len` bytes, and
+/// `output_ptr` points to a writable buffer of at least `ciphertext_len - 16` bytes.
 #[no_mangle]
-pub extern "C" fn decrypt_aes_gcm(
+pub unsafe extern "C" fn decrypt_aes_gcm(
     key_ptr: *const u8,
     key_len: usize,
     nonce_ptr: *const u8,
@@ -136,8 +150,13 @@ pub extern "C" fn decrypt_aes_gcm(
 }
 
 // 4. SRP Calculate X
+/// # Safety
+///
+/// Caller must ensure `username_ptr` points to valid UTF-8 of length `username_len`, `master_key_ptr`
+/// is valid for `master_key_len` bytes, `salt_ptr` is valid for `salt_len` bytes, and `output_ptr`
+/// points to a writable buffer of at least 32 bytes.
 #[no_mangle]
-pub extern "C" fn srp_calculate_x(
+pub unsafe extern "C" fn srp_calculate_x(
     username_ptr: *const u8,
     username_len: usize,
     master_key_ptr: *const u8,
@@ -170,8 +189,13 @@ pub extern "C" fn srp_calculate_x(
 }
 
 // 5. SRP Calculate Verifier
+/// # Safety
+///
+/// Caller must ensure `username_ptr` points to valid UTF-8 of length `username_len`, `master_key_ptr`
+/// is valid for `master_key_len` bytes, `salt_ptr` is valid for `salt_len` bytes, and `output_ptr`
+/// points to a writable buffer of at least 256 bytes.
 #[no_mangle]
-pub extern "C" fn srp_calculate_verifier(
+pub unsafe extern "C" fn srp_calculate_verifier(
     username_ptr: *const u8,
     username_len: usize,
     master_key_ptr: *const u8,
@@ -204,8 +228,12 @@ pub extern "C" fn srp_calculate_verifier(
 }
 
 // 6. SRP Generate Ephemeral (A)
+/// # Safety
+///
+/// Caller must ensure `a_bytes_ptr` is valid for `a_bytes_len` bytes, `secret_output_ptr` points
+/// to a writable buffer of at least 256 bytes, and `public_output_ptr` points to a writable buffer of at least 256 bytes.
 #[no_mangle]
-pub extern "C" fn srp_generate_client_ephemeral(
+pub unsafe extern "C" fn srp_generate_client_ephemeral(
     a_bytes_ptr: *const u8,
     a_bytes_len: usize,
     secret_output_ptr: *mut u8, // pre-allocated 256 bytes
@@ -231,8 +259,12 @@ pub extern "C" fn srp_generate_client_ephemeral(
 }
 
 // 7. SRP Calculate Session
+/// # Safety
+///
+/// Caller must ensure all pointer arguments point to valid memory buffers of their specified
+/// lengths and output buffers are sufficiently allocated (32 bytes each for session key and evidence).
 #[no_mangle]
-pub extern "C" fn srp_calculate_client_session(
+pub unsafe extern "C" fn srp_calculate_client_session(
     username_ptr: *const u8,
     username_len: usize,
     salt_ptr: *const u8,
@@ -365,7 +397,7 @@ pub fn wasm_srp_calculate_client_session(
         &a_pub,
         &b_pub,
         master_key,
-    ).map_err(|e| JsValue::from_str(e))?;
+    ).map_err(JsValue::from_str)?;
     
     let mut out = Vec::with_capacity(96);
     out.extend_from_slice(&session_key);
@@ -385,7 +417,7 @@ pub fn wasm_srp_calculate_client_session(
 #[wasm_bindgen(js_name = "wasmShamirSplit")]
 pub fn wasm_shamir_split(secret: &[u8], m: u8, n: u8) -> Result<Vec<u8>, JsValue> {
     let shares = shamir::split_secret(secret, m, n)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        .map_err(JsValue::from_str)?;
 
     // Flatten into length-prefixed wire format (same as FFI)
     let mut buf: Vec<u8> = Vec::new();
@@ -422,7 +454,7 @@ pub fn wasm_shamir_combine(flat_shares: &[u8]) -> Result<Vec<u8>, JsValue> {
     }
 
     shamir::combine_shares(&share_blobs)
-        .map_err(|e| JsValue::from_str(&e.to_string()))
+        .map_err(JsValue::from_str)
 }
 
 // ==========================================================================
@@ -552,8 +584,13 @@ pub fn wasm_pqc_verify_invitation(
 //  -1  null pointer
 //  -2  invalid m/n parameters or output too small
 //  -3  internal split error
+// 8. Shamir's Secret Sharing — Split
+/// # Safety
+///
+/// Caller must ensure `secret_ptr` is valid for `secret_len` bytes, `output_ptr` points to a writable
+/// buffer of capacity `output_capacity`, and `written_ptr` is a valid pointer to receive the byte count.
 #[no_mangle]
-pub extern "C" fn shamir_split(
+pub unsafe extern "C" fn shamir_split(
     secret_ptr: *const u8,
     secret_len: usize,
     m: u8,
@@ -593,21 +630,13 @@ pub extern "C" fn shamir_split(
     0
 }
 
-// ==========================================================================
-// 8. Shamir's Secret Sharing — Combine
-// ==========================================================================
-//
-// Input wire format matches the output of shamir_split exactly:
-//   [4 bytes LE u32: share_0_len] [share_0_len bytes: share_0] ...
-//
-// Output: reconstructed secret written to output_ptr.
-//
-// Returns 0 on success:
-//  -1  null pointer
-//  -2  malformed input buffer
-//  -3  reconstruction failed (wrong shares / tampered)
+// 9. Shamir's Secret Sharing — Combine
+/// # Safety
+///
+/// Caller must ensure `shares_ptr` is valid for `shares_total_len` bytes, `output_ptr` points to a writable
+/// buffer of capacity `output_capacity`, and `written_ptr` is a valid pointer to receive the byte count.
 #[no_mangle]
-pub extern "C" fn shamir_combine(
+pub unsafe extern "C" fn shamir_combine(
     shares_ptr: *const u8,
     shares_total_len: usize,
     output_ptr: *mut u8,
@@ -654,26 +683,13 @@ pub extern "C" fn shamir_combine(
     }
 }
 
-// ==========================================================================
-// 9. PQC Hybrid — Generate Keypairs
-// ==========================================================================
-//
-// Generates classical (X25519/Ed25519) + post-quantum (ML-KEM-768/ML-DSA-65)
-// keypairs and writes them into a caller-provided output buffer.
-//
-// Wire layout (all contiguous):
-//   [32]  x25519_pub
-//   [32]  x25519_priv
-//   [32]  ed25519_pub
-//   [32]  ed25519_priv (seed)
-//   [4 LE u32] mlkem_ek_len  + [bytes] mlkem_ek   (1184 bytes)
-//   [4 LE u32] mlkem_dk_len  + [bytes] mlkem_dk   (2400 bytes)
-//   [4 LE u32] mldsa_vk_len  + [bytes] mldsa_vk   (1952 bytes)
-//   [4 LE u32] mldsa_seed_len + [bytes] mldsa_seed (32 bytes)
-//
-// Pre-allocate >= 5728 bytes. Returns 0 on success, -1 null, -2 too small.
+// 10. PQC Hybrid — Generate Keypairs
+/// # Safety
+///
+/// Caller must ensure `output_ptr` points to a writable buffer of capacity `output_capacity`
+/// (at least 5728 bytes) and `written_ptr` is a valid pointer to receive the byte count.
 #[no_mangle]
-pub extern "C" fn pqc_generate_keypairs(
+pub unsafe extern "C" fn pqc_generate_keypairs(
     output_ptr:      *mut u8,
     output_capacity: usize,
     written_ptr:     *mut usize,
@@ -700,19 +716,13 @@ pub extern "C" fn pqc_generate_keypairs(
     0
 }
 
-// ==========================================================================
-// 10. PQC Hybrid — Wrap (Encapsulate) Folder Key
-// ==========================================================================
-//
-// Output wire layout:
-//   [32]  ephemeral X25519 pub key
-//   [4 LE u32] kem_ct_len + [bytes] ML-KEM ciphertext  (1088 bytes)
-//   [12]  AES-GCM nonce
-//   [4 LE u32] wrapped_len + [bytes] AES-GCM ciphertext+tag (48 bytes)
-//
-// Returns 0 on success, -1 null, -2 buffer too small, -3 crypto error.
+// 11. PQC Hybrid — Wrap (Encapsulate) Folder Key
+/// # Safety
+///
+/// Caller must ensure all input pointer arguments are valid for their specified lengths, `output_ptr`
+/// points to a writable buffer of capacity `output_capacity`, and `written_ptr` receives the byte count.
 #[no_mangle]
-pub extern "C" fn pqc_hybrid_wrap(
+pub unsafe extern "C" fn pqc_hybrid_wrap(
     recipient_x25519_pub_ptr: *const u8,
     recipient_mlkem_ek_ptr:   *const u8,
     recipient_mlkem_ek_len:   usize,
@@ -753,14 +763,13 @@ pub extern "C" fn pqc_hybrid_wrap(
     }
 }
 
-// ==========================================================================
-// 11. PQC Hybrid — Unwrap (Decapsulate) Folder Key
-// ==========================================================================
-//
-// Returns 0 on success writing 32 plaintext Folder Key bytes to output_ptr.
-// Returns -1 null, -2 bad argument size, -3 crypto/AEAD failure.
+// 12. PQC Hybrid — Unwrap (Decapsulate) Folder Key
+/// # Safety
+///
+/// Caller must ensure all input pointer arguments are valid for their specified lengths and `output_ptr`
+/// points to a writable buffer of at least 32 bytes for the plaintext folder key.
 #[no_mangle]
-pub extern "C" fn pqc_hybrid_unwrap(
+pub unsafe extern "C" fn pqc_hybrid_unwrap(
     recipient_x25519_priv_ptr: *const u8,
     recipient_mlkem_dk_ptr:    *const u8,
     recipient_mlkem_dk_len:    usize,
@@ -801,17 +810,13 @@ pub extern "C" fn pqc_hybrid_unwrap(
     }
 }
 
-// ==========================================================================
-// 12. PQC Hybrid — Sign Invitation
-// ==========================================================================
-//
-// Output wire layout:
-//   [4 LE u32] ed_sig_len  + [bytes] Ed25519 signature   (64 bytes)
-//   [4 LE u32] dsa_sig_len + [bytes] ML-DSA-65 signature (3309 bytes)
-//
-// Returns 0 on success, -1 null, -2 buffer too small, -3 crypto error.
+// 13. PQC Hybrid — Sign Invitation
+/// # Safety
+///
+/// Caller must ensure `payload_ptr`, `ed25519_priv_ptr`, and `mldsa_seed_ptr` are valid for their respective
+/// lengths, `output_ptr` points to a writable buffer of capacity `output_capacity`, and `written_ptr` receives the byte count.
 #[no_mangle]
-pub extern "C" fn pqc_sign_invitation(
+pub unsafe extern "C" fn pqc_sign_invitation(
     payload_ptr:      *const u8,
     payload_len:      usize,
     ed25519_priv_ptr: *const u8,
@@ -848,14 +853,13 @@ pub extern "C" fn pqc_sign_invitation(
     }
 }
 
-// ==========================================================================
-// 13. PQC Hybrid — Verify Invitation
-// ==========================================================================
-//
-// Returns 1 if both signatures verify, 0 if either fails,
-// -1 on null pointer, -3 on parsing/crypto error.
+// 14. PQC Hybrid — Verify Invitation
+/// # Safety
+///
+/// Caller must ensure all pointer arguments (`payload_ptr`, `ed25519_pub_ptr`, `mldsa_vk_ptr`,
+/// `ed25519_sig_ptr`, `mldsa_sig_ptr`) are valid for their specified byte lengths.
 #[no_mangle]
-pub extern "C" fn pqc_verify_invitation(
+pub unsafe extern "C" fn pqc_verify_invitation(
     payload_ptr:     *const u8,
     payload_len:     usize,
     ed25519_pub_ptr: *const u8,

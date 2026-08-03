@@ -101,7 +101,7 @@ pub fn calculate_x(username: &str, master_key: &[u8], salt: &[u8]) -> BigUint {
 
     let mut hasher = Sha256::new();
     hasher.update(salt);
-    hasher.update(&inner_hash);
+    hasher.update(inner_hash);
     let outer_hash = hasher.finalize();
     BigUint::from_bytes_be(&outer_hash)
 }
@@ -122,6 +122,8 @@ pub fn generate_client_ephemeral(a_bytes: &[u8]) -> (BigUint, BigUint) {
     (a, a_pub)
 }
 
+pub type ClientSessionKeys = (Vec<u8>, Vec<u8>, Vec<u8>);
+
 pub fn calculate_client_session(
     username: &str,
     salt: &[u8],
@@ -129,7 +131,7 @@ pub fn calculate_client_session(
     a_pub: &BigUint,
     b_pub: &BigUint,
     master_key: &[u8],
-) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), &'static str> {
+) -> Result<ClientSessionKeys, &'static str> {
     let n = get_n();
     if b_pub % &n == BigUint::from(0u32) {
         return Err("Server ephemeral B cannot be 0 mod N");
@@ -172,11 +174,11 @@ pub fn calculate_client_session(
 
     // M1 = H(H(N) ^ H(g), H(username), salt, A, B, sessionKey)
     let mut hasher = Sha256::new();
-    hasher.update(&biguint_to_bytes_padded(&n, 256));
+    hasher.update(biguint_to_bytes_padded(&n, 256));
     let hn = hasher.finalize();
 
     let mut hasher = Sha256::new();
-    hasher.update(&biguint_to_bytes_padded(&get_g(), 256));
+    hasher.update(biguint_to_bytes_padded(&get_g(), 256));
     let hg = hasher.finalize();
 
     let mut h_xor = vec![0u8; 32];
@@ -190,7 +192,7 @@ pub fn calculate_client_session(
 
     let mut hasher = Sha256::new();
     hasher.update(&h_xor);
-    hasher.update(&hu);
+    hasher.update(hu);
     hasher.update(salt);
     hasher.update(&a_bytes);
     hasher.update(&b_bytes);

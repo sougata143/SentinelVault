@@ -5,6 +5,8 @@ import { UserRepository } from '../src/auth/user.repository';
 import { User } from '../src/auth/entities/user.entity';
 import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
 
+import * as crypto from 'crypto';
+
 describe('UserRepository Database Persistence', () => {
   let appModule: TestingModule;
   let repository: UserRepository;
@@ -18,7 +20,6 @@ describe('UserRepository Database Persistence', () => {
 
     repository = appModule.get<UserRepository>(UserRepository);
     dataSource = appModule.get<DataSource>(DataSource);
-    await repository.clear();
   }, 30000);
 
   afterEach(async () => {
@@ -28,7 +29,7 @@ describe('UserRepository Database Persistence', () => {
   }, 30000);
 
   it('should persist a user across UserRepository instance restarts', async () => {
-    const testUsername = 'persist_test_user';
+    const testUsername = 'persist_user_' + crypto.randomBytes(6).toString('hex');
     const testRecord = {
       username: testUsername,
       salt: 'salt_hex_123',
