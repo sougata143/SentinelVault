@@ -170,6 +170,7 @@ jobs:
     name: Rust Crypto Core - ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-ios
@@ -219,7 +220,10 @@ jobs:
 
       - name: Install cargo-audit
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: cargo install cargo-audit --locked
+        run: |
+          if ! command -v cargo-audit &>/dev/null; then
+            cargo install cargo-audit --locked
+          fi
 
       - name: SCA — cargo audit
         if: matrix.target == 'wasm32-unknown-unknown'
