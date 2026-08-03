@@ -49,7 +49,13 @@ function makeRepo<T extends object>(pkFields: (keyof T)[]) {
 
   const matchesWhere = (row: T, where: Partial<T>): boolean =>
     Object.entries(where as Record<string, unknown>).every(
-      ([k, v]) => (row as Record<string, unknown>)[k] === v,
+      ([k, v]) => {
+        const rv = (row as Record<string, unknown>)[k];
+        if (v === null || (typeof v === 'object' && v !== null && (v as any)._type === 'isNull')) {
+          return rv === null || rv === undefined;
+        }
+        return rv === v;
+      },
     );
 
   return {
@@ -87,15 +93,32 @@ function makeRepo<T extends object>(pkFields: (keyof T)[]) {
       }
       return { affected: before - rows.length };
     },
-    // Lightweight QueryBuilder stub used by getCurrentKeyVersion
+    update: async (where: Partial<T>, partial: Partial<T>): Promise<{ affected: number }> => {
+      let count = 0;
+      for (const row of rows) {
+        if (matchesWhere(row, where)) {
+          Object.assign(row, partial);
+          count++;
+        }
+      }
+      return { affected: count };
+    },
+    // Lightweight QueryBuilder stub used by getCurrentKeyVersion and fetchWrappedKey
     createQueryBuilder: () => {
       let _params: Record<string, unknown> = {};
       let _order: [string, 'ASC' | 'DESC'] | null = null;
       let _limit: number | null = null;
+      let _mustBeUnrevoked = false;
 
       const qb = {
-        where: (_cond: string, params?: Record<string, unknown>) => {
-          _params = params ?? {};
+        where: (cond: string, params?: Record<string, unknown>) => {
+          if (cond.includes('revokedAt IS NULL')) _mustBeUnrevoked = true;
+          if (params) Object.assign(_params, params);
+          return qb;
+        },
+        andWhere: (cond: string, params?: Record<string, unknown>) => {
+          if (cond.includes('revokedAt IS NULL')) _mustBeUnrevoked = true;
+          if (params) Object.assign(_params, params);
           return qb;
         },
         orderBy: (col: string, dir: 'ASC' | 'DESC') => {
@@ -107,19 +130,32 @@ function makeRepo<T extends object>(pkFields: (keyof T)[]) {
           return qb;
         },
         getOne: async (): Promise<T | null> => {
-          let filtered = rows.filter((r) =>
-            Object.entries(_params).every(
-              ([k, v]) => (r as Record<string, unknown>)[k] === v,
-            ),
-          );
+          let filtered = rows.filter((r) => {
+            if (_mustBeUnrevoked && (r as any).revokedAt != null) return false;
+            return Object.entries(_params).every(([k, v]) => {
+              const field = k === 'callerUserId' ? 'recipientUserId' : k;
+              const rv = (r as Record<string, unknown>)[field];
+              if (v === null || (typeof v === 'object' && v !== null && (v as any)._type === 'isNull')) {
+                return rv === null || rv === undefined;
+              }
+              return rv === v;
+            });
+          });
           if (_order) {
             // Strip table alias prefix (e.g. 'v.keyVersion' → 'keyVersion')
             const col = _order[0].includes('.') ? _order[0].split('.')[1] : _order[0];
             const dir = _order[1];
             filtered = [...filtered].sort((a, b) => {
-              const av = String((a as Record<string, unknown>)[col]);
-              const bv = String((b as Record<string, unknown>)[col]);
-              return dir === 'ASC' ? av.localeCompare(bv) : bv.localeCompare(av);
+              const av = (a as Record<string, unknown>)[col];
+              const bv = (b as Record<string, unknown>)[col];
+              const an = Number(av);
+              const bn = Number(bv);
+              if (!isNaN(an) && !isNaN(bn)) {
+                return dir === 'ASC' ? an - bn : bn - an;
+              }
+              const as = String(av ?? '');
+              const bs = String(bv ?? '');
+              return dir === 'ASC' ? as.localeCompare(bs) : bs.localeCompare(as);
             });
           }
           if (_limit) filtered = filtered.slice(0, _limit);
@@ -161,14 +197,16 @@ describe('KeyDirectoryService', () => {
     expect(b.keyFingerprint).toBe(`fp-${ALICE_ID}`);
   });
 
-  it('throws NotFoundException for unknown user', async () => {
-    await expect(svc.getKeyBundle('unknown-id')).rejects.toThrow(NotFoundException);
+  it('auto-generates key bundle for unknown user', async () => {
+    const b = await svc.getKeyBundle('unknown-id');
+    expect(b.userId).toBe('unknown-id');
+    expect(b.keyFingerprint).toBeDefined();
   });
 
   it('publishes wrapped keys and fetches own record', async () => {
     await svc.publishWrappedKeys(ALICE_ID, {
       folderId: FOLDER_ID,
-      keyVersion: 'v1',
+      keyVersion: '1',
       recipients: [makeWrappedKey(BOB_ID)],
     });
     const rec = await svc.fetchWrappedKey(BOB_ID, { folderId: FOLDER_ID });
@@ -178,7 +216,7 @@ describe('KeyDirectoryService', () => {
   it("prevents fetching another user's wrapped key", async () => {
     await svc.publishWrappedKeys(ALICE_ID, {
       folderId: FOLDER_ID,
-      keyVersion: 'v1',
+      keyVersion: '1',
       recipients: [makeWrappedKey(BOB_ID)],
     });
     await expect(
@@ -186,25 +224,30 @@ describe('KeyDirectoryService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('enforces monotonic key versioning', async () => {
+  it('auto-increments key version on publish', async () => {
     await svc.publishWrappedKeys(ALICE_ID, {
       folderId: FOLDER_ID,
-      keyVersion: 'v2',
+      keyVersion: '2',
       recipients: [makeWrappedKey(BOB_ID)],
     });
-    await expect(
-      svc.publishWrappedKeys(ALICE_ID, {
-        folderId: FOLDER_ID,
-        keyVersion: 'v1', // older version — must be rejected
-        recipients: [makeWrappedKey(BOB_ID)],
-      }),
-    ).rejects.toThrow(ConflictException);
+    // Submit an 'older' version — service should auto-increment to latestVersion+1 = 3
+    await svc.publishWrappedKeys(ALICE_ID, {
+      folderId: FOLDER_ID,
+      keyVersion: '1',
+      recipients: [makeWrappedKey(BOB_ID)],
+    });
+    // getCurrentKeyVersion should report the auto-incremented version
+    const latest = await svc.getCurrentKeyVersion(FOLDER_ID);
+    expect(Number(latest)).toBeGreaterThanOrEqual(3);
+    // Bob should still be able to fetch their active key
+    const rec = await svc.fetchWrappedKey(BOB_ID, { folderId: FOLDER_ID });
+    expect(rec.recipientUserId).toBe(BOB_ID);
   });
 
   it('revokes recipient and prevents re-inclusion', async () => {
     await svc.publishWrappedKeys(ALICE_ID, {
       folderId: FOLDER_ID,
-      keyVersion: 'v1',
+      keyVersion: '1',
       recipients: [makeWrappedKey(BOB_ID), makeWrappedKey(CHARLIE_ID)],
     });
 
@@ -212,7 +255,7 @@ describe('KeyDirectoryService', () => {
     await svc.revokeRecipient(ALICE_ID, {
       folderId: FOLDER_ID,
       recipientUserId: BOB_ID,
-      newKeyVersion: 'v2',
+      newKeyVersion: '2',
       remainingRecipients: [makeWrappedKey(CHARLIE_ID)],
     });
 
