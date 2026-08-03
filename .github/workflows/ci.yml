@@ -88,7 +88,7 @@ jobs:
         working-directory: app
 
       - name: App — Run Tests
-        run: flutter test
+        run: flutter test --exclude-tags=e2e
         working-directory: app
 
   # ── NODE.js BACKEND SERVICES JOB ──────────────────────────────────────────

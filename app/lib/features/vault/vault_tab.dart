@@ -62,13 +62,6 @@ class _VaultTabState extends State<VaultTab> {
   }
 
   Future<void> _loadItems() async {
-    try {
-      await PqcSharingService.syncSharedFoldersWithMe();
-      if (VaultSyncManager.isInitialized) {
-        await VaultSyncManager.instance.sync();
-      }
-    } catch (_) {}
-
     final encItems = widget.db.getAllItems();
     final List<VaultItem> decrypted = [];
 
@@ -95,8 +88,19 @@ class _VaultTabState extends State<VaultTab> {
       if (folderDecrypted) continue;
     }
 
-    setState(() {
-      _decryptedItems = decrypted;
+    if (mounted) {
+      setState(() {
+        _decryptedItems = decrypted;
+      });
+    }
+
+    try {
+      await PqcSharingService.syncSharedFoldersWithMe();
+      if (VaultSyncManager.isInitialized) {
+        await VaultSyncManager.instance.sync();
+      }
+    } catch (_) {}
+  }
       
       // Select the first item by default on desktop if list is not empty
       if (_selectedItem != null) {
