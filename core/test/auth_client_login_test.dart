@@ -33,7 +33,7 @@ void main() {
           A = BigInt.parse(body['A'] as String, radix: 16);
 
           final saltHex = salt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-          final bHex = B.toRadixString(16);
+          final bHex = SrpClient.bigIntToBytesPadded(B, 256).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
           return http.Response(
             json.encode({
@@ -55,7 +55,7 @@ void main() {
             m1[i] = int.parse(m1Hex.substring(i * 2, i * 2 + 2), radix: 16);
           }
 
-          // Server derives shared session secret S
+          // Server derives shared session secret S = (A * v^u)^b mod N
           final aBytes = SrpClient.bigIntToBytesPadded(A, 256);
           final bBytes = SrpClient.bigIntToBytesPadded(B, 256);
           final uInput = Uint8List(aBytes.length + bBytes.length);
@@ -64,21 +64,25 @@ void main() {
           final uHash = await SrpClient.sha256Hash(uInput);
           final u = SrpClient.bytesToBigInt(uHash);
 
-          // S = (A * v^u) ^ b mod N
           final vu = verifier.modPow(u, SrpClient.N);
           final base = (A * vu) % SrpClient.N;
           final S = base.modPow(b, SrpClient.N);
           final sBytes = SrpClient.bigIntToBytesPadded(S, 256);
           final sessionKey = await SrpClient.sha256Hash(sBytes);
 
-          // Server calculates server proof M2 = H(A, M1, sessionKey)
+          final m1Input = Uint8List(256 + 256 + 32);
+          m1Input.setRange(0, 256, aBytes);
+          m1Input.setRange(256, 512, bBytes);
+          m1Input.setRange(512, 544, sessionKey);
+          final clientEv = await SrpClient.sha256Hash(m1Input);
+
           final m2Input = Uint8List(256 + 32 + 32);
           m2Input.setRange(0, 256, aBytes);
-          m2Input.setRange(256, 256 + 32, m1);
-          m2Input.setRange(256 + 32, m2Input.length, sessionKey);
-          final m2Bytes = await SrpClient.sha256Hash(m2Input);
+          m2Input.setRange(256, 288, clientEv);
+          m2Input.setRange(288, 320, sessionKey);
+          final serverEv = await SrpClient.sha256Hash(m2Input);
 
-          final serverEvidenceHex = m2Bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+          final serverEvidenceHex = serverEv.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
           return http.Response(
             json.encode({

@@ -73,6 +73,35 @@ class _ShamirRecoveryReconstructScreenState extends State<ShamirRecoveryReconstr
       return;
     }
 
+    // Parse first share and validate threshold before making any network call.
+    // This is a pure-Dart check and should fail fast without touching the server.
+    Uint8List firstPacket;
+    try {
+      firstPacket = _parseBase32(shares[0]);
+    } catch (_) {
+      setState(() {
+        _isReconstructing = false;
+        _errorMessage = 'Share 1 is invalid or could not be parsed.';
+      });
+      return;
+    }
+    if (firstPacket.length != 41) {
+      setState(() {
+        _isReconstructing = false;
+        _errorMessage = 'First share is invalid or has wrong length.';
+      });
+      return;
+    }
+    final expectedThreshold = firstPacket[16];
+    if (shares.length < expectedThreshold) {
+      setState(() {
+        _isReconstructing = false;
+        _errorMessage = 'You need at least $expectedThreshold valid shares to reconstruct the key. '
+            'Currently provided: ${shares.length}.';
+      });
+      return;
+    }
+
     try {
       final syncClient = HttpSyncApiClient(
         baseUrl: widget.syncBaseUrl,
@@ -92,20 +121,8 @@ class _ShamirRecoveryReconstructScreenState extends State<ShamirRecoveryReconstr
       // Convert server recovery salt hex back to uuid epoch format for checking
       final serverEpochId = _hexToUuid(serverSaltHex);
 
-      // Parse first share to check metadata
+      // Parse first share to check metadata (already parsed above — reuse packet)
       final shamir = ShamirRecovery();
-
-      // Check first share for threshold
-      final firstPacket = _parseBase32(shares[0]);
-      if (firstPacket.length != 41) {
-        throw Exception('First share is invalid or has wrong length.');
-      }
-      final expectedThreshold = firstPacket[16];
-
-      if (shares.length < expectedThreshold) {
-        throw Exception('You need at least $expectedThreshold valid shares to reconstruct the key. '
-            'Currently provided: ${shares.length}.');
-      }
 
       // Check epochs of all shares against server epoch
       for (var i = 0; i < shares.length; i++) {
@@ -166,10 +183,12 @@ class _ShamirRecoveryReconstructScreenState extends State<ShamirRecoveryReconstr
         );
       }
     } catch (e) {
-      setState(() {
-        _isReconstructing = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      });
+      if (mounted) {
+        setState(() {
+          _isReconstructing = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     }
   }
 

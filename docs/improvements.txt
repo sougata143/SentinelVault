@@ -1,0 +1,5 @@
+I have observed few things:
+
+1.  For importing from nordpass exported csv file it's importing them all but the field values are not coming properly. Also need to check for other password manager's export formats.
+2.  Not able to login to previously registered users test-a and test-b.
+3.  PQC share vault item is removed from other user to whom the item was not shared but also not visible to the user to whom the item was actually shared.

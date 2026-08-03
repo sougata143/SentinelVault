@@ -117,8 +117,14 @@ void main() {
       await tester.enterText(find.byType(TextFormField).at(3), '123'); // CVV
       await tester.enterText(find.byType(TextFormField).at(4), '5566'); // PIN
 
-      // Verify dropdown for Billing Address contains the prepopulated Identity item
+      // Wait for _loadIdentities to complete (async crypto decryption)
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Verify dropdown for Billing Address contains the prepopulated Identity item.
+      // The Billing Link card may be below the viewport; scroll into view first.
       final dropdownFinder = find.byKey(const Key('cc-billing-address-dropdown'));
+      await tester.scrollUntilVisible(dropdownFinder, 100.0, scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
       await tester.tap(dropdownFinder);
       await tester.pumpAndSettle();
 
