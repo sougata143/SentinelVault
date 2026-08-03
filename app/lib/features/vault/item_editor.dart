@@ -363,8 +363,13 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     );
 
     List<int> encryptionKey = widget.vaultKey;
-    if (targetVaultId.isNotEmpty && PqcSharingService.unwrappedFolderKeys.containsKey(targetVaultId)) {
-      encryptionKey = PqcSharingService.unwrappedFolderKeys[targetVaultId]!;
+    if (targetVaultId.isNotEmpty) {
+      if (PqcSharingService.unwrappedFolderKeys.containsKey(targetVaultId)) {
+        encryptionKey = PqcSharingService.unwrappedFolderKeys[targetVaultId]!;
+      } else {
+        encryptionKey = deriveFolderKey(widget.vaultKey, targetVaultId);
+        PqcSharingService.unwrappedFolderKeys[targetVaultId] = Uint8List.fromList(encryptionKey);
+      }
     }
 
     final encryptedItem = await item.encrypt(encryptionKey, _crypto);

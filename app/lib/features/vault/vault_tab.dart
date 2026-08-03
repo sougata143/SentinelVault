@@ -389,6 +389,7 @@ class _VaultTabState extends State<VaultTab> {
             Expanded(
               child: ItemDetailPane(
                 item: _selectedItem,
+                vaultKey: widget.vaultKey,
                 onEdit: _selectedItem == null ? null : () => _openItemEditor(_selectedItem),
                 onDelete: _selectedItem == null ? null : () => _deleteItem(_selectedItem!.id),
               ),
@@ -769,6 +770,7 @@ class _VaultTabState extends State<VaultTab> {
                                     appBar: AppBar(),
                                     body: ItemDetailPane(
                                       item: item,
+                                      vaultKey: widget.vaultKey,
                                       onEdit: () => _openItemEditor(item),
                                       onDelete: () => _deleteItem(item.id),
                                     ),

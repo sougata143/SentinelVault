@@ -2,6 +2,7 @@
 library core.models;
 
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 export 'vault_item.dart';
@@ -76,4 +77,12 @@ String getFolderUuid(String folderId) {
   final digest = sha256.convert(bytes).bytes;
   final hex = digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-4${hex.substring(13, 16)}-a${hex.substring(17, 20)}-${hex.substring(20, 32)}';
+}
+
+/// Derives a deterministic 32-byte Folder Key from masterVaultKey and folderId using HMAC-SHA256.
+Uint8List deriveFolderKey(List<int> masterVaultKey, String folderId) {
+  final targetUuid = getFolderUuid(folderId);
+  final hmac = Hmac(sha256, masterVaultKey);
+  final digest = hmac.convert(utf8.encode('sentinelvault_folder_key_$targetUuid'));
+  return Uint8List.fromList(digest.bytes);
 }

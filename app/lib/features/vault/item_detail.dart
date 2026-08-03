@@ -8,12 +8,14 @@ import 'sharing/sharing_screen.dart';
 
 class ItemDetailPane extends StatefulWidget {
   final VaultItem? item;
+  final List<int>? vaultKey;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
 
   const ItemDetailPane({
     super.key,
     required this.item,
+    this.vaultKey,
     this.onDelete,
     this.onEdit,
   });
@@ -103,12 +105,17 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
           IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.teal),
             onPressed: () {
+              final targetId = item.vaultId.isNotEmpty ? item.vaultId : item.id;
+              final folderKey = (widget.vaultKey != null && widget.vaultKey!.isNotEmpty)
+                  ? deriveFolderKey(widget.vaultKey!, targetId)
+                  : Uint8List.fromList(List.generate(32, (i) => i));
+
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => SharingScreen(
-                    folderId: item.vaultId.isNotEmpty ? item.vaultId : item.id,
+                    folderId: targetId,
                     folderName: item.vaultId.isNotEmpty ? item.vaultId : item.title,
-                    currentFolderKey: Uint8List.fromList(List.generate(32, (i) => i)),
+                    currentFolderKey: folderKey,
                     senderUserId: 'current-user-alice',
                   ),
                 ),
