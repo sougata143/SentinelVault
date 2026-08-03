@@ -29,13 +29,26 @@ export class SyncService {
    */
   public async pull(userId: string): Promise<EncryptedVaultItemDto[]> {
     const normalizedUserId = userId.toLowerCase();
+    let userUuid = normalizedUserId;
 
-    // Query active shared folders for recipient
+    try {
+      if (normalizedUserId.includes('@')) {
+        const userRows = await this.vaultItemRepository.manager.query(
+          `SELECT id FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $1 LIMIT 1`,
+          [normalizedUserId],
+        );
+        if (Array.isArray(userRows) && userRows.length > 0 && userRows[0].id) {
+          userUuid = userRows[0].id.toLowerCase();
+        }
+      }
+    } catch (_) {}
+
+    // Query active shared folders for recipient (checking both email and UUID)
     let sharedFolderIds: string[] = [];
     try {
       const recipientShares = await this.vaultItemRepository.manager.query(
-        `SELECT "folderId" FROM wrapped_key_recipients WHERE "recipientUserId"::text = $1 AND "revokedAt" IS NULL`,
-        [normalizedUserId],
+        `SELECT "folderId" FROM wrapped_key_recipients WHERE ("recipientUserId"::text = $1 OR "recipientUserId"::text = $2) AND "revokedAt" IS NULL`,
+        [normalizedUserId, userUuid],
       );
       if (Array.isArray(recipientShares)) {
         sharedFolderIds = recipientShares.map((r: any) => r.folderId).filter(Boolean);
@@ -44,19 +57,17 @@ export class SyncService {
       // Table may not exist in minimal unit test setups
     }
 
-    let items: EncryptedVaultItem[];
+    const whereConditions: Array<Record<string, any>> = [
+      { userId: normalizedUserId },
+      { userId: userUuid },
+    ];
     if (sharedFolderIds.length > 0) {
-      items = await this.vaultItemRepository.find({
-        where: [
-          { userId: normalizedUserId },
-          { folderId: In(sharedFolderIds) },
-        ],
-      });
-    } else {
-      items = await this.vaultItemRepository.find({
-        where: { userId: normalizedUserId },
-      });
+      whereConditions.push({ folderId: In(sharedFolderIds) });
     }
+
+    const items = await this.vaultItemRepository.find({
+      where: whereConditions,
+    });
 
     return items.map((item: EncryptedVaultItem) => ({
       id: item.id,

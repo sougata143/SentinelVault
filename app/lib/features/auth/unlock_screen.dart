@@ -300,12 +300,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
           httpClient: widget.httpClient,
         ),
       );
-      await VaultSyncManager.instance.sync();
-
       // Ensure PQC key bundle exists and is published to Key Directory
-      unawaited(PqcSharingService.ensureKeysPublished(widget.email));
-      // Sync any PQC folders shared with this user
-      unawaited(PqcSharingService.syncSharedFoldersWithMe());
+      await PqcSharingService.ensureKeysPublished(widget.email);
+      // Sync any PQC folders shared with this user (unwraps shared folder keys)
+      await PqcSharingService.syncSharedFoldersWithMe();
+      // Perform initial remote sync pull (fetches shared folder items)
+      await VaultSyncManager.instance.sync();
 
       navigated = true;
       if (mounted) {
