@@ -906,6 +906,7 @@ class VaultItem {
       nonce: base64.encode(outerNonce),
       version: 1,
       updatedAt: updatedAt,
+      folderId: vaultId.isNotEmpty ? vaultId : null,
     );
   }
 

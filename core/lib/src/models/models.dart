@@ -17,6 +17,8 @@ class EncryptedVaultItem {
   final DateTime updatedAt;
   /// Flag indicating if the item is soft-deleted.
   final bool isDeleted;
+  /// Optional folder / vault ID this item belongs to.
+  final String? folderId;
 
   /// Creates a new instance of [EncryptedVaultItem].
   ///
@@ -29,6 +31,7 @@ class EncryptedVaultItem {
     required this.version,
     required this.updatedAt,
     this.isDeleted = false,
+    this.folderId,
   });
 
   /// Factory constructor to parse a vault item from JSON.
@@ -40,6 +43,7 @@ class EncryptedVaultItem {
       version: json['version'] as int,
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       isDeleted: json['isDeleted'] as bool? ?? false,
+      folderId: json['folderId'] as String?,
     );
   }
 
@@ -52,6 +56,7 @@ class EncryptedVaultItem {
       'version': version,
       'updatedAt': updatedAt.toIso8601String(),
       'isDeleted': isDeleted,
+      if (folderId != null) 'folderId': folderId,
     };
   }
 }
