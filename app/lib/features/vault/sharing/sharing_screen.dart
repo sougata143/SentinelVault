@@ -213,7 +213,7 @@ Uint8List safeBase64Decode(String input) {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
-      final targetFolderId = getFolderUuid(widget.folderId);
+      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
       final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
 
       int nextVersion = 1;
@@ -318,7 +318,7 @@ Uint8List safeBase64Decode(String input) {
     setState(() => _loading = true);
     try {
       final token = await _storage.read(key: 'session_token') ?? '';
-      final targetFolderId = getFolderUuid(widget.folderId);
+      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
 
       // 1. Generate new cryptographically independent Folder Key
       final newFolderKey = Uint8List.fromList(List.generate(32, (i) => i ^ 0xAA));
