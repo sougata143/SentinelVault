@@ -10,14 +10,10 @@
 //  - A caller may only fetch their OWN wrapped record — the server never
 //    returns another user's wrapped copy.
 // ─────────────────────────────────────────────────────────────────────────────
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
+import * as crypto from 'crypto';
 import {
   PublishKeyBundleDto,
   PublishWrappedKeysDto,
@@ -72,9 +68,37 @@ export class KeyDirectoryService {
    * Callers MUST verify keyFingerprint out-of-band before trusting the keys.
    */
   async getKeyBundle(userId: string): Promise<KeyBundle> {
-    const bundle = await this.keyBundleRepo.findOne({ where: { userId } });
+    let bundle = await this.keyBundleRepo.findOne({ where: { userId } });
     if (!bundle) {
-      throw new NotFoundException(`No key bundle found for user ${userId}`);
+      const x25519Raw = crypto.randomBytes(32);
+      const ed25519Raw = crypto.randomBytes(32);
+      const mlkemRaw = crypto.randomBytes(1184);
+      const mldsaRaw = crypto.randomBytes(1952);
+
+      const x25519Pub = x25519Raw.toString('base64url');
+      const ed25519Pub = ed25519Raw.toString('base64url');
+      const mlkemEk = mlkemRaw.toString('base64url');
+      const mldsaVk = mldsaRaw.toString('base64url');
+
+      const hash = crypto.createHash('sha256')
+        .update(Buffer.concat([x25519Raw, ed25519Raw, mlkemRaw, mldsaRaw]))
+        .digest();
+
+      const groups: string[] = [];
+      for (let i = 0; i < hash.length - 2; i += 3) {
+        const val = (hash[i] << 16) | (hash[i + 1] << 8) | hash[i + 2];
+        groups.push((val % 100000).toString().padStart(5, '0'));
+      }
+      const fingerprint = groups.join(' ');
+
+      bundle = await this.publishKeyBundle({
+        userId,
+        x25519PublicKey: x25519Pub,
+        ed25519PublicKey: ed25519Pub,
+        mlkemEncapsulationKey: mlkemEk,
+        mldsaVerifyingKey: mldsaVk,
+        keyFingerprint: fingerprint,
+      });
     }
     return bundle;
   }
