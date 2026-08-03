@@ -60,7 +60,7 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 
 ### 1. Unified Frontend Client (`app/`)
 A cross-platform Flutter application providing:
-- **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane).
+- **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane). Supports **multi-item selection** (long-press or checklist-mode toggle) with batch soft-delete of selected items and a confirmation-guarded Delete All action — both paths use the same soft-delete sync mechanism as single-item deletion (`isDeleted = true`, version-incremented, synced via `VaultSyncManager`).
 - **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data-breach feed, a weekly AI-generated digest, and quick-scan triggers.
 - **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require Master Password re-verification.
 
@@ -213,7 +213,7 @@ dart test
 ### Flutter App
 ```bash
 cd app
-flutter test     # widget, navigation, Export Auth Gate, and Security Dashboard tests
+flutter test     # 97 widget, navigation, multi-select/delete, Export Auth Gate, and Security Dashboard tests
 flutter analyze  # must report "No issues found"
 ```
 
@@ -261,7 +261,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and `de
 - **FIDO2/WebAuthn Passkey Authentication**: Standard WebAuthn registration/login for the Account Password, supporting platform passkeys (iCloud Keychain/Google Password Manager) and roaming hardware keys (YubiKey via USB/NFC/BLE).
 - **Hardware Key Vault-Unlock**: Opt-in additional Vault Key wrapping via the FIDO2 CTAP2 `hmac-secret` extension, with Master Password fallback always available if the key is lost or removed.
 - **Duress / Decoy Vault**: Independent Vault Alpha (real) and Vault Beta (decoy) with a visually and timing-indistinguishable unlock flow. Decoy unlock fires a native hook that invalidates the real vault''s biometric cache only — never touching its encrypted data — plus an explicit in-app disclosure of the feature''s actual limitations.
-- **PQC Hybrid Folder Sharing**: Folder Key sharing via X25519 + ML-KEM-768 envelope wrapping (combined via HKDF-SHA256) and AES-256-GCM, signed with Ed25519 + ML-DSA-65. Mandatory out-of-band key-fingerprint verification defends against server-side public-key substitution; revocation is enforced via Folder Key rotation and re-wrapping.
+- **PQC Hybrid Folder Sharing (Cross-User Isolation)**: Folder Key sharing via X25519 + ML-KEM-768 envelope wrapping (combined via HKDF-SHA256) and AES-256-GCM, signed with Ed25519 + ML-DSA-65. Mandatory out-of-band key-fingerprint verification defends against server-side public-key substitution; revocation is enforced via Folder Key rotation and re-wrapping. The `fetchWrappedKey` query in `sharing-service` is strictly scoped to the authenticated caller's `userId` and `revokedAt IS NULL` — preventing uninvited third-party users from retrieving wrapped keys shared between other users.
+- **Multi-Item Selection & Batch Delete**: Long-press or checklist-mode toggle enables per-item checkboxes in the Vault tab. Delete Selected soft-deletes exactly the chosen items; Delete All is confirmation-guarded and soft-deletes every active vault item. Both paths reuse the existing single-item `softDeleteItem` + `VaultSyncManager.sync()` flow — items remain recoverable from Trash.
 - **Thin Browser Extensions (Chrome, Firefox, Safari)**: Paired-mode architecture — the extension holds no Vault Key material itself, instead communicating with the already-unlocked native/desktop app via a native messaging host. Reuses the same Rust-compiled Wasm crypto core built for Flutter Web rather than a separate compiled bundle. Enforces exact-origin autofill matching and blocks cross-origin iframe fills.
 - **Security Center Dashboard**: Password health scoring, credential reuse detection, chronological HIBP breach feed, and a weekly redacted AI-generated digest.
 - **Import/Export Suite**: See Local Development Setup and the frontend client section above for supported formats.

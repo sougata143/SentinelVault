@@ -37,6 +37,10 @@ class _VaultTabState extends State<VaultTab> {
   VaultItem? _selectedItem;
   StreamSubscription<SyncStatus>? _syncSubscription;
 
+  // Multi-selection state
+  bool _isSelectionMode = false;
+  final Set<String> _selectedItemIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +87,148 @@ class _VaultTabState extends State<VaultTab> {
         }
       }
     });
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedItemIds.clear();
+      }
+    });
+  }
+
+  void _toggleItemSelection(String itemId) {
+    setState(() {
+      if (_selectedItemIds.contains(itemId)) {
+        _selectedItemIds.remove(itemId);
+      } else {
+        _selectedItemIds.add(itemId);
+      }
+    });
+  }
+
+  void _selectAll(List<VaultItem> currentItems) {
+    setState(() {
+      if (_selectedItemIds.length == currentItems.length) {
+        _selectedItemIds.clear();
+      } else {
+        _selectedItemIds.addAll(currentItems.map((it) => it.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedItems() async {
+    if (_selectedItemIds.isEmpty) return;
+
+    final count = _selectedItemIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const Key('confirm-delete-selected-dialog'),
+        backgroundColor: AppTheme.surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        title: Text('Delete $count Items?'),
+        content: Text('Are you sure you want to soft-delete $count selected item${count > 1 ? 's' : ''}? They can be restored from Trash.'),
+        actions: [
+          TextButton(
+            key: const Key('cancel-delete-selected-button'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
+          ),
+          ElevatedButton(
+            key: const Key('confirm-delete-selected-button'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    for (final id in _selectedItemIds.toList()) {
+      widget.db.softDeleteItem(id);
+    }
+
+    setState(() {
+      _selectedItemIds.clear();
+      _isSelectionMode = false;
+      _selectedItem = null;
+    });
+
+    await _loadItems();
+
+    if (VaultSyncManager.isInitialized) {
+      VaultSyncManager.instance.sync();
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$count item${count > 1 ? 's' : ''} deleted locally')),
+      );
+    }
+  }
+
+  Future<void> _deleteAllItems() async {
+    final allEncryptedItems = widget.db.getAllItems().where((it) => !it.isDeleted).toList();
+    if (allEncryptedItems.isEmpty) return;
+
+    final count = allEncryptedItems.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const Key('confirm-delete-all-dialog'),
+        backgroundColor: AppTheme.surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        title: const Text('Delete All Vault Items?'),
+        content: Text('Are you sure you want to soft-delete all $count item${count > 1 ? 's' : ''} currently in your vault? They can be restored from Trash.'),
+        actions: [
+          TextButton(
+            key: const Key('cancel-delete-all-button'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
+          ),
+          ElevatedButton(
+            key: const Key('confirm-delete-all-button'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, foregroundColor: Colors.white),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    for (final item in allEncryptedItems) {
+      widget.db.softDeleteItem(item.id);
+    }
+
+    setState(() {
+      _selectedItemIds.clear();
+      _isSelectionMode = false;
+      _selectedItem = null;
+    });
+
+    await _loadItems();
+
+    if (VaultSyncManager.isInitialized) {
+      VaultSyncManager.instance.sync();
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All vault items deleted locally')),
+      );
+    }
   }
 
   List<VaultItem> _getFilteredAndSortedItems() {
@@ -414,7 +560,7 @@ class _VaultTabState extends State<VaultTab> {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // Search & Sort bar
+          // Search & Sort & Selection Mode Toggle Bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -430,26 +576,116 @@ class _VaultTabState extends State<VaultTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    DropdownButton<String>(
-                      value: _sortBy,
-                      dropdownColor: AppTheme.surfaceColor,
-                      items: const [
-                        DropdownMenuItem(value: 'title', child: Text('Sort by Title', style: TextStyle(fontSize: 12))),
-                        DropdownMenuItem(value: 'updated', child: Text('Sort by Date', style: TextStyle(fontSize: 12))),
+                    Row(
+                      children: [
+                        DropdownButton<String>(
+                          value: _sortBy,
+                          dropdownColor: AppTheme.surfaceColor,
+                          items: const [
+                            DropdownMenuItem(value: 'title', child: Text('Sort by Title', style: TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'updated', child: Text('Sort by Date', style: TextStyle(fontSize: 12))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _sortBy = val);
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
+                          onPressed: () => setState(() => _ascending = !_ascending),
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _sortBy = val);
-                      },
                     ),
-                    IconButton(
-                      icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward, size: 16),
-                      onPressed: () => setState(() => _ascending = !_ascending),
+                    Row(
+                      children: [
+                        IconButton(
+                          key: const Key('toggle-selection-mode-button'),
+                          tooltip: _isSelectionMode ? 'Cancel Selection' : 'Select Items',
+                          icon: Icon(
+                            _isSelectionMode ? Icons.close : Icons.checklist,
+                            color: _isSelectionMode ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
+                            size: 20,
+                          ),
+                          onPressed: _toggleSelectionMode,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
           ),
+
+          // Multi-Selection Action Header Bar
+          if (_isSelectionMode)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${_selectedItemIds.length} Selected',
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    key: const Key('select-all-button'),
+                    onPressed: () => _selectAll(items),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      _selectedItemIds.length == items.length && items.isNotEmpty
+                          ? 'Deselect All'
+                          : 'Select All',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const Key('delete-selected-button'),
+                    tooltip: 'Delete Selected',
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: _selectedItemIds.isNotEmpty ? AppTheme.errorColor : AppTheme.textSecondaryColor.withValues(alpha: 0.5),
+                      size: 20,
+                    ),
+                    onPressed: _selectedItemIds.isNotEmpty ? _deleteSelectedItems : null,
+                  ),
+                  IconButton(
+                    key: const Key('delete-all-button'),
+                    tooltip: 'Delete All Items',
+                    icon: const Icon(
+                      Icons.delete_forever_outlined,
+                      color: AppTheme.errorColor,
+                      size: 20,
+                    ),
+                    onPressed: _deleteAllItems,
+                  ),
+                  IconButton(
+                    key: const Key('cancel-selection-button'),
+                    tooltip: 'Exit Selection',
+                    icon: const Icon(
+                      Icons.cancel_outlined,
+                      color: AppTheme.textSecondaryColor,
+                      size: 18,
+                    ),
+                    onPressed: _toggleSelectionMode,
+                  ),
+                ],
+              ),
+            ),
 
           // Items list
           Expanded(
@@ -460,24 +696,49 @@ class _VaultTabState extends State<VaultTab> {
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      final isSelected = _selectedItem?.id == item.id;
+                      final isFocused = _selectedItem?.id == item.id;
+                      final isChecked = _selectedItemIds.contains(item.id);
                       
                       return Card(
-                        color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.12) : AppTheme.surfaceColor,
+                        color: (isChecked || isFocused)
+                            ? AppTheme.primaryColor.withValues(alpha: 0.12)
+                            : AppTheme.surfaceColor,
                         margin: const EdgeInsets.only(bottom: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: isSelected ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.05),
-                            width: isSelected ? 1.5 : 1.0,
+                            color: (isChecked || isFocused) ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.05),
+                            width: (isChecked || isFocused) ? 1.5 : 1.0,
                           ),
                         ),
                         child: ListTile(
+                          leading: _isSelectionMode
+                              ? Checkbox(
+                                  key: Key('select-item-checkbox-${item.id}'),
+                                  value: isChecked,
+                                  activeColor: AppTheme.primaryColor,
+                                  onChanged: (_) => _toggleItemSelection(item.id),
+                                )
+                              : null,
                           title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                           subtitle: Text(item.type.toValue().toUpperCase(), style: const TextStyle(fontSize: 11, color: AppTheme.textSecondaryColor)),
-                          trailing: const Icon(Icons.chevron_right, size: 16, color: AppTheme.textSecondaryColor),
+                          trailing: _isSelectionMode
+                              ? null
+                              : const Icon(Icons.chevron_right, size: 16, color: AppTheme.textSecondaryColor),
+                          onLongPress: () {
+                            if (!_isSelectionMode) {
+                              setState(() {
+                                _isSelectionMode = true;
+                                _selectedItemIds.add(item.id);
+                              });
+                            } else {
+                              _toggleItemSelection(item.id);
+                            }
+                          },
                           onTap: () {
-                            if (isMobile) {
+                            if (_isSelectionMode) {
+                              _toggleItemSelection(item.id);
+                            } else if (isMobile) {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => Scaffold(
