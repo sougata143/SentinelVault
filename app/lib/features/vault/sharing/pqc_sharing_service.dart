@@ -95,8 +95,8 @@ class PqcSharingService {
       final mlkemDkStr = await _storage.read(key: 'pqc_mlkem_dk');
       if (x25519PrivStr == null || mlkemDkStr == null) return [];
 
-      final x25519Priv = base64Url.decode(x25519PrivStr);
-      final mlkemDk = base64Url.decode(mlkemDkStr);
+      final x25519Priv = _safeBase64Decode(x25519PrivStr);
+      final mlkemDk = _safeBase64Decode(mlkemDkStr);
 
       final res = await http.get(
         Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/my-shares'),
