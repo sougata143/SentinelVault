@@ -14,12 +14,8 @@ num-bigint = "0.4.4"
 num-traits = "0.2.19"
 zeroize = { version = "1.7.0", features = ["derive"] }
 rand = "0.8.5"
-# Shamir's Secret Sharing over GF(256). Uses rand_chacha for polynomial coefficients
-# and includes zeroize_memory to clear intermediate share data.
-# NOTE: `sharks` v0.5.0 has not received a formal third-party security audit as of
-# 2026-07. Evaluate vsss-rs if a published audit report becomes available before
-# this feature ships to production.
-sharks = { version = "0.5.0", features = ["zeroize_memory"] }
+# Shamir's Secret Sharing over GF(256). Uses `blahaj` (fixed fork of `sharks` resolving RUSTSEC-2024-0398).
+sharks = { package = "blahaj", version = "0.5.1", features = ["zeroize_memory"] }
 wasm-bindgen = { version = "0.2", optional = true }
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
