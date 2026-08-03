@@ -275,9 +275,9 @@ SentinelVault uses a hybrid classical (X25519) + post-quantum (ML-KEM-768) zero-
 
 ### How PQC Zero-Knowledge Folder Sharing Works
 1. **PQC Public Key Bundle Registration**: Each user generates and publishes their X25519, Ed25519, ML-KEM-768, and ML-DSA-65 public key bundle to `sharing-service` (`POST /key-directory/keys`).
-2. **Deterministic Folder Key Derivation**: Every folder (e.g. `nvskjndvs` or `sdvdlvkndl`) is assigned a deterministic 36-character PostgreSQL UUID via `getFolderUuid(folderName)`.
+2. **Deterministic Folder Key Derivation**: Every folder (e.g. `work-passwords`, `family-vault`, `nvskjndvs`, or **any custom string input by the user**) is automatically converted into a deterministic 36-character PostgreSQL UUID via `getFolderUuid(folderName)`. There are **zero hardcoded values** — users can input any folder string they choose.
 3. **PQC Hybrid Key Wrapping**: The sender unwraps/generates a 32-byte Folder Key, wraps it using the recipient's ML-KEM-768 encapsulation key + X25519 ephemeral key, signs it with ML-DSA-65 + Ed25519, and posts the wrapped key record to `sharing-service` (`POST /key-directory/wrapped-keys`).
-4. **Shared Item Encryption**: Items created inside or assigned to a shared folder are encrypted on the client using the **Shared Folder Key** (cached in `PqcSharingService.unwrappedFolderKeys`).
+4. **Shared Item Encryption**: Items created inside or assigned to a shared folder are encrypted on the client using the **Shared Folder Key** (derived via HMAC-SHA256 from the master vault key and cached in `PqcSharingService.unwrappedFolderKeys`).
 5. **Recipient Sync & Unwrapping**: Upon recipient login, `PqcSharingService.syncSharedFoldersWithMe()` fetches `GET /key-directory/my-shares`, unwraps the Folder Key using ML-KEM-768 decapsulation key + X25519 private key, and `sync-api` returns all shared folder items for local decryption.
 
 ---
@@ -294,14 +294,14 @@ TRUNCATE TABLE encrypted_vault_items CASCADE;
 
 #### Step 2: Launch Application
 - Ensure Docker containers are running (`sentinelvault-db`, `sentinelvault-sharing`, `sentinelvault-sync`, `sentinelvault-auth`).
-- Start Flutter web:
+- Start Flutter web (using `web-server` to avoid debug timeouts):
   ```bash
   cd app
-  flutter run -d chrome --web-port=8080
+  flutter run -d web-server --web-port=8080
   ```
 
 #### Step 3: Register / Login as Sender (`test-a@sentinelvault.local`)
-1. Open `http://localhost:8080`.
+1. Open `http://localhost:8080` in Chrome.
 2. Log in (or register) as **`test-a@sentinelvault.local`** (Password: `TestAccountPassword123!`).
 3. Unlock the vault using Master Password **`TestMasterPassword456!`**.
 4. The client automatically generates and publishes `test-a@sentinelvault.local`'s PQC public key bundle to `sharing-service`.
@@ -313,15 +313,15 @@ TRUNCATE TABLE encrypted_vault_items CASCADE;
    - **Username**: `sougata_shared`
    - **Password**: `SecretPqcPass123!`
 3. Scroll down to **Organization & Notes**.
-4. In **Folder / Shared Section Name or ID**, enter **`nvskjndvs`** (or `sdvdlvkndl`).
+4. In **Folder / Shared Section Name or ID**, enter **ANY custom folder name** (e.g. `work-passwords`, `my-shared-folder`, `nvskjndvs`, etc.).
 5. Click **Save Item** (`✓`).
-   *(The item is encrypted under the shared folder key and saved with `folderId = e5bcd118-4fa3-41cc-a414-b431022c4697`).*
+   *(The item is encrypted under the shared folder key derived for that folder name).*
 
 #### Step 5: Invite Recipient (`test-b@sentinelvault.local`)
-1. Click the **Sharing** icon on the left sidebar (or open folder sharing for `nvskjndvs`).
+1. Open **Sharing** for that item or folder.
 2. Under **Invite user by email**, type **`test-b@sentinelvault.local`** and click **Add Recipient**.
 3. Verify and confirm the Safety Number / Key Fingerprint dialog.
-   *(The PQC wrapped Folder Key is published to `sharing-service` under `folderId = e5bcd118-4fa3-41cc-a414-b431022c4697`).*
+   *(The PQC wrapped Folder Key is published to `sharing-service` under the folder's deterministic UUID).*
 
 #### Step 6: Log Out
 1. Click **Logout** in the left sidebar to clear memory keys and session token.
