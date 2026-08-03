@@ -42,4 +42,10 @@ impl SecureBuffer {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    /// Returns true if the secure buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
+

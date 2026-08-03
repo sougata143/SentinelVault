@@ -44,6 +44,14 @@ use ml_dsa::{
 //  Key Generation
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Type alias for the 8-element tuple returned by `generate_keypairs`.
+pub type GeneratedKeyBundle = (
+    [u8; 32], [u8; 32],   // X25519  pub, priv
+    [u8; 32], [u8; 32],   // Ed25519 pub, priv (seed)
+    Vec<u8>,  Vec<u8>,    // ML-KEM-768 ek, dk
+    Vec<u8>,  Vec<u8>,    // ML-DSA-65  vk, sk-seed
+);
+
 /// Generates a full key-bundle: classical (X25519/Ed25519) + post-quantum
 /// (ML-KEM-768/ML-DSA-65) keypairs.
 ///
@@ -56,12 +64,7 @@ use ml_dsa::{
 ///   compact representation unambiguous and avoids leaking expanded key material.
 /// - All private material must be placed in secure OS key-storage and must
 ///   never be logged, printed, or transmitted to any server.
-pub fn generate_keypairs() -> (
-    [u8; 32], [u8; 32],   // X25519  pub, priv
-    [u8; 32], [u8; 32],   // Ed25519 pub, priv (seed)
-    Vec<u8>,  Vec<u8>,    // ML-KEM-768 ek, dk
-    Vec<u8>,  Vec<u8>,    // ML-DSA-65  vk, sk-seed
-) {
+pub fn generate_keypairs() -> GeneratedKeyBundle {
     let mut rng = OsRng;
 
     // 1. Classical – X25519
@@ -107,6 +110,14 @@ pub fn generate_keypairs() -> (
 //  Hybrid Wrap (Encapsulate)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Type alias for the tuple returned on successful `hybrid_encapsulate`.
+pub type HybridEncapsulationResult = (
+    [u8; 32],  // ephemeral X25519 public key
+    Vec<u8>,   // ML-KEM-768 ciphertext
+    [u8; 12],  // AES-GCM nonce (unique per wrap)
+    Vec<u8>,   // AES-256-GCM ciphertext+tag wrapping the Folder Key
+);
+
 /// Wraps a 32-byte Folder Key using the hybrid X25519 + ML-KEM-768 construction
 /// defined in docs/PQC_SHARING_DESIGN.md §3.
 ///
@@ -121,15 +132,7 @@ pub fn hybrid_encapsulate(
     recipient_x25519_pub: &[u8; 32],
     recipient_mlkem_pub:  &[u8],      // serialised EncapsulationKey bytes
     folder_key:           &[u8; 32],
-) -> Result<
-    (
-        [u8; 32],  // ephemeral X25519 public key
-        Vec<u8>,   // ML-KEM-768 ciphertext
-        [u8; 12],  // AES-GCM nonce (unique per wrap)
-        Vec<u8>,   // AES-256-GCM ciphertext+tag wrapping the Folder Key
-    ),
-    String,
-> {
+) -> Result<HybridEncapsulationResult, String> {
     let mut rng = OsRng;
 
     // Step 1 – Classical ECDH

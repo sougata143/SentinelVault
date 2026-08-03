@@ -16,7 +16,7 @@ impl NativeSecureBuffer {
     pub fn new(len: usize) -> Self {
         unsafe {
             let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
-            let num_data_pages = (len + page_size - 1) / page_size;
+            let num_data_pages = len.div_ceil(page_size);
             let total_size = (num_data_pages + 2) * page_size;
 
             let mut base_ptr: *mut libc::c_void = ptr::null_mut();
@@ -74,6 +74,10 @@ impl NativeSecureBuffer {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 

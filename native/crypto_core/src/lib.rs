@@ -365,7 +365,7 @@ pub fn wasm_srp_calculate_client_session(
         &a_pub,
         &b_pub,
         master_key,
-    ).map_err(|e| JsValue::from_str(e))?;
+    ).map_err(JsValue::from_str)?;
     
     let mut out = Vec::with_capacity(96);
     out.extend_from_slice(&session_key);

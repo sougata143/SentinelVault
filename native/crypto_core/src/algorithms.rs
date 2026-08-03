@@ -122,6 +122,8 @@ pub fn generate_client_ephemeral(a_bytes: &[u8]) -> (BigUint, BigUint) {
     (a, a_pub)
 }
 
+pub type ClientSessionKeys = (Vec<u8>, Vec<u8>, Vec<u8>);
+
 pub fn calculate_client_session(
     username: &str,
     salt: &[u8],
@@ -129,7 +131,7 @@ pub fn calculate_client_session(
     a_pub: &BigUint,
     b_pub: &BigUint,
     master_key: &[u8],
-) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), &'static str> {
+) -> Result<ClientSessionKeys, &'static str> {
     let n = get_n();
     if b_pub % &n == BigUint::from(0u32) {
         return Err("Server ephemeral B cannot be 0 mod N");
