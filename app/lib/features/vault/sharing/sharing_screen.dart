@@ -256,6 +256,8 @@ Uint8List safeBase64Decode(String input) {
         throw Exception('Failed to publish wrapped key: HTTP ${pubWrappedRes.statusCode}');
       }
 
+      PqcSharingService.unwrappedFolderKeys[targetFolderId] = Uint8List.fromList(widget.currentFolderKey);
+
       if (!mounted) return;
 
       _emailController.clear();
