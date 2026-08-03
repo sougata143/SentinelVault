@@ -64,6 +64,9 @@ class _VaultTabState extends State<VaultTab> {
   Future<void> _loadItems() async {
     try {
       await PqcSharingService.syncSharedFoldersWithMe();
+      if (VaultSyncManager.isInitialized) {
+        await VaultSyncManager.instance.sync();
+      }
     } catch (_) {}
 
     final encItems = widget.db.getAllItems();
@@ -253,7 +256,10 @@ class _VaultTabState extends State<VaultTab> {
     // 1. Filter by category
     var items = _decryptedItems.where((item) {
       if (_selectedCategory == 'shared') {
-        return item.tags.contains('shared') || item.id == 'shared-folder-item-pqc';
+        return item.tags.contains('shared') || 
+               item.id == 'shared-folder-item-pqc' || 
+               PqcSharingService.unwrappedFolderKeys.containsKey(item.vaultId) ||
+               (item.vaultId.isNotEmpty && item.vaultId != 'main');
       }
       if (_selectedCategory == 'favorites') {
         return item.favorite;
