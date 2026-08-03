@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -8,45 +10,87 @@ import 'package:app/features/auth/unlock_screen.dart';
 import 'package:app/features/settings/duress_setup_screen.dart';
 
 // ---------------------------------------------------------------------------
+// Pre-computed test fixtures (derived once via test/scratch_derive_keys.dart
+// with Argon2id memory=1024, iterations=1).
+//
+// Passwords used:
+//   masterPassword  = 'MasterP@ssw0rd!'
+//   duressPassword  = 'Duress@123secret'
+// ---------------------------------------------------------------------------
+
+List<int> _fromHex(String hex) {
+  final len = hex.length ~/ 2;
+  return List.generate(
+      len, (i) => int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16));
+}
+
+const _alphaSaltHex     = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _betaSaltHex      = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const _alphaVaultKeyHex = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+const _betaVaultKeyHex  = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+const _alphaWrappedHex  = '4403f17b405d6d970c5d60eba5f02f8f12e05f2c0ad67df07b91d43bf5d315fb7d6f558d9263e9f904aff5f95af3167febb98bce58d8532fb893e57d';
+const _betaWrappedHex   = '924e6957922c5b926c0c39b431a4a6ed1e007a90ff9fd5db6de888f538011897892ac7d960a7aeff10d99af02aba35fabf12b6b39539a66ba908dcf1';
+const _alphaMasterKeyHex = '3cc086df393d23170947cd6be88ba74c0542b490fd54fcc65cf2f8a55c2ab0d7';
+// Duress KDF key (derived from duressPassword + betaSalt)
+const _duressKdfKeyHex  = '3c2a3215f484b3fa35b0e9cdec63c416040a6b6c38ef309aacd7042bf770db11';
+
+const _masterPassword = 'MasterP@ssw0rd!';
+const _duressPassword  = 'Duress@123secret';
+
+// ---------------------------------------------------------------------------
+// FakeVaultCrypto: returns pre-computed values instantly, bypassing Argon2id.
+// Only KDF methods are overridden; all other methods delegate to real crypto.
+// ---------------------------------------------------------------------------
+class FakeVaultCrypto extends VaultCrypto {
+  final Map<String, List<int>> _kdfOverrides;
+
+  FakeVaultCrypto(this._kdfOverrides);
+
+  /// Returns the pre-computed master key if the password matches, otherwise
+  /// delegates to the real (slow) implementation.
+  @override
+  Future<List<int>> deriveMasterKey({
+    required String masterPassword,
+    required List<int> salt,
+  }) async {
+    final key = '${masterPassword}_${_toHex(salt)}';
+    return _kdfOverrides[key] ?? super.deriveMasterKey(masterPassword: masterPassword, salt: salt);
+  }
+
+  /// Returns the pre-computed recovery KDF key if the key+salt matches.
+  @override
+  Future<List<int>> deriveRecoveryKdfKey({
+    required String recoveryKey,
+    required List<int> salt,
+  }) async {
+    final key = '${recoveryKey}_${_toHex(salt)}';
+    return _kdfOverrides[key] ?? super.deriveRecoveryKdfKey(recoveryKey: recoveryKey, salt: salt);
+  }
+
+  static String _toHex(List<int> bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 void main() {
   group('Duress / Decoy Vault UI Tests', () {
-    late VaultCrypto crypto;
-    late List<int> alphaVaultKey;
-    late List<int> betaVaultKey;
-    late List<int> alphaSalt;     // simulates sync-server salt
-    late List<int> betaSalt;      // stored locally for duress
-    late List<int> alphaWrapped;  // wrapped under master password KDF
-    late List<int> betaWrapped;   // wrapped under duress password KDF
+    // Pre-decode all fixture values — zero KDF computation
+    final alphaSalt      = _fromHex(_alphaSaltHex);
+    final betaSalt       = _fromHex(_betaSaltHex);
+    final alphaVaultKey  = _fromHex(_alphaVaultKeyHex);
+    final alphaMasterKey = _fromHex(_alphaMasterKeyHex);
+    final duressKdfKey   = _fromHex(_duressKdfKeyHex);
 
-    const masterPassword = 'MasterP@ssw0rd!';
-    const duressPassword = 'Duress@123secret';
+    // Build a FakeVaultCrypto that maps password+salt → pre-computed key
+    late FakeVaultCrypto fakeCrypto;
 
-    setUpAll(() async {
-      crypto = VaultCrypto();
-      alphaSalt = crypto.generateRandomBytes(16);
-      betaSalt = crypto.generateRandomBytes(16);
-      alphaVaultKey = crypto.generateRandomBytes(32);
-      betaVaultKey = crypto.generateRandomBytes(32);
-
-      final alphaMasterKey = await crypto.deriveMasterKey(
-        masterPassword: masterPassword,
-        salt: alphaSalt,
-      );
-      alphaWrapped = await crypto.wrapVaultKey(
-        masterKey: alphaMasterKey,
-        vaultKey: alphaVaultKey,
-      );
-
-      final duressKdfKey = await crypto.deriveRecoveryKdfKey(
-        recoveryKey: duressPassword,
-        salt: betaSalt,
-      );
-      betaWrapped = await crypto.wrapVaultKey(
-        masterKey: duressKdfKey,
-        vaultKey: betaVaultKey,
-      );
+    setUp(() {
+      fakeCrypto = FakeVaultCrypto({
+        '${_masterPassword}_${_alphaSaltHex}': _fromHex(_alphaMasterKeyHex),
+        '${_duressPassword}_${_betaSaltHex}':  _fromHex(_duressKdfKeyHex),
+      });
     });
 
     tearDownAll(() {
@@ -58,7 +102,6 @@ void main() {
     // -----------------------------------------------------------------------
     testWidgets('1. DuressSetupScreen shows limitations and form fields',
         (WidgetTester tester) async {
-      // Ensure duress is NOT configured for Test 1
       await SecureStorage.instance.deleteString(DualVaultManager.duressConfiguredKey);
       await SecureStorage.instance.deleteString(DualVaultManager.duressSaltKey);
       await SecureStorage.instance.deleteString(DualVaultManager.duressWrappedKeyKey);
@@ -66,57 +109,40 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: DuressSetupScreen()));
       await tester.pumpAndSettle();
 
-      // Must show the limitations warning — non-negotiable from the skill spec
       expect(find.text('Important Limitations'), findsOneWidget);
       expect(find.textContaining('cannot guarantee'), findsNWidgets(2));
       expect(find.textContaining('Multiple encrypted database files'), findsOneWidget);
-
-      // Must show all form fields
       expect(find.byKey(const Key('duress-password-field')), findsOneWidget);
       expect(find.byKey(const Key('confirm-duress-field')), findsOneWidget);
       expect(find.byKey(const Key('master-password-verify-field')), findsOneWidget);
       expect(find.byKey(const Key('limitations-ack-checkbox')), findsOneWidget);
       expect(find.byKey(const Key('enable-decoy-button')), findsOneWidget);
-
-      // Unlock screen itself must NOT show the word "Duress"
-      // (label must be confined to the setup screen only)
       expect(find.text('Duress Password'), findsNothing);
     });
 
     // -----------------------------------------------------------------------
     // Test 2: Entering the Duress Password on the Unlock screen opens
     // Vault Beta, fires the wipe hook, and sets isDuressMode=true.
-    // Vault Alpha's biometric cache must be wiped; its data is untouched.
     // -----------------------------------------------------------------------
     testWidgets('2. Duress Password opens Vault Beta and wipes biometric cache',
         (WidgetTester tester) async {
-      // Setup duress config in mock SecureStorage
-      final betaSaltHex = betaSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final betaWrappedHex = betaWrapped.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      await SecureStorage.instance.writeString(DualVaultManager.duressSaltKey, betaSaltHex);
-      await SecureStorage.instance.writeString(DualVaultManager.duressWrappedKeyKey, betaWrappedHex);
+      VaultLockManager.instance.lock();
+
+      // Inject pre-computed duress config into SecureStorage
+      await SecureStorage.instance.writeString(DualVaultManager.duressSaltKey, _betaSaltHex);
+      await SecureStorage.instance.writeString(DualVaultManager.duressWrappedKeyKey, _betaWrappedHex);
       await SecureStorage.instance.writeString(DualVaultManager.duressConfiguredKey, 'true');
 
-      // Prepopulate biometric cache to verify wipe hook fires
-      final alphaMasterKey = await crypto.deriveMasterKey(
-        masterPassword: masterPassword,
-        salt: alphaSalt,
-      );
+      // Prepopulate biometric cache using pre-computed alphaMasterKey + alphaVaultKey
       await SecureStorage.instance.writeBiometricWrappedVaultKey(
         alphaMasterKey,
         alphaVaultKey,
       );
 
-      final alphaSaltHex = alphaSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final alphaWrappedHex = alphaWrapped.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
       final mockClient = MockClient((request) async {
         if (request.method == 'GET' && request.url.path == '/sync/vault-key') {
           return http.Response(
-            json.encode({
-              'salt': alphaSaltHex,
-              'wrappedKey': alphaWrappedHex,
-            }),
+            json.encode({'salt': _alphaSaltHex, 'wrappedKey': _alphaWrappedHex}),
             200,
           );
         }
@@ -129,6 +155,7 @@ void main() {
             email: 'user@example.com',
             syncBaseUrl: 'http://fake-sync',
             httpClient: mockClient,
+            cryptoOverride: fakeCrypto,
           ),
         ),
       );
@@ -138,18 +165,22 @@ void main() {
       var cached = await SecureStorage.instance.readBiometricWrappedVaultKey();
       expect(cached, isNotNull, reason: 'Biometric cache should be populated before duress');
 
-      // Enter the Duress Password — visually identical to a normal unlock
+      // Enter the Duress Password
       await tester.enterText(
         find.byKey(const Key('unlock-password-field')),
-        duressPassword,
+        _duressPassword,
       );
       await tester.pump();
 
+      // Tap unlock — FakeVaultCrypto returns instantly, no Argon2id wait needed
+      await tester.tap(find.byKey(const Key('decrypt-unlock-button')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('decrypt-unlock-button')));
-        await Future.delayed(const Duration(milliseconds: 1500));
+        // Even with fake KDF, AES-GCM unwrap + navigation are async
+        await Future.delayed(const Duration(milliseconds: 200));
       });
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       // isDuressMode must be set — decoy vault is active
       expect(
@@ -168,25 +199,27 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
-    // Test 3: Vault Alpha's existence is never revealed via the Unlock screen.
-    // An incorrect password returns the same error regardless of duress config.
+    // Test 3: Wrong password gives identical error — no vault differentiation.
     // -----------------------------------------------------------------------
     testWidgets('3. Wrong password gives identical error — Vault Alpha existence not revealed',
         (WidgetTester tester) async {
       VaultLockManager.instance.lock();
 
-      final alphaSaltHex = alphaSalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final alphaWrappedHex = alphaWrapped.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
+      // Duress still configured from test 2 (betaSalt + betaWrapped in SecureStorage)
       final mockClient = MockClient((request) async {
         if (request.method == 'GET' && request.url.path == '/sync/vault-key') {
           return http.Response(
-            json.encode({'salt': alphaSaltHex, 'wrappedKey': alphaWrappedHex}),
+            json.encode({'salt': _alphaSaltHex, 'wrappedKey': _alphaWrappedHex}),
             200,
           );
         }
         return http.Response('Not found', 404);
       });
+
+      // FakeVaultCrypto has no override for 'wrong-password', so it will call
+      // real Argon2id. We make a FakeCrypto that throws immediately for unknown
+      // passwords to simulate a fast KDF failure.
+      final fastFailCrypto = _FastFailVaultCrypto();
 
       await tester.pumpWidget(
         MaterialApp(
@@ -194,6 +227,7 @@ void main() {
             email: 'user@example.com',
             syncBaseUrl: 'http://fake-sync',
             httpClient: mockClient,
+            cryptoOverride: fastFailCrypto,
           ),
         ),
       );
@@ -206,18 +240,40 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const Key('decrypt-unlock-button')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('decrypt-unlock-button')));
-        await Future.delayed(const Duration(milliseconds: 1500));
+        await Future.delayed(const Duration(milliseconds: 200));
       });
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
-      // Error message must be the generic one — no mention of "duress",
-      // "alpha", "beta", or any vault differentiation
+      // Error message must be the generic one — no vault differentiation
       expect(find.text('Incorrect master password'), findsOneWidget);
       expect(find.textContaining('Vault Alpha'), findsNothing);
       expect(find.textContaining('duress'), findsNothing);
       expect(find.textContaining('decoy'), findsNothing);
     });
   });
+}
+
+/// A VaultCrypto that throws [SecretBoxAuthenticationError] instantly for any
+/// KDF call — simulates a wrong password without running actual Argon2id.
+class _FastFailVaultCrypto extends VaultCrypto {
+  @override
+  Future<List<int>> deriveMasterKey({
+    required String masterPassword,
+    required List<int> salt,
+  }) async {
+    // Return a random-looking key so unwrapVaultKey will fail with auth error
+    return List<int>.filled(32, 0xDE);
+  }
+
+  @override
+  Future<List<int>> deriveRecoveryKdfKey({
+    required String recoveryKey,
+    required List<int> salt,
+  }) async {
+    return List<int>.filled(32, 0xAD);
+  }
 }

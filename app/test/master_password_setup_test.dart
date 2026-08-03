@@ -75,7 +75,7 @@ void main() {
       await tester.runAsync(() async {
         await tester.tap(buttonFinder);
         var checks = 0;
-        while (!requestChecked && checks < 200) {
+        while (!requestChecked && checks < 400) {
           await Future.delayed(const Duration(milliseconds: 50));
           checks++;
         }

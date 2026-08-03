@@ -80,18 +80,22 @@ class _ShamirRecoverySetupScreenState extends State<ShamirRecoverySetupScreen> {
         recoveryWrappedKeyHex: recoveryWrappedKeyHex,
       );
 
-      setState(() {
-        _generatedShares = result.shares;
-        _confirmedShares.clear();
-        _confirmedShares.addAll(List.generate(_n, (_) => false));
-        _currentShareIndex = 0;
-        _isGenerating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _generatedShares = result.shares;
+          _confirmedShares.clear();
+          _confirmedShares.addAll(List.generate(_n, (_) => false));
+          _currentShareIndex = 0;
+          _isGenerating = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isGenerating = false;
-        _errorMessage = 'Failed to set up Shamir Recovery. Error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+          _errorMessage = 'Failed to set up Shamir Recovery. Error: $e';
+        });
+      }
     }
   }
 

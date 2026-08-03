@@ -15,6 +15,10 @@ class UnlockScreen extends StatefulWidget {
   final AuthClient? authClient;
   final String syncBaseUrl;
   final http.Client? httpClient;
+  /// Optional crypto override for testing — allows injecting a pre-configured
+  /// [VaultCrypto] instance so tests can avoid running the full Argon2id KDF.
+  /// In production, leave this null and [VaultCrypto()] is constructed normally.
+  final VaultCrypto? cryptoOverride;
 
   const UnlockScreen({
     super.key,
@@ -22,6 +26,7 @@ class UnlockScreen extends StatefulWidget {
     this.authClient,
     this.syncBaseUrl = ApiConfig.syncBaseUrl,
     this.httpClient,
+    this.cryptoOverride,
   });
 
   @override
@@ -179,7 +184,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     bool navigated = false;
 
     try {
-      final crypto = VaultCrypto();
+      final crypto = widget.cryptoOverride ?? VaultCrypto();
 
       // ── Duress Password Check (before Alpha path) ────────────────────────
       // Attempt to decrypt the locally-stored decoy vault key.
@@ -314,10 +319,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
       }
     } catch (e) {
       // 3. Increment failed attempts and trigger lockout delay
-      setState(() {
-        _failedAttempts++;
-        _errorMessage = 'Incorrect master password';
-      });
+      if (mounted) {
+        setState(() {
+          _failedAttempts++;
+          _errorMessage = 'Incorrect master password';
+        });
+      }
 
       int delay = 0;
       if (_failedAttempts >= 8) {
@@ -425,6 +432,52 @@ class _UnlockScreenState extends State<UnlockScreen> {
       builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
+            Future<void> doSubmit() async {
+              if (dialogLoading || !formKey.currentState!.validate()) return;
+              setDialogState(() {
+                dialogLoading = true;
+                dialogError = null;
+              });
+              try {
+                final crypto = widget.cryptoOverride ?? VaultCrypto();
+                final enteredRK = controller.text;
+                final rkk = await crypto.deriveRecoveryKdfKey(
+                  recoveryKey: enteredRK,
+                  salt: _recoverySalt!,
+                );
+                final vaultKey = await crypto.unwrapVaultKey(
+                  wrappedVaultKey: _recoveryWrappedKey!,
+                  masterKey: rkk,
+                );
+                VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
+                final db = SqliteVaultDatabase.inMemory();
+                db.open(vaultKey);
+                if (dialogCtx.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                }
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => AppShell(
+                        db: db,
+                        vaultKey: vaultKey,
+                        currentEmail: widget.email,
+                        authClient: widget.authClient,
+                        syncBaseUrl: widget.syncBaseUrl,
+                        httpClient: widget.httpClient,
+                      ),
+                    ),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                setDialogState(() {
+                  dialogLoading = false;
+                  dialogError = 'Invalid Recovery Key or decryption failed';
+                });
+              }
+            }
+
             return AlertDialog(
               backgroundColor: AppTheme.surfaceColor,
               shape: RoundedRectangleBorder(
@@ -452,49 +505,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                       enabled: !dialogLoading,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) {
-                        if (!dialogLoading && formKey.currentState!.validate()) {
-                          // trigger recovery key unlock
-                          setDialogState(() {
-                            dialogLoading = true;
-                            dialogError = null;
-                          });
-
-                          VaultCrypto().deriveRecoveryKdfKey(
-                            recoveryKey: controller.text,
-                            salt: _recoverySalt!,
-                          ).then((rkk) async {
-                            final vaultKey = await VaultCrypto().unwrapVaultKey(
-                              wrappedVaultKey: _recoveryWrappedKey!,
-                              masterKey: rkk,
-                            );
-                            VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
-                            final db = SqliteVaultDatabase.inMemory();
-                            db.open(vaultKey);
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop();
-                            }
-                            if (mounted) {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (_) => AppShell(
-                                    db: db,
-                                    vaultKey: vaultKey,
-                                    currentEmail: widget.email,
-                                    authClient: widget.authClient,
-                                    syncBaseUrl: widget.syncBaseUrl,
-                                    httpClient: widget.httpClient,
-                                  ),
-                                ),
-                                (route) => false,
-                              );
-                            }
-                          }).catchError((_) {
-                            setDialogState(() {
-                              dialogLoading = false;
-                              dialogError = 'Invalid Recovery Key or decryption failed';
-                            });
-                          });
-                        }
+                        if (!dialogLoading) doSubmit();
                       },
                       style: const TextStyle(color: AppTheme.textPrimaryColor),
                       decoration: const InputDecoration(
@@ -530,63 +541,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 ),
                 ElevatedButton(
                   key: const Key('submit-recovery-key-button'),
-                  onPressed: dialogLoading
-                      ? null
-                      : () async {
-                          if (!formKey.currentState!.validate()) return;
-                          
-                          setDialogState(() {
-                            dialogLoading = true;
-                            dialogError = null;
-                          });
-
-                          try {
-                            final crypto = VaultCrypto();
-                            final enteredRK = controller.text;
-
-                            // Derive Recovery KDF Key
-                            final rkk = await crypto.deriveRecoveryKdfKey(
-                              recoveryKey: enteredRK,
-                              salt: _recoverySalt!,
-                            );
-
-                            // Decrypt the Vault Key
-                            final vaultKey = await crypto.unwrapVaultKey(
-                              wrappedVaultKey: _recoveryWrappedKey!,
-                              masterKey: rkk,
-                            );
-
-                            // Success! Zero out memory, initialize DB
-                            VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
-
-                            final db = SqliteVaultDatabase.inMemory();
-                            db.open(vaultKey);
-
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop(); // Close dialog
-                            }
-                            if (mounted) {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (_) => AppShell(
-                                    db: db,
-                                    vaultKey: vaultKey,
-                                    currentEmail: widget.email,
-                                    authClient: widget.authClient,
-                                    syncBaseUrl: widget.syncBaseUrl,
-                                    httpClient: widget.httpClient,
-                                  ),
-                                ),
-                                (route) => false,
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() {
-                              dialogLoading = false;
-                              dialogError = 'Invalid Recovery Key or decryption failed';
-                            });
-                          }
-                        },
+                  onPressed: dialogLoading ? null : doSubmit,
                   child: dialogLoading
                       ? const SizedBox(
                           height: 20,

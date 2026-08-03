@@ -33,6 +33,11 @@ class SettingsScreen extends StatefulWidget {
   /// confirming the biometric toggle is absent) without spinning up Chrome.
   final bool isWebOverride;
 
+  /// Optional crypto override for testing — allows injecting a pre-configured
+  /// [VaultCrypto] instance so tests can avoid running the full Argon2id KDF.
+  /// Leave null in production; [VaultCrypto()] is constructed normally.
+  final VaultCrypto? cryptoOverride;
+
   const SettingsScreen({
     super.key,
     this.onLock,
@@ -41,6 +46,7 @@ class SettingsScreen extends StatefulWidget {
     this.syncBaseUrl = ApiConfig.syncBaseUrl,
     this.httpClient,
     this.isWebOverride = kIsWeb,
+    this.cryptoOverride,
   });
 
   @override
@@ -95,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleSetupRecoveryKey() async {
-    final crypto = VaultCrypto();
+    final crypto = widget.cryptoOverride ?? VaultCrypto();
     final recoveryKey = crypto.generateRecoveryKey();
     final printConfirmed = ValueNotifier<bool>(false);
     bool uploadLoading = false;
@@ -240,7 +246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               );
                             }
                             _checkRecoveryStatus();
-                          } catch (e) {
+                          } catch (e, stack) {
+                            print('UPLOAD ERROR: $e\n$stack');
                             setDialogState(() {
                               uploadLoading = false;
                               uploadError = 'Failed to upload Recovery Key. Please try again.';

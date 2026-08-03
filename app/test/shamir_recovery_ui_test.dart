@@ -105,9 +105,14 @@ void main() {
       // Generate shares — async because of Argon2id
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('generate-shares-button')));
-        await Future.delayed(const Duration(milliseconds: 1500));
+        const maxWait = Duration(seconds: 30);
+        final deadline = DateTime.now().add(maxWait);
+        while (find.text('Share 1 of 5').evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       });
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       // Should now show share viewer: "Share 1 of 5"
       expect(find.text('Share 1 of 5'), findsOneWidget);
@@ -200,6 +205,7 @@ void main() {
       await tester.ensureVisible(reconstructBtn);
       await tester.tap(reconstructBtn, warnIfMissed: false);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       // Validation error for M-1 — network not called yet
       expect(
@@ -221,7 +227,9 @@ void main() {
         await tester.tap(reconstructBtn, warnIfMissed: false);
         await Future.delayed(const Duration(milliseconds: 2000));
       });
-      await tester.pumpAndSettle();
+      // Pump frames to let navigation and state settle without infinite animation timeout.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Vault should now be unlocked (navigation completed or is in-progress)
       expect(VaultLockManager.instance.isLocked, isFalse);

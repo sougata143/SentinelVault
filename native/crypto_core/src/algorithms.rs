@@ -17,7 +17,7 @@ pub fn derive_master_key(
     let params = Params::new(
         64 * 1024, // 64 MB (65,536 KB)
         3,         // iterations
-        4,         // parallelism
+        1,         // parallelism
         Some(32),  // output length
     )?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);

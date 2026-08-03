@@ -1,0 +1,26 @@
+# SentinelVault — Caddy reverse proxy config
+# Place at deploy/Caddyfile. Caddy handles Let's Encrypt certificate
+# issuance and renewal automatically for every hostname listed below —
+# no manual certbot steps required.
+
+vault.yourdomain.com {
+    root * /srv/sentinelvault-web
+    file_server
+    try_files {path} /index.html
+}
+
+api-auth.vault.yourdomain.com {
+    reverse_proxy auth-service:3001
+}
+
+api-sync.vault.yourdomain.com {
+    reverse_proxy sync-api:3002
+}
+
+api-security.vault.yourdomain.com {
+    reverse_proxy security-analysis-service:3003
+}
+
+api-sharing.vault.yourdomain.com {
+    reverse_proxy sharing-service:3004
+}

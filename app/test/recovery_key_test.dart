@@ -1,252 +1,337 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:cryptography/cryptography.dart';
 import 'package:core/core.dart';
 import 'package:app/features/auth/unlock_screen.dart';
 import 'package:app/features/settings/settings_screen.dart';
 import 'package:app/app_shell.dart';
 
+// ---------------------------------------------------------------------------
+// Pre-computed test fixtures (derived via test/scratch_derive_recovery_keys.dart
+// with Argon2id memory=1024, iterations=1).
+//
+//   masterPassword = 'myMasterPassword123!'
+//   recoveryKey    = 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH'
+//   (both salt and recoverySalt are fixed byte patterns below)
+// ---------------------------------------------------------------------------
+
+List<int> _fromHex(String hex) {
+  final len = hex.length ~/ 2;
+  return List.generate(
+      len, (i) => int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16));
+}
+
+String _toHex(List<int> b) =>
+    b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+
+// Fixed test data
+const _saltHex       = '11111111111111111111111111111111';
+const _vaultKeyHex   = '2222222222222222222222222222222222222222222222222222222222222222';
+const _masterKeyHex  = 'b384d2142a28a5fbf8edfef737bfecf5533927a9a687f645604ea0b5dadaa1e3';
+const _wrappedKeyHex = 'b0285ec4c3348445b179dec8b5a0c6bbcec550a96f07d5ac5db9572ed81e6356105c6fae2222775af1798aa445d934c8a164d954c78e5b4758134dd9';
+
+const _recoverySaltHex       = '33333333333333333333333333333333';
+const _recoveryKey           = 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH';
+const _recoveryWrappedKeyHex = '22fddf2c65cde322aef3ea8ae6c24bd1229d4bdc0963cc6b168ecd2ae81b0f3b2793d88eccd3f7b7674e206b7f5cd09eececb64df3a923130c614fe9';
+
+// The KDF key derived from _recoveryKey + _recoverySalt.
+// Derived using crypto.deriveRecoveryKdfKey which internally calls deriveMasterKey
+// with cleaned recovery key ('AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH') + salt.
+// We derive it lazily in the test via runAsync (one call only).
+// See test/scratch_derive_recovery_keys.dart for derivation context.
+
+const _email           = 'user@example.com';
+const _correctPassword = 'myMasterPassword123!';
+
+// ---------------------------------------------------------------------------
+// FakeVaultCrypto helpers
+// ---------------------------------------------------------------------------
+
+/// Returns pre-computed keys for known (password, salt) combos instantly;
+/// delegates to real implementation for any unknown input.
+class _MappedFakeVaultCrypto extends VaultCrypto {
+  final Map<String, List<int>> _masterKeyMap;
+  final Map<String, List<int>> _recoveryKdfKeyMap;
+
+  _MappedFakeVaultCrypto({
+    required Map<String, List<int>> masterKeyMap,
+    required Map<String, List<int>> recoveryKdfKeyMap,
+  })  : _masterKeyMap = masterKeyMap,
+        _recoveryKdfKeyMap = recoveryKdfKeyMap;
+
+  @override
+  Future<List<int>> deriveMasterKey({
+    required String masterPassword,
+    required List<int> salt,
+  }) async {
+    final key = '${masterPassword}_${_toHex(salt)}';
+    return _masterKeyMap[key] ??
+        super.deriveMasterKey(masterPassword: masterPassword, salt: salt);
+  }
+
+  @override
+  Future<List<int>> deriveRecoveryKdfKey({
+    required String recoveryKey,
+    required List<int> salt,
+  }) async {
+    final key = '${recoveryKey}_${_toHex(salt)}';
+    return _recoveryKdfKeyMap[key] ??
+        super.deriveRecoveryKdfKey(recoveryKey: recoveryKey, salt: salt);
+  }
+}
+
+/// A VaultCrypto that returns a deterministic dummy key for ALL KDF calls —
+/// used in settings test 2 where any key is fine (we only check upload shape).
+class _AlwaysFakeVaultCrypto extends VaultCrypto {
+  static final _dummyKey = List<int>.filled(32, 0x42);
+
+  @override
+  Future<List<int>> deriveMasterKey({
+    required String masterPassword,
+    required List<int> salt,
+  }) async =>
+      _dummyKey;
+
+  @override
+  Future<List<int>> deriveRecoveryKdfKey({
+    required String recoveryKey,
+    required List<int> salt,
+  }) async =>
+      _dummyKey;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 void main() {
   group('Recovery Key Integration Tests', () {
-    const email = 'user@example.com';
-    const correctPassword = 'myMasterPassword123!';
-
-    late List<int> salt;
-    late List<int> vaultKey;
-    late List<int> wrappedVaultKey;
-    late String saltHex;
-    late String wrappedKeyHex;
-
-    late String recoveryKey;
-    late List<int> recoverySalt;
-    late List<int> recoveryWrappedKey;
-    late String recoverySaltHex;
-    late String recoveryWrappedKeyHex;
-
-    setUpAll(() async {
-      final crypto = VaultCrypto();
-      salt = crypto.generateRandomBytes(16);
-      final masterKey = await crypto.deriveMasterKey(
-        masterPassword: correctPassword,
-        salt: salt,
-      );
-      vaultKey = crypto.generateRandomBytes(32);
-      wrappedVaultKey = await crypto.wrapVaultKey(
-        vaultKey: vaultKey,
-        masterKey: masterKey,
-      );
-
-      saltHex = salt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      wrappedKeyHex = wrappedVaultKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-      // Setup Recovery Key variables
-      recoveryKey = crypto.generateRecoveryKey();
-      recoverySalt = crypto.generateRandomBytes(16);
-      final rkk = await crypto.deriveRecoveryKdfKey(
-        recoveryKey: recoveryKey,
-        salt: recoverySalt,
-      );
-      recoveryWrappedKey = await crypto.wrapVaultKey(
-        vaultKey: vaultKey,
-        masterKey: rkk,
-      );
-
-      recoverySaltHex = recoverySalt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      recoveryWrappedKeyHex = recoveryWrappedKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    });
+    final saltBytes      = _fromHex(_saltHex);
+    final vaultKeyBytes  = _fromHex(_vaultKeyHex);
+    final masterKeyBytes = _fromHex(_masterKeyHex);
 
     setUp(() {
       VaultLockManager.instance.logout();
     });
 
-    testWidgets('1. Forgot Master Password button appears and correct Recovery Key unlocks vault', (WidgetTester tester) async {
-      final mockClient = MockClient((request) async {
-        expect(request.url.path, '/sync/vault-key');
-        return http.Response(
-          json.encode({
-            'salt': saltHex,
-            'wrappedKey': wrappedKeyHex,
-            'recoverySalt': recoverySaltHex,
-            'recoveryWrappedKey': recoveryWrappedKeyHex,
-          }),
-          200,
-        );
-      });
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: UnlockScreen(
-            email: email,
-            syncBaseUrl: 'http://fake-sync',
-            httpClient: mockClient,
-          ),
-        ),
-      );
-
-      // Let fetch complete without pumpAndSettle timeout
-      for (int i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-
-      // Check recovery button is visible
-      final recoveryBtnFinder = find.byKey(const Key('use-recovery-key-button'));
-      expect(recoveryBtnFinder, findsOneWidget);
-
-      // Tap to open recovery dialog
-      await tester.tap(recoveryBtnFinder);
-      await tester.pump();
-
-      // Dialog should be shown
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.byKey(const Key('recovery-key-input-field')), findsOneWidget);
-
-      // 1. Enter invalid key
-      await tester.enterText(find.byKey(const Key('recovery-key-input-field')), 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-AAAA');
-      
-      await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
-        // Wait dynamically for recovery KDF derivation
-        await Future.delayed(const Duration(milliseconds: 1500));
-      });
-      await tester.pump();
-
-      // Decryption failure error message should be displayed
-      expect(find.text('Invalid Recovery Key or decryption failed'), findsOneWidget);
-
-      // 2. Enter correct recovery key
-      await tester.enterText(find.byKey(const Key('recovery-key-input-field')), recoveryKey);
-
-      await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
-        // Wait dynamically for recovery KDF derivation
-        await Future.delayed(const Duration(milliseconds: 1500));
-      });
-      for (int i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-
-      // Dialog closed, dashboard unlocked
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.byType(AppShell), findsOneWidget);
-      expect(VaultLockManager.instance.isLocked, isFalse);
-      expect(VaultLockManager.instance.masterKey, isNull); // Master key is null (unlocked via recovery)
-    });
-
-    testWidgets('2. Settings setup & regenerate Emergency Kit uploads correct fields and never leaks raw recovery key', (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1500);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-      });
-
-      // Initialize VaultLockManager to unlocked state
-      VaultLockManager.instance.unlock(List.generate(32, (i) => i), vaultKey);
-
-      final List<String> requests = [];
-
-      final mockClient = MockClient((request) async {
-        if (request.method == 'GET' && request.url.path == '/sync/vault-key') {
-          return http.Response(
-            json.encode({
-              'salt': saltHex,
-              'wrappedKey': wrappedKeyHex,
-            }),
-            200,
+    testWidgets(
+      '1. Forgot Master Password button appears and correct Recovery Key unlocks vault',
+      (WidgetTester tester) async {
+        // Derive the recovery KDF key once via runAsync so we can inject it.
+        late List<int> recoveryKdfKey;
+        await tester.runAsync(() async {
+          recoveryKdfKey = await VaultCrypto().deriveRecoveryKdfKey(
+            recoveryKey: _recoveryKey,
+            salt: _fromHex(_recoverySaltHex),
           );
-        }
-        if (request.method == 'POST' && request.url.path == '/sync/vault-key') {
-          requests.add(request.body);
-          return http.Response(json.encode({'success': true}), 200);
-        }
-        return http.Response('Not found', 404);
-      });
+        });
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: SettingsScreen(
-            currentEmail: email,
-            syncBaseUrl: 'http://fake-sync',
-            httpClient: mockClient,
+        // Build fake: override master-password KDF + recovery key KDF.
+        // For the invalid recovery key 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567',
+        // we return 0xFF×32 which will fail AES-GCM authentication.
+        final fakeCrypto = _MappedFakeVaultCrypto(
+          masterKeyMap: {
+            '${_correctPassword}_$_saltHex': masterKeyBytes,
+          },
+          recoveryKdfKeyMap: {
+            '${_recoveryKey}_$_recoverySaltHex': recoveryKdfKey,
+            'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567_$_recoverySaltHex':
+                List<int>.filled(32, 0xFF),
+          },
+        );
+
+        final mockClient = MockClient((request) async {
+          if (request.url.path == '/sync/vault-key') {
+            return http.Response(
+              json.encode({
+                'salt': _saltHex,
+                'wrappedKey': _wrappedKeyHex,
+                'recoverySalt': _recoverySaltHex,
+                'recoveryWrappedKey': _recoveryWrappedKeyHex,
+              }),
+              200,
+            );
+          }
+          return http.Response('Not found', 404);
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: UnlockScreen(
+              email: _email,
+              syncBaseUrl: 'http://fake-sync',
+              httpClient: mockClient,
+              cryptoOverride: fakeCrypto,
+            ),
           ),
-        ),
-      );
+        );
 
-      // Wait for fetch to complete
-      for (int i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+        // Let _fetchKeys() complete
+        for (int i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
 
-      // Setup Emergency Kit tile should be visible
-      final tileFinder = find.byKey(const Key('settings-setup-emergency-kit-tile'));
-      expect(tileFinder, findsOneWidget);
+        // Recovery button should be visible (recoverySalt + recoveryWrappedKey present)
+        final recoveryBtnFinder = find.byKey(const Key('use-recovery-key-button'));
+        expect(recoveryBtnFinder, findsOneWidget);
 
-      // Tap to open setup dialog
-      await tester.tap(tileFinder);
-      await tester.pump();
+        // Open recovery dialog
+        await tester.tap(recoveryBtnFinder);
+        await tester.pump();
 
-      // Dialog is open
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.byKey(const Key('generated-recovery-key-text')), findsOneWidget);
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.byKey(const Key('recovery-key-input-field')), findsOneWidget);
 
-      final textWidget = tester.widget<Text>(find.byKey(const Key('generated-recovery-key-text')));
-      final generatedRK = textWidget.data!;
-      expect(generatedRK, isNotEmpty);
+        // ── Step 1: invalid key → error ──
+        await tester.enterText(
+          find.byKey(const Key('recovery-key-input-field')),
+          'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23-4567',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pump();
 
-      // Checkbox is unchecked, button should be disabled
-      final uploadBtn = find.byKey(const Key('upload-recovery-key-button'));
-      expect(tester.widget<ElevatedButton>(uploadBtn).enabled, isFalse);
+        expect(find.text('Invalid Recovery Key or decryption failed'), findsOneWidget);
 
-      // Check the checkbox
-      await tester.tap(find.byKey(const Key('confirm-saved-checkbox')));
-      await tester.pump();
-      expect(tester.widget<ElevatedButton>(uploadBtn).enabled, isTrue);
+        // ── Step 2: correct recovery key → success ──
+        await tester.enterText(
+          find.byKey(const Key('recovery-key-input-field')),
+          _recoveryKey,
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pumpAndSettle();
 
-      // Tap upload with KDF runAsync
-      await tester.runAsync(() async {
+        // Dialog closed, vault unlocked, AppShell shown
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(AppShell), findsOneWidget);
+        expect(VaultLockManager.instance.isLocked, isFalse);
+        expect(VaultLockManager.instance.masterKey, isNull);
+      },
+    );
+
+    testWidgets(
+      '2. Settings setup & regenerate Emergency Kit uploads correct fields and never leaks raw recovery key',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1500);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        // Unlock the vault
+        VaultLockManager.instance.unlock(masterKeyBytes, vaultKeyBytes);
+
+        final List<String> requests = [];
+
+        final mockClient = MockClient((request) async {
+          if (request.method == 'GET' && request.url.path == '/sync/vault-key') {
+            return http.Response(
+              json.encode({'salt': _saltHex, 'wrappedKey': _wrappedKeyHex}),
+              200,
+            );
+          }
+          if (request.method == 'POST' && request.url.path == '/sync/vault-key') {
+            requests.add(request.body);
+            return http.Response(json.encode({'success': true}), 200);
+          }
+          return http.Response('Not found', 404);
+        });
+
+        // _AlwaysFakeVaultCrypto bypasses Argon2id for any recovery key KDF call
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SettingsScreen(
+              currentEmail: _email,
+              syncBaseUrl: 'http://fake-sync',
+              httpClient: mockClient,
+              cryptoOverride: _AlwaysFakeVaultCrypto(),
+            ),
+          ),
+        );
+
+        for (int i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        // Setup Emergency Kit tile
+        final tileFinder = find.byKey(const Key('settings-setup-emergency-kit-tile'));
+        expect(tileFinder, findsOneWidget);
+
+        await tester.tap(tileFinder);
+        await tester.pump();
+
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.byKey(const Key('generated-recovery-key-text')), findsOneWidget);
+
+        final textWidget =
+            tester.widget<Text>(find.byKey(const Key('generated-recovery-key-text')));
+        final generatedRK = textWidget.data!;
+        expect(generatedRK, isNotEmpty);
+
+        // Button should be disabled until checkbox is checked
+        final uploadBtn = find.byKey(const Key('upload-recovery-key-button'));
+        expect(tester.widget<ElevatedButton>(uploadBtn).enabled, isFalse);
+
+        // Check the confirmation checkbox
+        await tester.tap(find.byKey(const Key('confirm-saved-checkbox')));
+        await tester.pump();
+        expect(tester.widget<ElevatedButton>(uploadBtn).enabled, isTrue);
+
+        // Tap upload — FakeVaultCrypto returns instantly
         await tester.tap(uploadBtn);
-        // Wait dynamically for KDF derivation
-        await Future.delayed(const Duration(milliseconds: 1500));
-      });
-      await tester.pump();
+        await tester.pump();
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pumpAndSettle();
 
-      // Dialog should close
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(requests.length, equals(1));
+        // Dialog must be dismissed
+        expect(find.byType(AlertDialog), findsNothing);
+        // Exactly one POST request
+        expect(requests.length, equals(1));
 
-      final Map<String, dynamic> body = json.decode(requests[0]);
-      expect(body['salt'], equals(saltHex));
-      expect(body['wrappedKey'], equals(wrappedKeyHex));
-      expect(body['recoverySalt'], isNotEmpty);
-      expect(body['recoveryWrappedKey'], isNotEmpty);
+        final Map<String, dynamic> body = json.decode(requests[0]);
+        expect(body['salt'], equals(_saltHex));
+        expect(body['wrappedKey'], equals(_wrappedKeyHex));
+        expect(body['recoverySalt'], isNotEmpty);
+        expect(body['recoveryWrappedKey'], isNotEmpty);
 
-      // Security check: Raw recovery key string MUST NOT exist in payload or logs
-      expect(requests[0].contains(generatedRK), isFalse);
-      expect(requests[0].contains(generatedRK.replaceAll('-', '')), isFalse);
-    });
+        // Security: raw recovery key must NOT appear in the upload payload
+        expect(requests[0].contains(generatedRK), isFalse);
+        expect(requests[0].contains(generatedRK.replaceAll('-', '')), isFalse);
+      },
+    );
 
-    test('3. Recovery Key invalidation logic (old key rejected after regeneration)', () async {
-      final crypto = VaultCrypto();
-      
-      // Original Recovery Key
-      final rk1 = crypto.generateRecoveryKey();
-      final salt1 = crypto.generateRandomBytes(16);
-      final rkk1 = await crypto.deriveRecoveryKdfKey(recoveryKey: rk1, salt: salt1);
-      await crypto.wrapVaultKey(vaultKey: vaultKey, masterKey: rkk1);
+    test(
+      '3. Recovery Key invalidation logic (old key rejected after regeneration)',
+      () async {
+        final crypto = VaultCrypto();
 
-      // Regenerated Recovery Key
-      final rk2 = crypto.generateRecoveryKey();
-      final salt2 = crypto.generateRandomBytes(16);
-      final rkk2 = await crypto.deriveRecoveryKdfKey(recoveryKey: rk2, salt: salt2);
-      final wrappedVK2 = await crypto.wrapVaultKey(vaultKey: vaultKey, masterKey: rkk2);
+        final rk1 = crypto.generateRecoveryKey();
+        final salt1 = crypto.generateRandomBytes(16);
+        final rkk1 = await crypto.deriveRecoveryKdfKey(recoveryKey: rk1, salt: salt1);
+        await crypto.wrapVaultKey(vaultKey: vaultKeyBytes, masterKey: rkk1);
 
-      // Attempting to unwrap wrappedVK2 with rkk1 MUST fail
-      expect(
-        () => crypto.unwrapVaultKey(wrappedVaultKey: wrappedVK2, masterKey: rkk1),
-        throwsA(isA<SecretBoxAuthenticationError>()),
-      );
-    });
+        final rk2 = crypto.generateRecoveryKey();
+        final salt2 = crypto.generateRandomBytes(16);
+        final rkk2 = await crypto.deriveRecoveryKdfKey(recoveryKey: rk2, salt: salt2);
+        final wrappedVK2 =
+            await crypto.wrapVaultKey(vaultKey: vaultKeyBytes, masterKey: rkk2);
+
+        // Old rkk1 must fail against wrappedVK2 (different key)
+        expect(
+          () => crypto.unwrapVaultKey(wrappedVaultKey: wrappedVK2, masterKey: rkk1),
+          throwsA(isA<SecretBoxAuthenticationError>()),
+        );
+      },
+    );
   });
 }

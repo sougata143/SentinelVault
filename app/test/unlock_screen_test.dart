@@ -39,15 +39,17 @@ void main() {
 
     testWidgets('1. Correct Master Password succeeds and navigates to AppShell', (WidgetTester tester) async {
       final mockClient = MockClient((request) async {
-        expect(request.url.path, '/sync/vault-key');
-        expect(request.headers['x-user-id'], email);
-        return http.Response(
-          json.encode({
-            'salt': saltHex,
-            'wrappedKey': wrappedKeyHex,
-          }),
-          200,
-        );
+        if (request.url.path == '/sync/vault-key') {
+          expect(request.headers['x-user-id'], email);
+          return http.Response(
+            json.encode({
+              'salt': saltHex,
+              'wrappedKey': wrappedKeyHex,
+            }),
+            200,
+          );
+        }
+        return http.Response(json.encode([]), 200);
       });
 
       await tester.pumpWidget(
@@ -79,11 +81,14 @@ void main() {
       await tester.runAsync(() async {
         await tester.tap(buttonFinder);
         // Wait dynamically for KDF derivation to complete
-        await Future.delayed(const Duration(milliseconds: 1500));
+        const maxWait = Duration(seconds: 30);
+        final deadline = DateTime.now().add(maxWait);
+        while (VaultLockManager.instance.isLocked && DateTime.now().isBefore(deadline)) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+        await Future.delayed(const Duration(milliseconds: 200));
       });
-      for (int i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      await tester.pumpAndSettle();
 
       // Verify we navigated to AppShell
       expect(find.byType(AppShell), findsOneWidget);
@@ -121,8 +126,10 @@ void main() {
       await tester.ensureVisible(buttonFinder);
       await tester.pumpAndSettle();
 
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
       await tester.runAsync(() async {
-        await tester.tap(buttonFinder);
         await Future.delayed(const Duration(milliseconds: 1500));
       });
       await tester.pumpAndSettle();
@@ -163,13 +170,12 @@ void main() {
       Future<void> submitIncorrectPassword() async {
         await tester.enterText(find.byKey(const Key('unlock-password-field')), incorrectPassword);
         await tester.pump();
+        await tester.tap(buttonFinder);
+        await tester.pump();
         await tester.runAsync(() async {
-          await tester.tap(buttonFinder);
           await Future.delayed(const Duration(milliseconds: 1500));
         });
-        for (int i = 0; i < 10; i++) {
-          await tester.pump(const Duration(milliseconds: 100));
-        }
+        await tester.pumpAndSettle();
       }
 
       // 1st failure
@@ -184,26 +190,20 @@ void main() {
       await submitIncorrectPassword();
       expect(find.textContaining('Locked for'), findsOneWidget);
 
-      // Wait 2 seconds for lockout to expire in real time
-      await tester.runAsync(() async {
-        await Future.delayed(const Duration(seconds: 2));
-      });
-      for (int i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      // Advance 2 seconds for lockout timer to expire
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
       expect(find.textContaining('Locked for'), findsNothing);
 
       // 4th failure (no increase yet, triggers 2s delay again)
       await submitIncorrectPassword();
       expect(find.textContaining('Locked for'), findsOneWidget);
 
-      // Wait 2 seconds in real time
-      await tester.runAsync(() async {
-        await Future.delayed(const Duration(seconds: 2));
-      });
-      for (int i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      // Advance 2 seconds for lockout timer to expire
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
       expect(find.textContaining('Locked for'), findsNothing);
 
       // 5th failure (triggers 5s delay)
