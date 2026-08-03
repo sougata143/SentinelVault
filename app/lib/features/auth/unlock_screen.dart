@@ -458,9 +458,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 VaultLockManager.instance.unlockWithRecoveryKey(vaultKey);
                 final db = SqliteVaultDatabase.inMemory();
                 db.open(vaultKey);
-                if (dialogCtx.mounted) {
-                  Navigator.of(dialogCtx).pop();
-                }
                 if (mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
