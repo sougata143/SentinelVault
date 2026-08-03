@@ -417,7 +417,7 @@ pub fn wasm_srp_calculate_client_session(
 #[wasm_bindgen(js_name = "wasmShamirSplit")]
 pub fn wasm_shamir_split(secret: &[u8], m: u8, n: u8) -> Result<Vec<u8>, JsValue> {
     let shares = shamir::split_secret(secret, m, n)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        .map_err(|e| JsValue::from_str(e))?;
 
     // Flatten into length-prefixed wire format (same as FFI)
     let mut buf: Vec<u8> = Vec::new();
@@ -454,7 +454,7 @@ pub fn wasm_shamir_combine(flat_shares: &[u8]) -> Result<Vec<u8>, JsValue> {
     }
 
     shamir::combine_shares(&share_blobs)
-        .map_err(|e| JsValue::from_str(&e.to_string()))
+        .map_err(|e| JsValue::from_str(e))
 }
 
 // ==========================================================================

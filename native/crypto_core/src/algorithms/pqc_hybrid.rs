@@ -68,7 +68,7 @@ pub fn generate_keypairs() -> GeneratedKeyBundle {
     let mut rng = OsRng;
 
     // 1. Classical – X25519
-    let x_priv = StaticSecret::random_from_rng(&mut rng);
+    let x_priv = StaticSecret::random_from_rng(rng);
     let x_pub  = XPublicKey::from(&x_priv);
 
     // 2. Classical – Ed25519
@@ -136,7 +136,7 @@ pub fn hybrid_encapsulate(
     let mut rng = OsRng;
 
     // Step 1 – Classical ECDH
-    let ephem_secret = StaticSecret::random_from_rng(&mut rng);
+    let ephem_secret = StaticSecret::random_from_rng(rng);
     let ephem_pub    = XPublicKey::from(&ephem_secret);
     let peer_x25519  = XPublicKey::from(*recipient_x25519_pub);
     let ss_c         = ephem_secret.diffie_hellman(&peer_x25519);
