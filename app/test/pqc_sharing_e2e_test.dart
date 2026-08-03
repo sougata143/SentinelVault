@@ -1,9 +1,11 @@
+@Tags(['e2e'])
+library;
+
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:core/core.dart';
-import 'package:core/src/crypto/native_crypto_bridge_selector.dart';
 import 'package:app/config/api_config.dart';
 
 void main() {
@@ -184,7 +186,6 @@ void main() {
       }),
     );
     expect(publishWrappedRes.statusCode, equals(200));
-    print('--> Test-A successfully published wrapped key for Test-B to Postgres DB.');
 
     // 8. Test-b (intended recipient) fetches wrapped key
     final fetchWrappedResB = await httpClient.get(
@@ -210,7 +211,6 @@ void main() {
       nonce: nonce,
     );
     expect(utf8.decode(decryptedB), equals('Top Secret Shared Password 123'));
-    print('--> Test-B successfully retrieved, unwrapped, and decrypted the shared item!');
 
     // 11. Test-c (uninvited third party) attempts to fetch wrapped key
     final fetchWrappedResC = await httpClient.get(
@@ -218,6 +218,5 @@ void main() {
       headers: {'Authorization': 'Bearer $tokenC'},
     );
     expect(fetchWrappedResC.statusCode, equals(404));
-    print('--> Test-C (uninvited third party) correctly rejected with HTTP 404.');
   });
 }

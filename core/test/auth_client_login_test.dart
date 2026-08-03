@@ -70,10 +70,24 @@ void main() {
           final sBytes = SrpClient.bigIntToBytesPadded(S, 256);
           final sessionKey = await SrpClient.sha256Hash(sBytes);
 
-          final m1Input = Uint8List(256 + 256 + 32);
-          m1Input.setRange(0, 256, aBytes);
-          m1Input.setRange(256, 512, bBytes);
-          m1Input.setRange(512, 544, sessionKey);
+          final nPadded = SrpClient.bigIntToBytesPadded(SrpClient.N, 256);
+          final gPadded = SrpClient.bigIntToBytesPadded(SrpClient.g, 256);
+          final hN = await SrpClient.sha256Hash(nPadded);
+          final hG = await SrpClient.sha256Hash(gPadded);
+          final hXor = Uint8List(32);
+          for (var i = 0; i < 32; i++) {
+            hXor[i] = hN[i] ^ hG[i];
+          }
+
+          final hU = await SrpClient.sha256Hash(utf8.encode(email));
+
+          final m1Input = Uint8List(32 + 32 + salt.length + 256 + 256 + 32);
+          m1Input.setRange(0, 32, hXor);
+          m1Input.setRange(32, 64, hU);
+          m1Input.setRange(64, 64 + salt.length, salt);
+          m1Input.setRange(64 + salt.length, 64 + salt.length + 256, aBytes);
+          m1Input.setRange(64 + salt.length + 256, 64 + salt.length + 512, bBytes);
+          m1Input.setRange(64 + salt.length + 512, m1Input.length, sessionKey);
           final clientEv = await SrpClient.sha256Hash(m1Input);
 
           final m2Input = Uint8List(256 + 32 + 32);

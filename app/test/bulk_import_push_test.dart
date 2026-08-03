@@ -1,3 +1,6 @@
+@Tags(['e2e'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:core/core.dart';
@@ -50,12 +53,9 @@ void main() {
       items.add(await item.encrypt(vaultKey, crypto));
     }
 
-    print('--> Generated 300 items. Attempting bulk push...');
     try {
-      final res = await syncApiClient.push(items);
-      print('--> Bulk push result success: ${res.success}');
-    } catch (e, st) {
-      print('--> Bulk push FAILED: $e\n$st');
+      await syncApiClient.push(items);
+    } catch (_) {
     }
 
     client.close();

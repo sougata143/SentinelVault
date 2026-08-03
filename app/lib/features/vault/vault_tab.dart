@@ -62,13 +62,6 @@ class _VaultTabState extends State<VaultTab> {
   }
 
   Future<void> _loadItems() async {
-    try {
-      await PqcSharingService.syncSharedFoldersWithMe();
-      if (VaultSyncManager.isInitialized) {
-        await VaultSyncManager.instance.sync();
-      }
-    } catch (_) {}
-
     final encItems = widget.db.getAllItems();
     final List<VaultItem> decrypted = [];
 
@@ -95,19 +88,28 @@ class _VaultTabState extends State<VaultTab> {
       if (folderDecrypted) continue;
     }
 
-    setState(() {
-      _decryptedItems = decrypted;
-      
-      // Select the first item by default on desktop if list is not empty
-      if (_selectedItem != null) {
-        final index = _decryptedItems.indexWhere((it) => it.id == _selectedItem!.id);
-        if (index != -1) {
-          _selectedItem = _decryptedItems[index];
-        } else {
-          _selectedItem = null;
+    if (mounted) {
+      setState(() {
+        _decryptedItems = decrypted;
+
+        // Select the first item by default on desktop if list is not empty
+        if (_selectedItem != null) {
+          final index = _decryptedItems.indexWhere((it) => it.id == _selectedItem!.id);
+          if (index != -1) {
+            _selectedItem = _decryptedItems[index];
+          } else {
+            _selectedItem = null;
+          }
         }
+      });
+    }
+
+    try {
+      await PqcSharingService.syncSharedFoldersWithMe();
+      if (VaultSyncManager.isInitialized) {
+        await VaultSyncManager.instance.sync();
       }
-    });
+    } catch (_) {}
   }
 
   void _toggleSelectionMode() {
