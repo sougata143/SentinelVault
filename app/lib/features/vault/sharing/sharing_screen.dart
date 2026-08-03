@@ -214,6 +214,21 @@ Uint8List safeBase64Decode(String input) {
 
       final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
 
+      int nextVersion = 1;
+      try {
+        final versionRes = await http.get(
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/${widget.folderId}/version'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (versionRes.statusCode == 200) {
+          final vData = json.decode(versionRes.body) as Map<String, dynamic>;
+          final curr = vData['keyVersion'];
+          if (curr != null) {
+            nextVersion = (int.tryParse(curr.toString()) ?? 0) + 1;
+          }
+        }
+      } catch (_) {}
+
       // 5. Post wrapped key to DB-backed POST /key-directory/wrapped-keys endpoint
       final pubWrappedRes = await http.post(
         Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys'),
@@ -223,7 +238,7 @@ Uint8List safeBase64Decode(String input) {
         },
         body: json.encode({
           'folderId': widget.folderId.length == 36 ? widget.folderId : '8e96b1aa-1986-4e20-b9c4-cb50ec763ccd',
-          'keyVersion': '1',
+          'keyVersion': nextVersion.toString(),
           'recipients': [
             {
               'recipientUserId': recipientUserId,
