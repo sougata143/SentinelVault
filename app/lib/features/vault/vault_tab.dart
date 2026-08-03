@@ -91,6 +91,16 @@ class _VaultTabState extends State<VaultTab> {
     if (mounted) {
       setState(() {
         _decryptedItems = decrypted;
+
+        // Select the first item by default on desktop if list is not empty
+        if (_selectedItem != null) {
+          final index = _decryptedItems.indexWhere((it) => it.id == _selectedItem!.id);
+          if (index != -1) {
+            _selectedItem = _decryptedItems[index];
+          } else {
+            _selectedItem = null;
+          }
+        }
       });
     }
 
@@ -100,18 +110,6 @@ class _VaultTabState extends State<VaultTab> {
         await VaultSyncManager.instance.sync();
       }
     } catch (_) {}
-  }
-      
-      // Select the first item by default on desktop if list is not empty
-      if (_selectedItem != null) {
-        final index = _decryptedItems.indexWhere((it) => it.id == _selectedItem!.id);
-        if (index != -1) {
-          _selectedItem = _decryptedItems[index];
-        } else {
-          _selectedItem = null;
-        }
-      }
-    });
   }
 
   void _toggleSelectionMode() {
