@@ -213,6 +213,7 @@ Uint8List safeBase64Decode(String input) {
       );
 
       final targetFolderId = widget.folderId.length == 36 ? widget.folderId : '81232196-2b98-47af-a62b-92c041fe48cd';
+      final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
 
       int nextVersion = 1;
       try {
