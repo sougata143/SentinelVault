@@ -106,8 +106,8 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => SharingScreen(
-                    folderId: item.id,
-                    folderName: item.title,
+                    folderId: item.vaultId.isNotEmpty ? item.vaultId : item.id,
+                    folderName: item.vaultId.isNotEmpty ? item.vaultId : item.title,
                     currentFolderKey: Uint8List.fromList(List.generate(32, (i) => i)),
                     senderUserId: 'current-user-alice',
                   ),
