@@ -39,14 +39,14 @@ class PqcSharingService {
         final mldsaVkStr = await _storage.read(key: 'pqc_mldsa_vk') ?? '';
 
         bundle = PqcKeyBundle(
-          x25519Pub: base64Url.decode(base64Url.normalize(x25519PubStr)),
-          x25519Priv: base64Url.decode(base64Url.normalize(x25519PrivStr)),
-          ed25519Pub: base64Url.decode(base64Url.normalize(ed25519PubStr)),
-          ed25519Priv: base64Url.decode(base64Url.normalize(ed25519PrivStr)),
-          mlkemEk: base64Url.decode(base64Url.normalize(mlkemEkStr)),
-          mlkemDk: base64Url.decode(base64Url.normalize(mlkemDkStr)),
-          mldsaVk: base64Url.decode(base64Url.normalize(mldsaVkStr)),
-          mldsaSeed: base64Url.decode(base64Url.normalize(mldsaSeedStr)),
+          x25519Pub: _safeBase64Decode(x25519PubStr),
+          x25519Priv: _safeBase64Decode(x25519PrivStr),
+          ed25519Pub: _safeBase64Decode(ed25519PubStr),
+          ed25519Priv: _safeBase64Decode(ed25519PrivStr),
+          mlkemEk: _safeBase64Decode(mlkemEkStr),
+          mlkemDk: _safeBase64Decode(mlkemDkStr),
+          mldsaVk: _safeBase64Decode(mldsaVkStr),
+          mldsaSeed: _safeBase64Decode(mldsaSeedStr),
         );
       }
 
@@ -129,5 +129,10 @@ class PqcSharingService {
     } catch (_) {
       return [];
     }
+  }
+
+  static Uint8List _safeBase64Decode(String input) {
+    final clean = input.replaceAll('=', '').replaceAll(' ', '').trim();
+    return base64Url.decode(base64Url.normalize(clean));
   }
 }
