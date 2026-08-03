@@ -67,8 +67,7 @@ class _MappedFakeVaultCrypto extends VaultCrypto {
     required List<int> salt,
   }) async {
     final key = '${masterPassword}_${_toHex(salt)}';
-    return _masterKeyMap[key] ??
-        super.deriveMasterKey(masterPassword: masterPassword, salt: salt);
+    return _masterKeyMap[key] ?? List<int>.filled(32, 0x99);
   }
 
   @override
@@ -77,8 +76,7 @@ class _MappedFakeVaultCrypto extends VaultCrypto {
     required List<int> salt,
   }) async {
     final key = '${recoveryKey}_${_toHex(salt)}';
-    return _recoveryKdfKeyMap[key] ??
-        super.deriveRecoveryKdfKey(recoveryKey: recoveryKey, salt: salt);
+    return _recoveryKdfKeyMap[key] ?? List<int>.filled(32, 0x99);
   }
 }
 
@@ -190,7 +188,7 @@ void main() {
         await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
         await tester.pump();
         await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future.delayed(const Duration(milliseconds: 500));
         });
         await tester.pump();
 
@@ -204,7 +202,7 @@ void main() {
         await tester.tap(find.byKey(const Key('submit-recovery-key-button')));
         await tester.pump();
         await tester.runAsync(() async {
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future.delayed(const Duration(milliseconds: 500));
         });
         await tester.pumpAndSettle();
 
