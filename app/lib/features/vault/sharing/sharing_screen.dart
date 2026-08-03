@@ -352,88 +352,99 @@ class _SharingScreenState extends State<SharingScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'PQC Hybrid Zero-Knowledge Folder Sharing',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Vault folders are shared securely using classical (X25519) and post-quantum (ML-KEM-768) hybrid wrapping. Keys are rotatable upon recipient revocation.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Invite user by email',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.email),
-                          ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight > 48.0 ? constraints.maxHeight - 48.0 : 0.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'PQC Hybrid Zero-Knowledge Folder Sharing',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: _inviteRecipient,
-                        icon: const Icon(Icons.share),
-                        label: const Text('Add Recipient'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade800,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Vault folders are shared securely using classical (X25519) and post-quantum (ML-KEM-768) hybrid wrapping. Keys are rotatable upon recipient revocation.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Active Share Recipients',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _recipients.isEmpty
-                        ? const Center(child: Text('This folder is not currently shared with anyone.'))
-                        : ListView.builder(
-                            itemCount: _recipients.length,
-                            itemBuilder: (ctx, index) {
-                              final rec = _recipients[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.teal.shade100,
-                                    child: Icon(Icons.person, color: Colors.teal.shade900),
-                                  ),
-                                  title: Text(rec['email'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Key Fingerprint: ${rec['fingerprint'] as String}',
-                                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
-                                    onPressed: () => _revokeRecipient(rec['userId'] as String, rec['email'] as String),
-                                  ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _emailController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Invite user by email',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.email),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _inviteRecipient,
+                              icon: const Icon(Icons.share),
+                              label: const Text('Add Recipient'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal.shade800,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Active Share Recipients',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        _recipients.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24.0),
+                                child: Center(child: Text('This folder is not currently shared with anyone.')),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _recipients.length,
+                                itemBuilder: (ctx, index) {
+                                  final rec = _recipients[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.teal.shade100,
+                                        child: Icon(Icons.person, color: Colors.teal.shade900),
+                                      ),
+                                      title: Text(rec['email'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Key Fingerprint: ${rec['fingerprint'] as String}',
+                                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
+                                        onPressed: () => _revokeRecipient(rec['userId'] as String, rec['email'] as String),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
     );
   }
