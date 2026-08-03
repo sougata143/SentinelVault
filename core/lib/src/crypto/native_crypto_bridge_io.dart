@@ -611,10 +611,26 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
 
       final aPadded = SrpClient.bigIntToBytesPadded(aPubInt, 256);
       final bPadded = SrpClient.bigIntToBytesPadded(bPubInt, 256);
-      final m1Input = Uint8List(256 + 256 + 32);
-      m1Input.setRange(0, 256, aPadded);
-      m1Input.setRange(256, 512, bPadded);
-      m1Input.setRange(512, 544, key);
+      final nPadded = SrpClient.bigIntToBytesPadded(SrpClient.N, 256);
+      final gPadded = SrpClient.bigIntToBytesPadded(SrpClient.g, 256);
+
+      final hN = (await Sha256().hash(nPadded)).bytes;
+      final hG = (await Sha256().hash(gPadded)).bytes;
+      final hXor = Uint8List(32);
+      for (var i = 0; i < 32; i++) {
+        hXor[i] = hN[i] ^ hG[i];
+      }
+
+      final hU = (await Sha256().hash(utf8.encode(username))).bytes;
+
+      final m1Input = Uint8List(32 + 32 + salt.length + 256 + 256 + 32);
+      m1Input.setRange(0, 32, hXor);
+      m1Input.setRange(32, 64, hU);
+      m1Input.setRange(64, 64 + salt.length, salt);
+      m1Input.setRange(64 + salt.length, 64 + salt.length + 256, aPadded);
+      m1Input.setRange(64 + salt.length + 256, 64 + salt.length + 512, bPadded);
+      m1Input.setRange(64 + salt.length + 512, m1Input.length, key);
+
       final clientEv = Uint8List.fromList((await Sha256().hash(m1Input)).bytes);
 
       final m2Input = Uint8List(256 + 32 + 32);
