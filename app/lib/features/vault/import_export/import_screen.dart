@@ -376,11 +376,9 @@ class _ImportScreenState extends State<ImportScreen> {
     // Clear the paste area
     _fileContentController.clear();
 
-    // Fire-and-forget sync so imported items propagate to other devices.
-    // Failure is surfaced via SyncStatusIndicator (error state) rather than
-    // blocking the user on this screen.
+    // Sync so imported items propagate to remote server and other devices.
     if (VaultSyncManager.isInitialized) {
-      VaultSyncManager.instance.sync();
+      await VaultSyncManager.instance.sync();
     }
 
     setState(() {

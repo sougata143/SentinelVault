@@ -474,7 +474,13 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => AppShell(db: db, vaultKey: vaultKey),
+          builder: (_) => AppShell(
+            db: db,
+            vaultKey: vaultKey,
+            currentEmail: widget.email,
+            syncBaseUrl: widget.syncBaseUrl,
+            httpClient: widget.httpClient,
+          ),
         ),
         (route) => false,
       );

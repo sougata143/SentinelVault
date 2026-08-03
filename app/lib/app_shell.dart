@@ -48,6 +48,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _resetInactivityTimer();
+
+    if (!VaultSyncManager.isInitialized &&
+        widget.currentEmail != null &&
+        widget.currentEmail!.isNotEmpty) {
+      VaultSyncManager.initialize(
+        localDb: widget.db,
+        api: HttpSyncApiClient(
+          baseUrl: widget.syncBaseUrl,
+          userId: widget.currentEmail!,
+          httpClient: widget.httpClient,
+        ),
+      );
+    }
   }
 
   @override
