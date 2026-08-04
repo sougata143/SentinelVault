@@ -27,6 +27,19 @@ export interface UserRecord {
   }>;
 }
 
+function fp(val: string | Buffer | bigint | null | undefined): string {
+  if (val === null || val === undefined) return 'null';
+  let str: string;
+  if (typeof val === 'bigint') {
+    str = val.toString(16);
+  } else if (Buffer.isBuffer(val)) {
+    str = val.toString('hex');
+  } else {
+    str = String(val);
+  }
+  return crypto.createHash('sha256').update(str).digest('hex').substring(0, 6);
+}
+
 @Injectable()
 export class UserRepository {
   constructor(
@@ -88,7 +101,7 @@ export class UserRepository {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_DB_READ] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} findByUsername('${username}') => found=${!!user} salt=${user?.salt} verifier=${user?.verifier}`);
+    console.log(`[DIAG_DB_READ] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} findByUsername('${username}') => found=${!!user} saltFp=${fp(user?.salt)} verifierFp=${fp(user?.verifier)}`);
 
     if (!user) return null;
     return this.mapUserToRecord(user);
@@ -150,8 +163,7 @@ export class UserRepository {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_DB_WRITE] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} save('${record.username}') => savedId=${savedEntity.id} salt=${savedEntity.salt} verifier=${savedEntity.verifier}`);
-
+    console.log(`[DIAG_DB_WRITE] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} save('${record.username}') => savedId=${savedEntity.id} saltFp=${fp(savedEntity.salt)} verifierFp=${fp(savedEntity.verifier)}`);
     return this.mapUserToRecord(savedEntity);
   }
 
