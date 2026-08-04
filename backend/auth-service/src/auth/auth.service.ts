@@ -611,21 +611,26 @@ export class AuthService {
    */
   private pruneOldChallenges(): void {
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    for (const [id, challenge] of this.challenges.entries()) {
-      if (challenge.createdAt < fiveMinutesAgo) {
-        this.challenges.delete(id);
-      }
-    }
-    for (const [token, session] of this.mfaSessions.entries()) {
-      if (session.createdAt < fiveMinutesAgo) {
-        this.mfaSessions.delete(token);
-      }
-    }
-    for (const [challenge, session] of this.passkeyChallenges.entries()) {
-      if (session.createdAt < fiveMinutesAgo) {
-        this.passkeyChallenges.delete(challenge);
-      }
-    }
+
+    // Collect stale keys first, then delete outside the iterator.
+    // Mutating a Map while iterating it (for...of entries()) causes V8's live
+    // iterator to silently skip entries in certain Map sizes/hash states —
+    // which was the root cause of intermittent CI failures where a freshly
+    // created challenge was immediately pruned despite being < 1 ms old.
+    const staleChallenge = [...this.challenges.entries()]
+      .filter(([, c]) => c.createdAt < fiveMinutesAgo)
+      .map(([id]) => id);
+    staleChallenge.forEach(id => this.challenges.delete(id));
+
+    const staleMfa = [...this.mfaSessions.entries()]
+      .filter(([, s]) => s.createdAt < fiveMinutesAgo)
+      .map(([token]) => token);
+    staleMfa.forEach(token => this.mfaSessions.delete(token));
+
+    const stalePasskey = [...this.passkeyChallenges.entries()]
+      .filter(([, s]) => s.createdAt < fiveMinutesAgo)
+      .map(([ch]) => ch);
+    stalePasskey.forEach(ch => this.passkeyChallenges.delete(ch));
   }
 }
 
