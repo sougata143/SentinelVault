@@ -72,6 +72,10 @@ export class AuthService {
    * Registers a new user.
    */
   public async register(username: string, saltHex: string, verifierHex: string): Promise<{ success: boolean; token: string }> {
+    const hrStart = process.hrtime.bigint();
+    const isoStart = new Date().toISOString();
+    console.log(`[DIAG_REGISTER_START] ISO=${isoStart} HR=${hrStart} username=${username} saltHex=${saltHex} verifierHex=${verifierHex}`);
+
     if (!username || !saltHex || !verifierHex) {
       throw new HttpException('Missing registration parameters', HttpStatus.BAD_REQUEST);
     }
@@ -107,8 +111,10 @@ export class AuthService {
       throw new HttpException('Registration failed. Please try again.', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    // Issue a session JWT immediately so the client can make authenticated
-    // calls (e.g. POST /sync/vault-key) without a separate login round-trip.
+    const hrEnd = process.hrtime.bigint();
+    const elapsedMs = Number(hrEnd - hrStart) / 1e6;
+    console.log(`[DIAG_REGISTER_COMPLETE] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} registeredUser=${saved.username} id=${saved.id} salt=${saved.salt} verifier=${saved.verifier}`);
+
     const token = this.jwtService.sign(
       { sub: saved.id, username: saved.username },
       { expiresIn: '24h' },
@@ -125,6 +131,10 @@ export class AuthService {
     username: string,
     aHex: string,
   ): Promise<{ salt: string; B: string; challengeId: string }> {
+    const hrStart = process.hrtime.bigint();
+    const isoStart = new Date().toISOString();
+    console.log(`[DIAG_STEP1_START] ISO=${isoStart} HR=${hrStart} username=${username} aHex=${aHex}`);
+
     if (!username || !aHex) {
       throw new HttpException('Missing login parameters', HttpStatus.BAD_REQUEST);
     }
@@ -132,7 +142,6 @@ export class AuthService {
     const user = await this.userRepository.findByUsername(username);
     const now = new Date();
 
-    // Check account lockout
     if (user && user.lockoutUntil && user.lockoutUntil > now) {
       throw new HttpException('Account is locked. Try again later.', 423);
     }
@@ -159,6 +168,7 @@ export class AuthService {
     const { secret: b, publicValue: B } = SrpServer.generateServerEphemeral(v, bBytes);
 
     const challengeId = crypto.randomBytes(16).toString('hex');
+    const createdAt = Date.now();
     this.challenges.set(challengeId, {
       username,
       A,
@@ -166,8 +176,13 @@ export class AuthService {
       B,
       salt,
       verifier: v,
-      createdAt: Date.now(),
+      createdAt,
     });
+
+    const hrEnd = process.hrtime.bigint();
+    const elapsedMs = Number(hrEnd - hrStart) / 1e6;
+
+    console.log(`[DIAG_STEP1_CHALLENGE_CREATED] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} challengeId=${challengeId} username=${username} isRealUser=${!!user} saltHex=${salt.toString('hex')} verifierHex=${v.toString(16)} A=${A.toString(16)} B=${B.toString(16)} b=${b.toString(16)} createdAt=${createdAt}`);
 
     // Clean up old challenges after 5 minutes
     this.pruneOldChallenges();
@@ -185,10 +200,18 @@ export class AuthService {
    * If MFA is enabled, returns an MFA redirect instead of the final token.
    */
   public async loginStep2(challengeId: string, m1Hex: string): Promise<any> {
+    const hrStart = process.hrtime.bigint();
+    const isoStart = new Date().toISOString();
+    console.log(`[DIAG_STEP2_START] ISO=${isoStart} HR=${hrStart} challengeId=${challengeId} m1Hex=${m1Hex}`);
+
     const challenge = this.challenges.get(challengeId);
     if (!challenge) {
+      console.log(`[DIAG_STEP2_ERROR] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} Challenge NOT FOUND: challengeId=${challengeId} totalMapSize=${this.challenges.size}`);
       throw new HttpException('Invalid or expired login session', HttpStatus.UNAUTHORIZED);
     }
+
+    const challengeAgeMs = Date.now() - challenge.createdAt;
+    console.log(`[DIAG_STEP2_CHALLENGE_FOUND] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} challengeId=${challengeId} username=${challenge.username} challengeAgeMs=${challengeAgeMs}`);
 
     // Immediately remove challenge so it cannot be re-used (replay protection)
     this.challenges.delete(challengeId);
@@ -211,12 +234,15 @@ export class AuthService {
       clientEvidence,
     });
 
+    const hrEnd = process.hrtime.bigint();
+    const elapsedMs = Number(hrEnd - hrStart) / 1e6;
+
+    console.log(`[DIAG_STEP2_VERIFY_RESULT] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} success=${verification.success} username=${challenge.username} userFound=${!!user} userSalt=${user?.salt} challengeSalt=${challenge.salt.toString('hex')} userVerifier=${user?.verifier} challengeVerifier=${challenge.verifier.toString(16)}`);
+
     if (!verification.success || !user) {
-      // Handle authentication failure
       if (user) {
         user.failedAttempts += 1;
         if (user.failedAttempts >= 5) {
-          // Lock account for 15 minutes
           user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000);
         }
         await this.userRepository.save(user);
