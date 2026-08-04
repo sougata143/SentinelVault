@@ -101,7 +101,7 @@ export class UserRepository {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_DB_READ] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} findByUsername('${username}') => found=${!!user} saltFp=${fp(user?.salt)} verifierFp=${fp(user?.verifier)}`);
+    // console.log(`[DIAG_DB_READ] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} findByUsername('${username}') => found=${!!user} saltFp=${fp(user?.salt)} verifierFp=${fp(user?.verifier)}`);
 
     if (!user) return null;
     return this.mapUserToRecord(user);
@@ -163,7 +163,7 @@ export class UserRepository {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_DB_WRITE] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} save('${record.username}') => savedId=${savedEntity.id} saltFp=${fp(savedEntity.salt)} verifierFp=${fp(savedEntity.verifier)}`);
+    // console.log(`[DIAG_DB_WRITE] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} ${poolInfo} save('${record.username}') => savedId=${savedEntity.id} saltFp=${fp(savedEntity.salt)} verifierFp=${fp(savedEntity.verifier)}`);
     return this.mapUserToRecord(savedEntity);
   }
 
@@ -191,6 +191,6 @@ export class UserRepository {
     await this.userRepository.createQueryBuilder().delete().execute();
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
-    console.log(`[DIAG_DB_CLEAR] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} UserRepository clear() completed`);
+    // console.log(`[DIAG_DB_CLEAR] ISO=${isoStart} HR_START=${hrStart} HR_END=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} CPU_CORES=${cpus} UserRepository clear() completed`);
   }
 }

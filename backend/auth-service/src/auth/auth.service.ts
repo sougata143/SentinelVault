@@ -87,7 +87,7 @@ export class AuthService {
   public async register(username: string, saltHex: string, verifierHex: string): Promise<{ success: boolean; token: string }> {
     const hrStart = process.hrtime.bigint();
     const isoStart = new Date().toISOString();
-    console.log(`[DIAG_REGISTER_START] ISO=${isoStart} HR=${hrStart} username=${username} saltFp=${fp(saltHex)} verifierFp=${fp(verifierHex)}`);
+    // console.log(`[DIAG_REGISTER_START] ISO=${isoStart} HR=${hrStart} username=${username} saltFp=${fp(saltHex)} verifierFp=${fp(verifierHex)}`);
 
     if (!username || !saltHex || !verifierHex) {
       throw new HttpException('Missing registration parameters', HttpStatus.BAD_REQUEST);
@@ -126,7 +126,7 @@ export class AuthService {
 
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
-    console.log(`[DIAG_REGISTER_COMPLETE] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} registeredUser=${saved.username} id=${saved.id} saltFp=${fp(saved.salt)} verifierFp=${fp(saved.verifier)}`);
+    // console.log(`[DIAG_REGISTER_COMPLETE] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} registeredUser=${saved.username} id=${saved.id} saltFp=${fp(saved.salt)} verifierFp=${fp(saved.verifier)}`);
 
     const token = this.jwtService.sign(
       { sub: saved.id, username: saved.username },
@@ -146,7 +146,7 @@ export class AuthService {
   ): Promise<{ salt: string; B: string; challengeId: string }> {
     const hrStart = process.hrtime.bigint();
     const isoStart = new Date().toISOString();
-    console.log(`[DIAG_STEP1_START] ISO=${isoStart} HR=${hrStart} username=${username} aFp=${fp(aHex)}`);
+    // console.log(`[DIAG_STEP1_START] ISO=${isoStart} HR=${hrStart} username=${username} aFp=${fp(aHex)}`);
 
     if (!username || !aHex) {
       throw new HttpException('Missing login parameters', HttpStatus.BAD_REQUEST);
@@ -195,7 +195,7 @@ export class AuthService {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_STEP1_CHALLENGE_CREATED] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} challengeIdFp=${fp(challengeId)} username=${username} isRealUser=${!!user} saltFp=${fp(salt)} verifierFp=${fp(v)} AFp=${fp(A)} BFp=${fp(B)} bFp=${fp(b)} createdAt=${createdAt}`);
+    // console.log(`[DIAG_STEP1_CHALLENGE_CREATED] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} challengeIdFp=${fp(challengeId)} username=${username} isRealUser=${!!user} saltFp=${fp(salt)} verifierFp=${fp(v)} AFp=${fp(A)} BFp=${fp(B)} bFp=${fp(b)} createdAt=${createdAt}`);
 
     // Clean up old challenges after 5 minutes
     this.pruneOldChallenges();
@@ -215,16 +215,16 @@ export class AuthService {
   public async loginStep2(challengeId: string, m1Hex: string): Promise<any> {
     const hrStart = process.hrtime.bigint();
     const isoStart = new Date().toISOString();
-    console.log(`[DIAG_STEP2_START] ISO=${isoStart} HR=${hrStart} challengeIdFp=${fp(challengeId)} m1Fp=${fp(m1Hex)}`);
+    // console.log(`[DIAG_STEP2_START] ISO=${isoStart} HR=${hrStart} challengeIdFp=${fp(challengeId)} m1Fp=${fp(m1Hex)}`);
 
     const challenge = this.challenges.get(challengeId);
     if (!challenge) {
-      console.log(`[DIAG_STEP2_ERROR] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} Challenge NOT FOUND: challengeIdFp=${fp(challengeId)} totalMapSize=${this.challenges.size}`);
+      // console.log(`[DIAG_STEP2_ERROR] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} Challenge NOT FOUND: challengeIdFp=${fp(challengeId)} totalMapSize=${this.challenges.size}`);
       throw new HttpException('Invalid or expired login session', HttpStatus.UNAUTHORIZED);
     }
 
     const challengeAgeMs = Date.now() - challenge.createdAt;
-    console.log(`[DIAG_STEP2_CHALLENGE_FOUND] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} challengeIdFp=${fp(challengeId)} username=${challenge.username} challengeAgeMs=${challengeAgeMs}`);
+    // console.log(`[DIAG_STEP2_CHALLENGE_FOUND] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} challengeIdFp=${fp(challengeId)} username=${challenge.username} challengeAgeMs=${challengeAgeMs}`);
 
     // Immediately remove challenge so it cannot be re-used (replay protection)
     this.challenges.delete(challengeId);
@@ -250,7 +250,7 @@ export class AuthService {
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
-    console.log(`[DIAG_STEP2_VERIFY_RESULT] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} success=${verification.success} username=${challenge.username} userFound=${!!user} userSaltFp=${fp(user?.salt)} challengeSaltFp=${fp(challenge.salt)} userVerifierFp=${fp(user?.verifier)} challengeVerifierFp=${fp(challenge.verifier)} saltMatches=${user?.salt === challenge.salt.toString('hex')} verifierMatches=${user?.verifier === challenge.verifier.toString(16)}`);
+    // console.log(`[DIAG_STEP2_VERIFY_RESULT] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} success=${verification.success} username=${challenge.username} userFound=${!!user} userSaltFp=${fp(user?.salt)} challengeSaltFp=${fp(challenge.salt)} userVerifierFp=${fp(user?.verifier)} challengeVerifierFp=${fp(challenge.verifier)} saltMatches=${user?.salt === challenge.salt.toString('hex')} verifierMatches=${user?.verifier === challenge.verifier.toString(16)}`);
 
     if (!verification.success || !user) {
       if (user) {
