@@ -28,8 +28,8 @@ class AppShell extends StatefulWidget {
     this.currentEmail,
     this.authClient,
     this.autoLockTimeoutOverride,
-    this.syncBaseUrl = ApiConfig.syncBaseUrl,
-    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
+    this.syncBaseUrl = '',
+    this.sharingBaseUrl = '',
     this.httpClient,
   });
 
@@ -38,6 +38,11 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+  String get _effectiveSyncBaseUrl =>
+      widget.syncBaseUrl.isNotEmpty ? widget.syncBaseUrl : ApiConfig.syncBaseUrl;
+  String get _effectiveSharingBaseUrl =>
+      widget.sharingBaseUrl.isNotEmpty ? widget.sharingBaseUrl : ApiConfig.sharingBaseUrl;
+
   int _selectedTabIndex = 0;
   Timer? _inactivityTimer;
   /// Grace-period timer started when the app goes to background on native.
@@ -57,7 +62,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       VaultSyncManager.initialize(
         localDb: widget.db,
         api: HttpSyncApiClient(
-          baseUrl: widget.syncBaseUrl,
+          baseUrl: _effectiveSyncBaseUrl,
           userId: widget.currentEmail!,
           httpClient: widget.httpClient,
         ),
@@ -240,8 +245,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                             onLock: _triggerLock,
                             onLogout: _triggerLogout,
                             currentEmail: widget.currentEmail ?? 'auditor@sentinelvault.io',
-                            syncBaseUrl: widget.syncBaseUrl,
-                            sharingBaseUrl: widget.sharingBaseUrl,
+                            syncBaseUrl: _effectiveSyncBaseUrl,
+                            sharingBaseUrl: _effectiveSharingBaseUrl,
                             httpClient: widget.httpClient,
                           ),
                         ),

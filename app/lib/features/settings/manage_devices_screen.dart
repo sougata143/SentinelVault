@@ -11,7 +11,7 @@ class ManageDevicesScreen extends StatefulWidget {
 
   const ManageDevicesScreen({
     super.key,
-    this.authBaseUrl = ApiConfig.authBaseUrl,
+    this.authBaseUrl = '',
     this.jwtToken = 'mock_jwt_token',
     this.httpClient,
   });
@@ -21,6 +21,8 @@ class ManageDevicesScreen extends StatefulWidget {
 }
 
 class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
+  String get _effectiveAuthBaseUrl =>
+      widget.authBaseUrl.isNotEmpty ? widget.authBaseUrl : ApiConfig.authBaseUrl;
   late final AuthClient _authClient;
   bool _isLoading = true;
   String? _errorMessage;
@@ -30,7 +32,7 @@ class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
   void initState() {
     super.initState();
     _authClient = AuthClient(
-      baseUrl: widget.authBaseUrl,
+      baseUrl: _effectiveAuthBaseUrl,
       httpClient: widget.httpClient,
     );
     _fetchSessions();

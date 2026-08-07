@@ -15,7 +15,7 @@ class MasterPasswordSetupScreen extends StatefulWidget {
   const MasterPasswordSetupScreen({
     super.key,
     required this.email,
-    this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.syncBaseUrl = '',
     this.httpClient,
   });
 
@@ -25,6 +25,8 @@ class MasterPasswordSetupScreen extends StatefulWidget {
 
 
 class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
+  String get _effectiveSyncBaseUrl =>
+      widget.syncBaseUrl.isNotEmpty ? widget.syncBaseUrl : ApiConfig.syncBaseUrl;
   final _formKey = GlobalKey<FormState>();
   final _masterPasswordController = TextEditingController();
   final _confirmMasterPasswordController = TextEditingController();
@@ -61,7 +63,7 @@ class _MasterPasswordSetupScreenState extends State<MasterPasswordSetupScreen> {
 
     try {
       final syncClient = HttpSyncApiClient(
-        baseUrl: widget.syncBaseUrl,
+        baseUrl: _effectiveSyncBaseUrl,
         userId: widget.email,
         httpClient: widget.httpClient,
       );

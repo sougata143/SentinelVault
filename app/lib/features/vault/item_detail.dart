@@ -287,6 +287,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 ],
               ),
             ),
+          ],
           // Password History & Rollback Section
           if (item.fields is LoginFields && (item.fields as LoginFields).passwordHistory.isNotEmpty) ...[
             const SizedBox(height: 20),
