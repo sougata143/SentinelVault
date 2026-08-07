@@ -463,6 +463,17 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           vendor: _licenseVendorController.text.isNotEmpty ? _licenseVendorController.text : null,
         );
         break;
+      case VaultItemType.passkey:
+        fields = PasskeyFields(
+          rpId: _usernameController.text,
+          userHandle: '',
+          userName: _usernameController.text,
+          credentialId: '',
+          privateKeyPem: const ConcealedValue.plain(''),
+          publicKeyRaw: '',
+          cosePublicKey: '',
+        );
+        break;
     }
 
     final tags = _tagsController.text
@@ -1626,6 +1637,20 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   hintText: 'e.g. JetBrains, Adobe, Microsoft',
                   prefixIcon: Icon(Icons.storefront_outlined),
                 ),
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.passkey:
+        return [
+          _buildSectionCard(
+            title: 'FIDO2 / WebAuthn Passkey',
+            titleIcon: Icons.fingerprint,
+            children: [
+              const Text(
+                'Passkeys are generated automatically during WebAuthn registration.',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
           ),

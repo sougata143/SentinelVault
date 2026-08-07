@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 export 'vault_item.dart';
+export 'passkey_item.dart';
 
 /// Represents an encrypted vault item (e.g., password, login credentials).
 class EncryptedVaultItem {

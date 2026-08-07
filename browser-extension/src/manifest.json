@@ -17,6 +17,11 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "js": ["content-scripts/webauthn-interceptor.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
       "js": ["content-scripts/autofill.js"],
       "run_at": "document_end"
     }

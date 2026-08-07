@@ -14,6 +14,29 @@ import Security
     channel.setMethodCallHandler { [weak self] (call, result) in
       self?.handleSecureStorage(call: call, result: result)
     }
+
+    let passkeyChannel = FlutterMethodChannel(name: "com.example.app/passkeys_ios", binaryMessenger: controller.binaryMessenger)
+    passkeyChannel.setMethodCallHandler { (call, result) in
+      switch call.method {
+      case "isPasskeyExtensionSupported":
+        if #available(iOS 17.0, *) {
+          result(true)
+        } else {
+          result(false)
+        }
+      case "syncPasskeyToAppGroup":
+        if let args = call.arguments as? [String: Any],
+           let payload = args["payload"] as? String {
+          let userDefaults = UserDefaults(suiteName: "group.io.sentinelvault.app")
+          userDefaults?.set(payload, forKey: "sentinel_passkeys")
+          result(true)
+        } else {
+          result(false)
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

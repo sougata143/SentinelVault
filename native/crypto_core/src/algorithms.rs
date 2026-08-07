@@ -211,4 +211,5 @@ pub fn calculate_client_session(
 
 pub mod pqc_hybrid;
 pub mod totp;
+pub mod webauthn;
 
