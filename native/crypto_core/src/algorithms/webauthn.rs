@@ -14,6 +14,18 @@ pub struct WebAuthnKeyPair {
     pub cose_public_key: Vec<u8>,
 }
 
+impl Zeroize for WebAuthnKeyPair {
+    fn zeroize(&mut self) {
+        self.private_key_pem.zeroize();
+    }
+}
+
+impl Drop for WebAuthnKeyPair {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
 /// Generates a new P-256 (ES256) WebAuthn keypair.
 pub fn generate_webauthn_keypair() -> WebAuthnKeyPair {
     let secret_key = SecretKey::random(&mut OsRng);
@@ -160,5 +172,13 @@ mod tests {
 
         let valid = verify_webauthn_assertion(&keypair.public_key_raw, &auth_data, &client_data_hash, &sig);
         assert!(valid);
+    }
+
+    #[test]
+    fn test_webauthn_keypair_zeroization() {
+        let mut keypair = generate_webauthn_keypair();
+        assert!(!keypair.private_key_pem.is_empty());
+        keypair.zeroize();
+        assert!(keypair.private_key_pem.is_empty() || keypair.private_key_pem.chars().all(|c| c == '\0'));
     }
 }
