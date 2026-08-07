@@ -62,6 +62,7 @@ pub fn decode_base32(input: &str) -> Result<Vec<u8>, &'static str> {
         if bits_left >= 8 {
             bits_left -= 8;
             out.push((buffer >> bits_left) as u8);
+            buffer &= (1 << bits_left) - 1;
         }
     }
 
@@ -142,8 +143,6 @@ mod tests {
 
     #[test]
     fn test_totp_algorithm_from_str() {
-        use std::str::FromStr;
-
         assert_eq!(TotpAlgorithm::from_str("sha1"), TotpAlgorithm::Sha1);
         assert_eq!(TotpAlgorithm::from_str("SHA256"), TotpAlgorithm::Sha256);
         assert_eq!(TotpAlgorithm::from_str("sha-512"), TotpAlgorithm::Sha512);
