@@ -353,26 +353,26 @@ TRUNCATE TABLE encrypted_vault_items CASCADE;
 
 ---
 
-## 🛠️ SentinelVault Developer CLI (`sv`)
+## 🛠️ SentinelVault Developer CLI (`svault`)
 
-A high-performance standalone Rust CLI tool (`cli/sv`) for developer workflows, shell scripts, and CI/CD pipelines.
+A high-performance standalone Rust CLI tool (`cli/svault`) for developer workflows, shell scripts, and CI/CD pipelines.
 
 ### Key Commands & Usage:
 ```bash
 # 1. Authenticate with auth-service via SRP-6a (stores JWT in OS Keyring)
-sv login --email dev@sentinelvault.io
+svault login --email dev@sentinelvault.io
 
 # 2. Unlock vault in memory (Argon2id KDF, TTL in-memory cache)
-sv unlock --session-timeout 15m
+svault unlock --session-timeout 15m
 
 # 3. List vault items
-sv list --folder Development
+svault list --folder Development
 
 # 4. Fetch single secret / field
-sv get "Database Password" --field password
+svault get "Database Password" --field password
 
 # 5. Export folder secrets to .env file
-sv env Development > .env
+svault env Development > .env
 ```
 
 ### Common Workflows:
@@ -381,21 +381,21 @@ sv env Development > .env
 Inject secrets directly from a SentinelVault folder into local development config without storing credentials in git:
 ```bash
 # Inject all items in the 'Development' folder as KEY=VALUE pairs
-sv env Development > .env
+svault env Development > .env
 ```
 
 #### 2. Shell Profile Integration (`.zshrc` / `.bashrc`)
 Add an alias to quickly inject decrypted secrets into shell environment variables:
 ```bash
 # In ~/.zshrc or ~/.bash_profile
-alias load-dev-env="eval \$(sv env Development | sed 's/^/export /')"
+alias load-dev-env="eval \$(svault env Development | sed 's/^/export /')"
 ```
 
 #### 3. Docker Build Step Integration
 Pass API keys into Docker builds without writing secrets to layer caches or git history:
 ```bash
 # Fetch secret directly from vault and pass via build-arg
-export STRIPE_KEY=$(sv get Stripe --field password)
+export STRIPE_KEY=$(svault get Stripe --field password)
 docker build --build-arg STRIPE_KEY=$STRIPE_KEY -t my-app:latest .
 ```
 

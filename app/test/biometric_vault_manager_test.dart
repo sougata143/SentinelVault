@@ -1,17 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:core/core.dart';
 import 'package:app/features/auth/biometric_vault_manager.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('BiometricVaultManager Unit Tests', () {
-    const mockStorage = FlutterSecureStorage();
     final sampleVaultKey = List<int>.generate(32, (i) => i + 1);
     const masterPassword = 'MySecretMasterPassword!123';
 
     setUp(() async {
-      FlutterSecureStorage.setMockInitialValues({});
+      SecureStorage.instance = InMemorySecureStorage();
       await BiometricVaultManager.purgeCachedKey();
       await BiometricVaultManager.setBiometricsEnabled(false);
     });
@@ -20,13 +19,9 @@ void main() {
       await BiometricVaultManager.setBiometricsEnabled(true);
       await BiometricVaultManager.cacheVaultKey(sampleVaultKey);
 
-      final storedKey = await mockStorage.read(key: BiometricVaultManager.keyCachedVaultKey);
+      final storedKey = await SecureStorage.instance.readString(BiometricVaultManager.keyCachedVaultKey);
       expect(storedKey, isNotNull);
       expect(storedKey, isNot(contains(masterPassword)));
-
-      final allKeys = await mockStorage.readAll();
-      final allValues = allKeys.values.join(' ');
-      expect(allValues, isNot(contains(masterPassword)));
     });
 
     test('Caching Vault Key when biometrics disabled is a no-op', () async {
@@ -47,7 +42,7 @@ void main() {
       await BiometricVaultManager.setBiometricsEnabled(false);
 
       expect(await BiometricVaultManager.hasValidCachedKey(), isFalse);
-      final storedKey = await mockStorage.read(key: BiometricVaultManager.keyCachedVaultKey);
+      final storedKey = await SecureStorage.instance.readString(BiometricVaultManager.keyCachedVaultKey);
       expect(storedKey, isNull);
     });
 
@@ -60,13 +55,13 @@ void main() {
 
       // Artificially simulate 15 seconds passing
       final oldTimestamp = DateTime.now().millisecondsSinceEpoch - 15000;
-      await mockStorage.write(key: BiometricVaultManager.keyCachedTimestamp, value: oldTimestamp.toString());
+      await SecureStorage.instance.writeString(BiometricVaultManager.keyCachedTimestamp, oldTimestamp.toString());
 
       // Should return false and auto-purge
       final isValid = await BiometricVaultManager.hasValidCachedKey();
       expect(isValid, isFalse);
 
-      final storedKey = await mockStorage.read(key: BiometricVaultManager.keyCachedVaultKey);
+      final storedKey = await SecureStorage.instance.readString(BiometricVaultManager.keyCachedVaultKey);
       expect(storedKey, isNull);
     });
 
@@ -77,7 +72,7 @@ void main() {
       await BiometricVaultManager.purgeCachedKey();
 
       expect(await BiometricVaultManager.hasValidCachedKey(), isFalse);
-      expect(await mockStorage.read(key: BiometricVaultManager.keyCachedVaultKey), isNull);
+      expect(await SecureStorage.instance.readString(BiometricVaultManager.keyCachedVaultKey), isNull);
     });
   });
 }

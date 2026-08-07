@@ -86,7 +86,7 @@ fn get_session_file_path() -> PathBuf {
 fn load_session() -> Result<SessionConfig, String> {
     let path = get_session_file_path();
     if !path.exists() {
-        return Err("No active session found. Please run 'sv login' first.".into());
+        return Err("No active session found. Please run 'svault login' first.".into());
     }
     let data = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let mut config: SessionConfig = serde_json::from_str(&data).map_err(|e| e.to_string())?;
@@ -264,7 +264,7 @@ async fn main() {
             };
 
             if session.vault_key_hex.is_none() {
-                eprintln!("Vault is locked. Please run 'sv unlock' first.");
+                eprintln!("Vault is locked. Please run 'svault unlock' first.");
                 process::exit(1);
             }
 
@@ -315,7 +315,7 @@ async fn main() {
             let vault_key_hex = match session.vault_key_hex {
                 Some(k) => k,
                 None => {
-                    eprintln!("Vault is locked. Please run 'sv unlock' first.");
+                    eprintln!("Vault is locked. Please run 'svault unlock' first.");
                     process::exit(1);
                 }
             };
@@ -380,7 +380,7 @@ async fn main() {
             let vault_key_hex = match session.vault_key_hex {
                 Some(k) => k,
                 None => {
-                    eprintln!("Vault is locked. Please run 'sv unlock' first.");
+                    eprintln!("Vault is locked. Please run 'svault unlock' first.");
                     process::exit(1);
                 }
             };
