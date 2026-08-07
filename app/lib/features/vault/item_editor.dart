@@ -1227,7 +1227,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _totpAlgorithm,
+                      initialValue: _totpAlgorithm,
                       decoration: const InputDecoration(labelText: 'Algorithm'),
                       items: const [
                         DropdownMenuItem(value: 'SHA1', child: Text('SHA-1')),
@@ -1242,7 +1242,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _totpDigits,
+                      initialValue: _totpDigits,
                       decoration: const InputDecoration(labelText: 'Digits'),
                       items: const [
                         DropdownMenuItem(value: 6, child: Text('6 Digits')),
@@ -1256,7 +1256,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _totpPeriod,
+                      initialValue: _totpPeriod,
                       decoration: const InputDecoration(labelText: 'Period'),
                       items: const [
                         DropdownMenuItem(value: 30, child: Text('30s')),
