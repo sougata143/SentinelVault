@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UserRepository } from './user.repository';
+import { RedisService } from './redis.service';
 import { User } from './entities/user.entity';
 import { WebauthnCredential } from './entities/webauthn-credential.entity';
 
@@ -21,7 +22,7 @@ import { WebauthnCredential } from './entities/webauthn-credential.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, UserRepository],
-  exports: [AuthService, UserRepository, JwtModule],
+  providers: [AuthService, UserRepository, RedisService],
+  exports: [AuthService, UserRepository, JwtModule, RedisService],
 })
 export class AuthModule {}

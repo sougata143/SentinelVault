@@ -14,6 +14,7 @@ import {
 } from '@simplewebauthn/server';
 import { Repository, QueryFailedError } from 'typeorm';
 import { Logger } from '@nestjs/common';
+import { RedisService } from './redis.service';
 
 interface LoginChallenge {
   username: string;
@@ -45,8 +46,6 @@ function fp(val: string | Buffer | bigint | null | undefined): string {
 
 @Injectable()
 export class AuthService {
-  // Temporary storage for active login challenges, keyed by challengeId
-  private readonly challenges: Map<string, LoginChallenge> = new Map();
   // Temporary storage for active MFA sessions, keyed by mfaToken
   private readonly mfaSessions: Map<string, MfaSession> = new Map();
   // Temporary storage for WebAuthn challenges, keyed by username
@@ -65,6 +64,7 @@ export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
   ) {
     this.serverSecret = crypto.randomBytes(32);
   }
@@ -182,22 +182,26 @@ export class AuthService {
 
     const challengeId = crypto.randomBytes(16).toString('hex');
     const createdAt = Date.now();
-    this.challenges.set(challengeId, {
+    const redisKey = `srp:challenge:${challengeId}`;
+    const challengeData = JSON.stringify({
       username,
-      A,
-      b,
-      B,
-      salt,
-      verifier: v,
+      A: A.toString(16),
+      b: b.toString(16),
+      B: B.toString(16),
+      salt: salt.toString('hex'),
+      verifier: v.toString(16),
       createdAt,
     });
+
+    // Store challenge in Redis with a 5-minute (300 seconds) native TTL
+    await this.redisService.set(redisKey, challengeData, 'EX', 300);
 
     const hrEnd = process.hrtime.bigint();
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
 
     // console.log(`[DIAG_STEP1_CHALLENGE_CREATED] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} challengeIdFp=${fp(challengeId)} username=${username} isRealUser=${!!user} saltFp=${fp(salt)} verifierFp=${fp(v)} AFp=${fp(A)} BFp=${fp(B)} bFp=${fp(b)} createdAt=${createdAt}`);
 
-    // Clean up old challenges after 5 minutes
+    // Clean up old non-Redis challenges
     this.pruneOldChallenges();
 
     return {
@@ -217,17 +221,26 @@ export class AuthService {
     const isoStart = new Date().toISOString();
     // console.log(`[DIAG_STEP2_START] ISO=${isoStart} HR=${hrStart} challengeIdFp=${fp(challengeId)} m1Fp=${fp(m1Hex)}`);
 
-    const challenge = this.challenges.get(challengeId);
-    if (!challenge) {
-      // console.log(`[DIAG_STEP2_ERROR] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} Challenge NOT FOUND: challengeIdFp=${fp(challengeId)} totalMapSize=${this.challenges.size}`);
+    const redisKey = `srp:challenge:${challengeId}`;
+    const rawChallenge = await this.redisService.getdel(redisKey);
+    if (!rawChallenge) {
+      // console.log(`[DIAG_STEP2_ERROR] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} Challenge NOT FOUND: challengeIdFp=${fp(challengeId)}`);
       throw new HttpException('Invalid or expired login session', HttpStatus.UNAUTHORIZED);
     }
 
+    const parsed = JSON.parse(rawChallenge);
+    const challenge: LoginChallenge = {
+      username: parsed.username,
+      A: BigInt('0x' + parsed.A),
+      b: BigInt('0x' + parsed.b),
+      B: BigInt('0x' + parsed.B),
+      salt: Buffer.from(parsed.salt, 'hex'),
+      verifier: BigInt('0x' + parsed.verifier),
+      createdAt: parsed.createdAt,
+    };
+
     const challengeAgeMs = Date.now() - challenge.createdAt;
     // console.log(`[DIAG_STEP2_CHALLENGE_FOUND] ISO=${new Date().toISOString()} HR=${process.hrtime.bigint()} challengeIdFp=${fp(challengeId)} username=${challenge.username} challengeAgeMs=${challengeAgeMs}`);
-
-    // Immediately remove challenge so it cannot be re-used (replay protection)
-    this.challenges.delete(challengeId);
 
     const user = await this.userRepository.findByUsername(challenge.username);
     const now = new Date();
@@ -611,16 +624,6 @@ export class AuthService {
    */
   private pruneOldChallenges(): void {
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    // Collect stale keys first, then delete outside the iterator.
-    // Mutating a Map while iterating it (for...of entries()) causes V8's live
-    // iterator to silently skip entries in certain Map sizes/hash states —
-    // which was the root cause of intermittent CI failures where a freshly
-    // created challenge was immediately pruned despite being < 1 ms old.
-    const staleChallenge = [...this.challenges.entries()]
-      .filter(([, c]) => c.createdAt < fiveMinutesAgo)
-      .map(([id]) => id);
-    staleChallenge.forEach(id => this.challenges.delete(id));
 
     const staleMfa = [...this.mfaSessions.entries()]
       .filter(([, s]) => s.createdAt < fiveMinutesAgo)

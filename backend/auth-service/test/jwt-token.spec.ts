@@ -19,6 +19,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/auth/auth.service';
 import { UserRepository } from '../src/auth/user.repository';
+import { RedisService } from '../src/auth/redis.service';
 import { User } from '../src/auth/entities/user.entity';
 import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
 import { SrpServer, bigIntToBuffer, bufferToBigInt, sha256 } from '../src/auth/srp';
@@ -159,6 +160,7 @@ describe('JWT token issued by AuthService', () => {
       providers: [
         AuthService,
         UserRepository,
+        RedisService,
         // Provide fake in-memory repositories so no Postgres connection is needed
         {
           provide: getRepositoryToken(User),

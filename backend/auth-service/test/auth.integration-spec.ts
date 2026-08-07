@@ -5,6 +5,7 @@ import { INestApplication, HttpStatus } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { UserRepository } from '../src/auth/user.repository';
+import { RedisService } from '../src/auth/redis.service';
 import { SrpServer, bigIntToBuffer, bufferToBigInt, sha256 } from '../src/auth/srp';
 import * as crypto from 'crypto';
 
@@ -41,6 +42,7 @@ jest.mock('@simplewebauthn/server', () => ({
 describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
   let app: INestApplication;
   let userRepository: UserRepository;
+  let redisService: RedisService;
 
   function getUniqueUser(prefix = 'user'): string {
     return `${prefix}_${crypto.randomBytes(6).toString('hex')}`;
@@ -120,6 +122,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
     await app.init();
 
     userRepository = moduleFixture.get<UserRepository>(UserRepository);
+    redisService = moduleFixture.get<RedisService>(RedisService);
   }, 30000);
 
   afterAll(async () => {
@@ -130,6 +133,7 @@ describe('AuthService Integration Tests (SRP-6a, MFA, & Lockout)', () => {
 
   beforeEach(async () => {
     await userRepository.clear();
+    await redisService.flushall();
   });
 
   it('rate limiting headers are present on auth endpoints', async () => {
