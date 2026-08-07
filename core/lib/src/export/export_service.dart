@@ -149,6 +149,61 @@ class ExportService {
           csv(item.favorite.toString()),
           csv(item.notes.plaintext),
         ].join(',');
+      } else if (f is TotpFields) {
+        row = [
+          csv('totp'),
+          csv(item.title),
+          csv(f.accountName),
+          csv(f.secret.plaintext),
+          '', ...List.filled(17, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is SshKeyFields) {
+        row = [
+          csv('ssh_key'),
+          csv(item.title),
+          csv(f.keyName),
+          csv(f.privateKey.plaintext),
+          csv(f.publicKey), ...List.filled(16, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is ApiKeyFields) {
+        row = [
+          csv('api_key'),
+          csv(item.title),
+          csv(f.serviceName),
+          csv(f.keyValue.plaintext),
+          ...List.filled(18, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is CryptoSeedFields) {
+        row = [
+          csv('crypto_seed'),
+          csv(item.title),
+          csv(f.walletName),
+          csv(f.seedPhrase.plaintext),
+          ...List.filled(18, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
+      } else if (f is SoftwareLicenseFields) {
+        row = [
+          csv('software_license'),
+          csv(item.title),
+          csv(f.productName),
+          csv(f.licenseKey.plaintext),
+          ...List.filled(18, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
       } else {
         // Unknown type — output a row with only the title
         row = [csv('unknown'), csv(item.title), ...List.filled(21, '')].join(',');
@@ -209,7 +264,10 @@ class ExportService {
             'country': f.address.country,
           };
         } else if (f is SecureNoteFields) {
-          base['fields'] = {'content': f.content.plaintext ?? ''};
+          base['fields'] = {
+            'content': f.content.plaintext ?? '',
+            'attachment_count': f.attachments.length,
+          };
         } else if (f is BankAccountFields) {
           base['fields'] = {
             'bank_name': f.bankName,
@@ -218,6 +276,44 @@ class ExportService {
           };
         } else if (f is PasswordFields) {
           base['fields'] = {'password': f.password.plaintext ?? ''};
+        } else if (f is TotpFields) {
+          base['fields'] = {
+            'issuer': f.issuer,
+            'account_name': f.accountName,
+            'secret': f.secret.plaintext ?? '',
+            'algorithm': f.algorithm,
+            'digits': f.digits,
+            'period': f.period,
+          };
+        } else if (f is SshKeyFields) {
+          base['fields'] = {
+            'key_name': f.keyName,
+            'private_key': f.privateKey.plaintext ?? '',
+            'public_key': f.publicKey,
+            'passphrase': f.passphrase.plaintext ?? '',
+            'key_type': f.keyType,
+          };
+        } else if (f is ApiKeyFields) {
+          base['fields'] = {
+            'service_name': f.serviceName,
+            'key_value': f.keyValue.plaintext ?? '',
+            'api_secret': f.apiSecret.plaintext ?? '',
+            'expiry_date': f.expiryDate ?? '',
+          };
+        } else if (f is CryptoSeedFields) {
+          base['fields'] = {
+            'wallet_name': f.walletName,
+            'seed_phrase': f.seedPhrase.plaintext ?? '',
+            'derivation_path': f.derivationPath ?? '',
+          };
+        } else if (f is SoftwareLicenseFields) {
+          base['fields'] = {
+            'product_name': f.productName,
+            'license_key': f.licenseKey.plaintext ?? '',
+            'purchase_date': f.purchaseDate ?? '',
+            'seats_or_version': f.seatsOrVersion ?? '',
+            'vendor': f.vendor ?? '',
+          };
         }
 
         return base;

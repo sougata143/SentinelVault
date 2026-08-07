@@ -367,6 +367,10 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
               ),
               const SizedBox(height: 24),
 
+              // Security Audit Log Feed Section
+              _buildAuditLogFeedSection(),
+              const SizedBox(height: 24),
+
               // Weekly AI Digest Section
               const Text(
                 'Weekly Security Digest',
@@ -619,6 +623,132 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
 
       ),
     );
+  }
+
+  Widget _buildAuditLogFeedSection() {
+    final localLogs = SecurityActivityLog.instance.getLog();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Security Audit Log Feed',
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              '${localLogs.length} Events',
+              style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Card(
+          color: AppTheme.surfaceColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.shield_outlined, color: AppTheme.primaryColor, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Zero-Knowledge Activity Stream',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (localLogs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text(
+                        'No audit events recorded in current session.',
+                        style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: localLogs.length > 5 ? 5 : localLogs.length,
+                    separatorBuilder: (_, _) => const Divider(color: Colors.white10, height: 16),
+                    itemBuilder: (context, index) {
+                      final item = localLogs[index];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: _getAuditIconColor(item.type).withValues(alpha: 0.15),
+                          child: Icon(_getAuditIcon(item.type), color: _getAuditIconColor(item.type), size: 16),
+                        ),
+                        title: Text(
+                          _formatAuditTitle(item.type),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          '${item.timestamp.toLocal().toString().split('.').first} • ${item.itemCount} items',
+                          style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 11),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('OK', style: TextStyle(fontSize: 10, color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getAuditIcon(String type) {
+    if (type.contains('export')) return Icons.file_upload_outlined;
+    if (type.contains('import')) return Icons.file_download_outlined;
+    if (type.contains('lock')) return Icons.lock_outlined;
+    if (type.contains('share')) return Icons.folder_shared_outlined;
+    if (type.contains('failure')) return Icons.warning_amber_outlined;
+    return Icons.security_outlined;
+  }
+
+  Color _getAuditIconColor(String type) {
+    if (type.contains('failure')) return AppTheme.errorColor;
+    if (type.contains('export')) return Colors.orangeAccent;
+    if (type.contains('share')) return Colors.purpleAccent;
+    return AppTheme.primaryColor;
+  }
+
+  String _formatAuditTitle(String type) {
+    return type
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+        .join(' ');
   }
 
   Widget _buildBreachFeedSection() {

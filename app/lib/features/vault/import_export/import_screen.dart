@@ -81,6 +81,58 @@ Future<void> encryptAndSave(
       );
       break;
 
+    case 'totp':
+      type = VaultItemType.totp;
+      final secretRaw = item.totpSecret ?? '';
+      final params = secretRaw.trim().toLowerCase().startsWith('otpauth://')
+          ? TotpHelper.parseOtpauthUri(secretRaw)
+          : TotpParams(issuer: item.title, accountName: item.username ?? '', secret: secretRaw);
+      fields = TotpFields(
+        issuer: params.issuer.isNotEmpty ? params.issuer : item.title,
+        accountName: params.accountName,
+        secret: ConcealedValue.plain(params.secret),
+        algorithm: params.algorithm,
+        digits: params.digits,
+        period: params.period,
+      );
+      break;
+
+    case 'ssh_key':
+      type = VaultItemType.sshKey;
+      fields = SshKeyFields(
+        keyName: item.title,
+        privateKey: ConcealedValue.plain(item.notes ?? item.password ?? ''),
+        publicKey: item.username ?? '',
+        passphrase: const ConcealedValue.plain(''),
+        keyType: 'Ed25519',
+      );
+      break;
+
+    case 'api_key':
+      type = VaultItemType.apiKey;
+      fields = ApiKeyFields(
+        serviceName: item.title,
+        keyValue: ConcealedValue.plain(item.password ?? item.notes ?? ''),
+        apiSecret: const ConcealedValue.plain(''),
+      );
+      break;
+
+    case 'crypto_seed':
+      type = VaultItemType.cryptoSeed;
+      fields = CryptoSeedFields(
+        walletName: item.title,
+        seedPhrase: ConcealedValue.plain(item.notes ?? item.password ?? ''),
+      );
+      break;
+
+    case 'software_license':
+      type = VaultItemType.softwareLicense;
+      fields = SoftwareLicenseFields(
+        productName: item.title,
+        licenseKey: ConcealedValue.plain(item.password ?? item.notes ?? ''),
+      );
+      break;
+
     case 'login':
     default:
       type = VaultItemType.login;
@@ -796,6 +848,10 @@ class _ImportScreenState extends State<ImportScreen> {
       case 'secure_note': return 'Secure Notes';
       case 'bank_account': return 'Bank Accounts';
       case 'password': return 'Passwords';
+      case 'ssh_key': return 'SSH Keys';
+      case 'api_key': return 'API Keys & Tokens';
+      case 'crypto_seed': return 'Crypto Seed Phrases';
+      case 'software_license': return 'Software Licenses';
       default: return type;
     }
   }

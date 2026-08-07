@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:core/core.dart';
 import 'package:app/features/auth/unlock_screen.dart';
 import 'package:app/features/settings/settings_screen.dart';
+import 'package:app/features/auth/biometric_vault_manager.dart';
 import 'package:app/app_shell.dart';
 
 void main() {
@@ -57,6 +58,7 @@ void main() {
       BiometricAuthService.instance.setMockSupported(true);
       BiometricAuthService.instance.setMockAuthenticateSuccess(true);
       BiometricAuthService.instance.setMockEnrollmentChanged(false);
+      BiometricVaultManager.isBiometricAvailableOverride = true;
 
       FlutterError.onError = (FlutterErrorDetails details) {
         final message = details.exceptionAsString();
@@ -101,6 +103,8 @@ void main() {
       // Toggle switch ON
       await tester.ensureVisible(switchFinder);
       await tester.tap(switchFinder);
+      await tester.pump();
+      await tester.idle();
       await tester.pumpAndSettle();
 
       // Verify setting state and VaultLockManager cache
