@@ -353,6 +353,54 @@ TRUNCATE TABLE encrypted_vault_items CASCADE;
 
 ---
 
+## 🛠️ SentinelVault Developer CLI (`sv`)
+
+A high-performance standalone Rust CLI tool (`cli/sv`) for developer workflows, shell scripts, and CI/CD pipelines.
+
+### Key Commands & Usage:
+```bash
+# 1. Authenticate with auth-service via SRP-6a (stores JWT in OS Keyring)
+sv login --email dev@sentinelvault.io
+
+# 2. Unlock vault in memory (Argon2id KDF, TTL in-memory cache)
+sv unlock --session-timeout 15m
+
+# 3. List vault items
+sv list --folder Development
+
+# 4. Fetch single secret / field
+sv get "Database Password" --field password
+
+# 5. Export folder secrets to .env file
+sv env Development > .env
+```
+
+### Common Workflows:
+
+#### 1. Local Development (`.env` Output Piping)
+Inject secrets directly from a SentinelVault folder into local development config without storing credentials in git:
+```bash
+# Inject all items in the 'Development' folder as KEY=VALUE pairs
+sv env Development > .env
+```
+
+#### 2. Shell Profile Integration (`.zshrc` / `.bashrc`)
+Add an alias to quickly inject decrypted secrets into shell environment variables:
+```bash
+# In ~/.zshrc or ~/.bash_profile
+alias load-dev-env="eval \$(sv env Development | sed 's/^/export /')"
+```
+
+#### 3. Docker Build Step Integration
+Pass API keys into Docker builds without writing secrets to layer caches or git history:
+```bash
+# Fetch secret directly from vault and pass via build-arg
+export STRIPE_KEY=$(sv get Stripe --field password)
+docker build --build-arg STRIPE_KEY=$STRIPE_KEY -t my-app:latest .
+```
+
+---
+
 ## 🔮 Future Scope
 
 - **Post-Quantum Account Auth Hardening**: SRP-6a and WebAuthn/passkey signatures are asymmetric/discrete-log-based and theoretically vulnerable to a future quantum computer, unlike the vault''s symmetric-only encryption chain. Bounded in severity today (compromise would grant account-level access only, never vault contents) but worth revisiting once post-quantum variants of these protocols mature.
