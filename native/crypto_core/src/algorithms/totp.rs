@@ -15,12 +15,20 @@ pub enum TotpAlgorithm {
 }
 
 impl TotpAlgorithm {
-    pub from_str(s: &str) -> Self {
+    pub fn from_str(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "SHA256" | "SHA-256" => TotpAlgorithm::Sha256,
             "SHA512" | "SHA-512" => TotpAlgorithm::Sha512,
             _ => TotpAlgorithm::Sha1,
         }
+    }
+}
+
+impl std::str::FromStr for TotpAlgorithm {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from_str(s))
     }
 }
 
@@ -129,5 +137,17 @@ mod tests {
             let code8 = generate_totp(secret, t, 30, 8, TotpAlgorithm::Sha1).unwrap();
             assert_eq!(code8, exp8, "Failed for 8-digit t={}", t);
         }
+    }
+
+    #[test]
+    fn test_totp_algorithm_from_str() {
+        use std::str::FromStr;
+
+        assert_eq!(TotpAlgorithm::from_str("sha1"), TotpAlgorithm::Sha1);
+        assert_eq!(TotpAlgorithm::from_str("SHA256"), TotpAlgorithm::Sha256);
+        assert_eq!(TotpAlgorithm::from_str("sha-512"), TotpAlgorithm::Sha512);
+        assert_eq!(TotpAlgorithm::from_str("unknown"), TotpAlgorithm::Sha1);
+
+        assert_eq!(TotpAlgorithm::from_str("sha256").ok(), Some(TotpAlgorithm::Sha256));
     }
 }
