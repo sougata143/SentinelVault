@@ -5,6 +5,7 @@ import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import '../settings/settings_screen.dart';
 import 'sharing/sharing_screen.dart';
+import 'totp_code_card.dart';
 
 class ItemDetailPane extends StatefulWidget {
   final VaultItem? item;
@@ -320,6 +321,10 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         icon = Icons.vpn_key_outlined;
         color = AppTheme.primaryColor;
         break;
+      case VaultItemType.totp:
+        icon = Icons.qr_code_2_outlined;
+        color = Colors.cyanAccent;
+        break;
     }
 
     return Container(
@@ -379,6 +384,17 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
     } else if (fields is PasswordFields) {
       return [
         _buildDetailField('Password', fields.password.plaintext ?? '', isSecret: true, obscureKey: 'pw_standalone'),
+      ];
+    } else if (fields is TotpFields) {
+      return [
+        TotpCodeCard.fromFields(fields: fields),
+        const SizedBox(height: 12),
+        _buildDetailField('Issuer / Service', fields.issuer),
+        if (fields.accountName.isNotEmpty) _buildDetailField('Account Name', fields.accountName),
+        _buildDetailField('Secret Key (Base32)', fields.secret.plaintext ?? '', isSecret: true, obscureKey: 'totp_secret'),
+        _buildDetailField('Algorithm', fields.algorithm),
+        _buildDetailField('Digits', fields.digits.toString()),
+        _buildDetailField('Period', '${fields.period}s'),
       ];
     }
     return const [];

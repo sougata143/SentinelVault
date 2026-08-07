@@ -94,6 +94,16 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   // Standalone Password
   final _standalonePwController = TextEditingController();
 
+  // TOTP / Authenticator
+  final _totpIssuerController = TextEditingController();
+  final _totpAccountController = TextEditingController();
+  final _totpSecretController = TextEditingController();
+  final _totpUriInputController = TextEditingController();
+  String _totpAlgorithm = 'SHA1';
+  int _totpDigits = 6;
+  int _totpPeriod = 30;
+  bool _obscureTotpSecret = true;
+
   @override
   void initState() {
     super.initState();
@@ -168,6 +178,13 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       _bankSwiftController.text = fields.swift ?? '';
     } else if (fields is PasswordFields) {
       _standalonePwController.text = fields.password.plaintext ?? '';
+    } else if (fields is TotpFields) {
+      _totpIssuerController.text = fields.issuer;
+      _totpAccountController.text = fields.accountName;
+      _totpSecretController.text = fields.secret.plaintext ?? '';
+      _totpAlgorithm = fields.algorithm;
+      _totpDigits = fields.digits;
+      _totpPeriod = fields.period;
     }
   }
 
@@ -198,6 +215,10 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     _bankRoutingController.dispose();
     _bankIbanController.dispose();
     _bankSwiftController.dispose();
+    _totpIssuerController.dispose();
+    _totpAccountController.dispose();
+    _totpSecretController.dispose();
+    _totpUriInputController.dispose();
     _standalonePwController.dispose();
     _urlInputController.dispose();
     super.dispose();
@@ -334,6 +355,16 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       case VaultItemType.password:
         fields = PasswordFields(
           password: ConcealedValue.plain(_standalonePwController.text),
+        );
+        break;
+      case VaultItemType.totp:
+        fields = TotpFields(
+          issuer: _totpIssuerController.text,
+          accountName: _totpAccountController.text,
+          secret: ConcealedValue.plain(_totpSecretController.text),
+          algorithm: _totpAlgorithm,
+          digits: _totpDigits,
+          period: _totpPeriod,
         );
         break;
     }
@@ -596,6 +627,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           _buildTypeTile(VaultItemType.secureNote, 'Secure Note', Icons.note_outlined, Colors.amberAccent),
           _buildTypeTile(VaultItemType.bankAccount, 'Bank Account', Icons.account_balance_outlined, Colors.lightBlueAccent),
           _buildTypeTile(VaultItemType.password, 'Password', Icons.vpn_key_outlined, AppTheme.primaryColor),
+          _buildTypeTile(VaultItemType.totp, 'TOTP / 2FA', Icons.qr_code_2_outlined, Colors.cyanAccent),
         ],
       ),
     );
@@ -1097,6 +1129,145 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   ),
                 ),
                 validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.totp:
+        return [
+          _buildSectionCard(
+            title: 'Import from otpauth:// URI',
+            titleIcon: Icons.qr_code_scanner,
+            children: [
+              TextFormField(
+                controller: _totpUriInputController,
+                decoration: InputDecoration(
+                  labelText: 'Paste otpauth:// URI or secret',
+                  hintText: 'otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.download, color: AppTheme.primaryColor),
+                    tooltip: 'Parse URI',
+                    onPressed: () {
+                      final input = _totpUriInputController.text.trim();
+                      if (input.isNotEmpty) {
+                        try {
+                          final params = TotpHelper.parseOtpauthUri(input);
+                          setState(() {
+                            if (params.issuer.isNotEmpty) _totpIssuerController.text = params.issuer;
+                            if (params.accountName.isNotEmpty) _totpAccountController.text = params.accountName;
+                            if (params.secret.isNotEmpty) _totpSecretController.text = params.secret;
+                            _totpAlgorithm = params.algorithm;
+                            _totpDigits = params.digits;
+                            _totpPeriod = params.period;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('URI parsed successfully!')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Parse error: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'TOTP Secret & Parameters',
+            titleIcon: Icons.security,
+            children: [
+              TextFormField(
+                controller: _totpIssuerController,
+                decoration: const InputDecoration(
+                  labelText: 'Service / Issuer',
+                  hintText: 'e.g. GitHub, Google, AWS',
+                  prefixIcon: Icon(Icons.business),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Issuer is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _totpAccountController,
+                decoration: const InputDecoration(
+                  labelText: 'Account Name / Email',
+                  hintText: 'e.g. user@example.com',
+                  prefixIcon: Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _totpSecretController,
+                obscureText: _obscureTotpSecret,
+                decoration: InputDecoration(
+                  labelText: 'Base32 Secret Key',
+                  hintText: 'e.g. JBSWY3DPEHPK3PXP',
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureTotpSecret ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureTotpSecret = !_obscureTotpSecret),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Secret key is required';
+                  try {
+                    TotpHelper.decodeBase32(v);
+                  } catch (_) {
+                    return 'Invalid Base32 secret key format';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _totpAlgorithm,
+                      decoration: const InputDecoration(labelText: 'Algorithm'),
+                      items: const [
+                        DropdownMenuItem(value: 'SHA1', child: Text('SHA-1')),
+                        DropdownMenuItem(value: 'SHA256', child: Text('SHA-256')),
+                        DropdownMenuItem(value: 'SHA512', child: Text('SHA-512')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _totpAlgorithm = val);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _totpDigits,
+                      decoration: const InputDecoration(labelText: 'Digits'),
+                      items: const [
+                        DropdownMenuItem(value: 6, child: Text('6 Digits')),
+                        DropdownMenuItem(value: 8, child: Text('8 Digits')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _totpDigits = val);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _totpPeriod,
+                      decoration: const InputDecoration(labelText: 'Period'),
+                      items: const [
+                        DropdownMenuItem(value: 30, child: Text('30s')),
+                        DropdownMenuItem(value: 60, child: Text('60s')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _totpPeriod = val);
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

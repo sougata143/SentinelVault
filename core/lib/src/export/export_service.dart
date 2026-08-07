@@ -149,6 +149,17 @@ class ExportService {
           csv(item.favorite.toString()),
           csv(item.notes.plaintext),
         ].join(',');
+      } else if (f is TotpFields) {
+        row = [
+          csv('totp'),
+          csv(item.title),
+          csv(f.accountName),
+          csv(f.secret.plaintext),
+          '', ...List.filled(17, ''),
+          csv(item.tags.join('|')),
+          csv(item.favorite.toString()),
+          csv(item.notes.plaintext),
+        ].join(',');
       } else {
         // Unknown type — output a row with only the title
         row = [csv('unknown'), csv(item.title), ...List.filled(21, '')].join(',');
@@ -218,6 +229,15 @@ class ExportService {
           };
         } else if (f is PasswordFields) {
           base['fields'] = {'password': f.password.plaintext ?? ''};
+        } else if (f is TotpFields) {
+          base['fields'] = {
+            'issuer': f.issuer,
+            'account_name': f.accountName,
+            'secret': f.secret.plaintext ?? '',
+            'algorithm': f.algorithm,
+            'digits': f.digits,
+            'period': f.period,
+          };
         }
 
         return base;

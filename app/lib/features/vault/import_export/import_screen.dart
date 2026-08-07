@@ -81,6 +81,22 @@ Future<void> encryptAndSave(
       );
       break;
 
+    case 'totp':
+      type = VaultItemType.totp;
+      final secretRaw = item.totpSecret ?? '';
+      final params = secretRaw.trim().toLowerCase().startsWith('otpauth://')
+          ? TotpHelper.parseOtpauthUri(secretRaw)
+          : TotpParams(issuer: item.title, accountName: item.username ?? '', secret: secretRaw);
+      fields = TotpFields(
+        issuer: params.issuer.isNotEmpty ? params.issuer : item.title,
+        accountName: params.accountName,
+        secret: ConcealedValue.plain(params.secret),
+        algorithm: params.algorithm,
+        digits: params.digits,
+        period: params.period,
+      );
+      break;
+
     case 'login':
     default:
       type = VaultItemType.login;

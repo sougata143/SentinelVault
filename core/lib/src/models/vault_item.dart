@@ -22,6 +22,9 @@ enum VaultItemType {
 
   /// A standalone plaintext password entry.
   password,
+
+  /// Standalone TOTP / Authenticator 2FA secret entry.
+  totp,
 }
 
 /// Extension on [VaultItemType] providing serialization helpers.
@@ -41,6 +44,8 @@ extension VaultItemTypeExtension on VaultItemType {
         return 'bank_account';
       case VaultItemType.password:
         return 'password';
+      case VaultItemType.totp:
+        return 'totp';
     }
   }
 
@@ -59,6 +64,8 @@ extension VaultItemTypeExtension on VaultItemType {
         return VaultItemType.bankAccount;
       case 'password':
         return VaultItemType.password;
+      case 'totp':
+        return VaultItemType.totp;
       default:
         throw ArgumentError('Invalid VaultItemType value: $value');
     }
@@ -679,6 +686,87 @@ class PasswordFields implements VaultItemFields {
   }
 }
 
+// ── TOTP / Authenticator Fields ───────────────────────────────────────────
+
+/// Vault item payload containing a TOTP / Authenticator seed and parameters.
+class TotpFields implements VaultItemFields {
+  /// Service or issuer label (e.g., 'GitHub', 'Google', 'AWS').
+  final String issuer;
+
+  /// Account name or email identifier (e.g., 'user@example.com').
+  final String accountName;
+
+  /// Base32 encoded TOTP secret key (symmetrically encrypted).
+  final ConcealedValue secret;
+
+  /// HMAC digest algorithm ('SHA1', 'SHA256', 'SHA512').
+  final String algorithm;
+
+  /// Number of digits in generated code (typically 6 or 8).
+  final int digits;
+
+  /// Code refresh period in seconds (typically 30).
+  final int period;
+
+  /// Creates TOTP fields.
+  TotpFields({
+    required this.issuer,
+    required this.accountName,
+    required this.secret,
+    this.algorithm = 'SHA1',
+    this.digits = 6,
+    this.period = 30,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'issuer': issuer,
+        'account_name': accountName,
+        'secret': secret.toJson(),
+        'algorithm': algorithm,
+        'digits': digits,
+        'period': period,
+      };
+
+  /// Deserializes a [TotpFields] instance from a JSON map.
+  factory TotpFields.fromJson(Map<String, dynamic> json) {
+    return TotpFields(
+      issuer: json['issuer'] as String? ?? '',
+      accountName: json['account_name'] as String? ?? '',
+      secret: json['secret'] != null
+          ? ConcealedValue.fromJson(json['secret'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      algorithm: json['algorithm'] as String? ?? 'SHA1',
+      digits: json['digits'] as int? ?? 6,
+      period: json['period'] as int? ?? 30,
+    );
+  }
+
+  @override
+  Future<TotpFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return TotpFields(
+      issuer: issuer,
+      accountName: accountName,
+      secret: await secret.encrypt(key, crypto),
+      algorithm: algorithm,
+      digits: digits,
+      period: period,
+    );
+  }
+
+  @override
+  Future<TotpFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return TotpFields(
+      issuer: issuer,
+      accountName: accountName,
+      secret: await secret.decrypt(key, crypto),
+      algorithm: algorithm,
+      digits: digits,
+      period: period,
+    );
+  }
+}
+
 // ── Custom Field ──────────────────────────────────────────────────────────
 
 /// Represents a user-defined custom field extension inside a vault item.
@@ -839,6 +927,9 @@ class VaultItem {
         break;
       case VaultItemType.password:
         fields = PasswordFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.totp:
+        fields = TotpFields.fromJson(fieldsJson);
         break;
     }
 

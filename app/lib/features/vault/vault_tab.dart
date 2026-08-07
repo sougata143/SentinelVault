@@ -545,6 +545,7 @@ class _VaultTabState extends State<VaultTab> {
         _buildSidebarTile('secure_note', 'Secure Notes', Icons.note_outlined),
         _buildSidebarTile('bank_account', 'Bank Accounts', Icons.account_balance_outlined),
         _buildSidebarTile('password', 'Passwords', Icons.vpn_key_outlined),
+        _buildSidebarTile('totp', 'TOTP / 2FA', Icons.qr_code_2_outlined),
         const Divider(color: Colors.white10),
         _buildSidebarTile('shared', 'Shared With Me', Icons.folder_shared_outlined),
         _buildSidebarTile('favorites', 'Favorites', Icons.star_border),
