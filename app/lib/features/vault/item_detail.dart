@@ -287,6 +287,84 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 ],
               ),
             ),
+          // Password History & Rollback Section
+          if (item.fields is LoginFields && (item.fields as LoginFields).passwordHistory.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'PASSWORD HISTORY & ROLLBACK',
+                        style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                      ),
+                      Text(
+                        '${(item.fields as LoginFields).passwordHistory.length} previous version(s)',
+                        style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  ...(item.fields as LoginFields).passwordHistory.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final hist = entry.value;
+                    final histPwd = hist.password.plaintext ?? '••••••••';
+                    final obscureKey = 'hist_$idx';
+                    final isObscured = _isObscured(obscureKey);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isObscured ? '••••••••••••' : histPwd,
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.bold,
+                                    color: isObscured ? AppTheme.textSecondaryColor : AppTheme.textPrimaryColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Rotated: ${hist.changedAt.toLocal().toString().split('.').first}',
+                                  style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(isObscured ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondaryColor, size: 18),
+                            onPressed: () => _toggleObscure(obscureKey),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.copy, color: AppTheme.primaryColor, size: 18),
+                            onPressed: () => _copyToClipboard('Historical Password', histPwd),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
           ],
         ],
       ),

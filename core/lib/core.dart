@@ -10,6 +10,7 @@ export 'src/crypto/srp.dart';
 export 'src/database/vault_database.dart';
 export 'src/models/models.dart';
 export 'src/security/password_strength.dart';
+export 'src/security/password_generator.dart';
 export 'src/security/url_scanner.dart';
 export 'src/security/email_scanner.dart';
 export 'src/security/breach_monitor.dart';

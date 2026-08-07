@@ -252,6 +252,12 @@ class LoginFields implements VaultItemFields {
   /// A list of past passwords recorded for this account.
   final List<PasswordHistoryEntry> passwordHistory;
 
+  /// Optional timestamp when the password was last rotated.
+  final DateTime? lastRotatedAt;
+
+  /// Configurable interval (in days) for password rotation reminders.
+  final int? rotationReminderDays;
+
   /// Creates login credential fields.
   LoginFields({
     required this.username,
@@ -259,6 +265,8 @@ class LoginFields implements VaultItemFields {
     required this.urls,
     required this.otpSecret,
     required this.passwordHistory,
+    this.lastRotatedAt,
+    this.rotationReminderDays = 90,
   });
 
   @override
@@ -268,6 +276,8 @@ class LoginFields implements VaultItemFields {
         'urls': urls,
         'otp_secret': otpSecret.toJson(),
         'password_history': passwordHistory.map((e) => e.toJson()).toList(),
+        'last_rotated_at': lastRotatedAt?.toIso8601String(),
+        'rotation_reminder_days': rotationReminderDays,
       };
 
   /// Deserializes a [LoginFields] payload from a JSON map.
@@ -284,7 +294,67 @@ class LoginFields implements VaultItemFields {
       passwordHistory: (json['password_history'] as List? ?? [])
           .map((e) => PasswordHistoryEntry.fromJson(e as Map<String, dynamic>))
           .toList(),
+      lastRotatedAt: json['last_rotated_at'] != null ? DateTime.tryParse(json['last_rotated_at'] as String) : null,
+      rotationReminderDays: (json['rotation_reminder_days'] as num?)?.toInt() ?? 90,
     );
+  }
+
+  /// Rotates the active password, archiving current password into [passwordHistory] (max 5 entries).
+  LoginFields rotatePassword({
+    required String newPassword,
+    DateTime? timestamp,
+    int? newReminderDays,
+  }) {
+    final ts = timestamp ?? DateTime.now();
+    final newHistoryEntry = PasswordHistoryEntry(
+      password: password,
+      changedAt: ts,
+    );
+
+    final updatedHistory = [newHistoryEntry, ...passwordHistory];
+    if (updatedHistory.length > 5) {
+      updatedHistory.removeRange(5, updatedHistory.length);
+    }
+
+    return LoginFields(
+      username: username,
+      password: ConcealedValue.plain(newPassword),
+      urls: urls,
+      otpSecret: otpSecret,
+      passwordHistory: updatedHistory,
+      lastRotatedAt: ts,
+      rotationReminderDays: newReminderDays ?? rotationReminderDays,
+    );
+  }
+
+  /// Restores the most recently archived password from [passwordHistory] (rollback action).
+  LoginFields rollbackPassword() {
+    if (passwordHistory.isEmpty) return this;
+
+    final restoredEntry = passwordHistory.first;
+    final remainingHistory = passwordHistory.sublist(1);
+
+    return LoginFields(
+      username: username,
+      password: restoredEntry.password,
+      urls: urls,
+      otpSecret: otpSecret,
+      passwordHistory: remainingHistory,
+      lastRotatedAt: lastRotatedAt,
+      rotationReminderDays: rotationReminderDays,
+    );
+  }
+
+  /// Checks if password rotation is due based on [lastRotatedAt] or [createdAt] and [rotationReminderDays].
+  bool isRotationDue({DateTime? referenceDate, DateTime? now, int defaultDays = 90}) {
+    final daysThreshold = rotationReminderDays ?? defaultDays;
+    if (daysThreshold <= 0) return false;
+
+    final baseDate = lastRotatedAt ?? referenceDate;
+    if (baseDate == null) return true;
+
+    final currentDate = now ?? DateTime.now();
+    return currentDate.difference(baseDate).inDays >= daysThreshold;
   }
 
   @override
@@ -303,6 +373,8 @@ class LoginFields implements VaultItemFields {
       urls: urls,
       otpSecret: encOtp,
       passwordHistory: encHistory,
+      lastRotatedAt: lastRotatedAt,
+      rotationReminderDays: rotationReminderDays,
     );
   }
 
@@ -322,6 +394,8 @@ class LoginFields implements VaultItemFields {
       urls: urls,
       otpSecret: decOtp,
       passwordHistory: decHistory,
+      lastRotatedAt: lastRotatedAt,
+      rotationReminderDays: rotationReminderDays,
     );
   }
 }
