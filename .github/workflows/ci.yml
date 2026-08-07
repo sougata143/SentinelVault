@@ -48,7 +48,9 @@ jobs:
           key: flutter-test-${{ hashFiles('native/crypto_core/Cargo.lock') }}
 
       - name: Build native libcrypto_core (host — for dart:ffi tests)
-        run: cargo build --release --locked
+        run: |
+          cargo generate-lockfile
+          cargo build --release --locked
         working-directory: native/crypto_core
         # Produces: native/crypto_core/target/release/libcrypto_core.so
         # _loadLibrary() in native_crypto_bridge_io.dart probes
@@ -223,6 +225,10 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
+
+      - name: Ensure Cargo lockfile is up to date
+        run: cargo generate-lockfile
+        working-directory: native/crypto_core
 
       - name: Cargo Cache
         uses: actions/cache@v4
