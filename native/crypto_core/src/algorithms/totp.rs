@@ -121,8 +121,8 @@ mod tests {
     #[test]
     fn test_rfc6238_sha1_vectors() {
         // RFC 6238 Appendix B test vectors for SHA1 (20-byte key: 12345678901234567890)
-        // Base32 representation of "12345678901234567890" is GEZDGNBVGY3TQOJQGEZDGNBVGY======
-        let secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY======";
+        // Base32 representation of "12345678901234567890" is GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+        let secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
         let tests = vec![
             (59u64, "287082", "94287082"),
