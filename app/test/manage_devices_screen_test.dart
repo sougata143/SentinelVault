@@ -111,7 +111,7 @@ void main() {
     expect(find.text('Are you sure you want to revoke access for "Firefox on Linux"? The device will be logged out immediately.'), findsOneWidget);
 
     // Tap confirm Revoke button in dialog
-    final dialogRevokeBtn = find.widgetWithText(ElevatedButton, 'Revoke');
+    final dialogRevokeBtn = find.byKey(const Key('confirm-revoke-dialog-btn'));
     await widgetTester.tap(dialogRevokeBtn);
     await widgetTester.pumpAndSettle();
 

@@ -79,6 +79,7 @@ class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
             child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryColor)),
           ),
           ElevatedButton(
+            key: const Key('confirm-revoke-dialog-btn'),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Revoke', style: TextStyle(color: Colors.white)),
