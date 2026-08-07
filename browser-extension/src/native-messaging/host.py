@@ -62,6 +62,26 @@ def main():
                         "items": [],
                         "error": str(e)
                     })
+            elif msg_type == "WEBAUTHN_REGISTER":
+                try:
+                    req = urllib.request.Request("http://127.0.0.1:16235/webauthn/register",
+                                                data=json.dumps(msg).encode('utf-8'),
+                                                headers={'Content-Type': 'application/json'})
+                    with urllib.request.urlopen(req, timeout=3) as response:
+                        res = json.loads(response.read().decode('utf-8'))
+                        send_message(res)
+                except Exception as e:
+                    send_message({"success": False, "error": f"WebAuthn register error: {str(e)}"})
+            elif msg_type == "WEBAUTHN_ASSERT":
+                try:
+                    req = urllib.request.Request("http://127.0.0.1:16235/webauthn/assert",
+                                                data=json.dumps(msg).encode('utf-8'),
+                                                headers={'Content-Type': 'application/json'})
+                    with urllib.request.urlopen(req, timeout=3) as response:
+                        res = json.loads(response.read().decode('utf-8'))
+                        send_message(res)
+                except Exception as e:
+                    send_message({"success": False, "error": f"WebAuthn assertion error: {str(e)}"})
             else:
                 send_message({"error": "Unknown message type"})
         except Exception:

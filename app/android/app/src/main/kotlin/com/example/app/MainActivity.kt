@@ -58,6 +58,34 @@ class MainActivity : FlutterFragmentActivity() {
                     val sharedPrefs = getSharedPreferences("SecureStoragePrefs", Context.MODE_PRIVATE)
                     sharedPrefs.edit().putBoolean("mock_enrollment_changed", false).apply()
                     result.success(null)
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.app/passkeys").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isPasskeyProviderSupported" -> {
+                    val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                    result.success(supported)
+                }
+                "getPendingPasskeyIntent" -> {
+                    val intentAction = intent?.action
+                    if (intentAction != null && intentAction.startsWith("com.example.app.WEBAUTHN_")) {
+                        val rpId = intent.getStringExtra("rpId") ?: ""
+                        val reqJson = intent.getStringExtra("requestJson") ?: ""
+                        val callingPackage = intent.getStringExtra("callingPackage") ?: ""
+                        val map = mapOf(
+                            "action" to intentAction,
+                            "rpId" to rpId,
+                            "requestJson" to reqJson,
+                            "callingPackage" to callingPackage
+                        )
+                        result.success(map)
+                    } else {
+                        result.success(null)
+                    }
                 }
                 else -> {
                     result.notImplemented()

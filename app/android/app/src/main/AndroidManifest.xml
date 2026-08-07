@@ -30,6 +30,19 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- SentinelVault FIDO2/WebAuthn Credential Provider Service -->
+        <service
+            android:name=".SentinelCredentialProviderService"
+            android:permission="android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.credentials.CredentialProviderService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.credentials.credential_provider"
+                android:resource="@xml/credential_provider" />
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
