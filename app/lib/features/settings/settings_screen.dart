@@ -8,6 +8,7 @@ import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
 import '../emergency/emergency_access_screen.dart';
 import 'duress_setup_screen.dart';
+import 'manage_devices_screen.dart';
 
 class AppSettings {
   static int clipboardTimeoutSeconds = 30;
@@ -584,6 +585,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Column(
               children: [
+                ListTile(
+                  key: const Key('settings-manage-devices-tile'),
+                  leading: const Icon(Icons.devices, color: AppTheme.primaryColor),
+                  title: const Text('Manage Devices & Sessions'),
+                  subtitle: const Text('View active logins and revoke remote device sessions'),
+                  trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ManageDevicesScreen(
+                          authBaseUrl: ApiConfig.authBaseUrl,
+                          httpClient: widget.httpClient,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(color: Colors.white10, height: 1),
                 ListTile(
                   key: const Key('settings-lock-tile'),
                   leading: const Icon(Icons.lock_outline, color: Colors.orange),

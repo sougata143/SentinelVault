@@ -23,6 +23,7 @@ import { UserRepository } from '../src/auth/user.repository';
 import { RedisService } from '../src/auth/redis.service';
 import { User } from '../src/auth/entities/user.entity';
 import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
+import { SessionEntity } from '../src/auth/entities/session.entity';
 import { SrpServer, bigIntToBuffer, bufferToBigInt, sha256 } from '../src/auth/srp';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
@@ -185,6 +186,15 @@ describe('JWT token issued by AuthService', () => {
         {
           provide: getRepositoryToken(WebauthnCredential),
           useClass: InMemoryWebauthnRepo,
+        },
+        {
+          provide: getRepositoryToken(SessionEntity),
+          useValue: {
+            create: (dto: any) => ({ id: crypto.randomUUID(), ...dto }),
+            save: jest.fn(async (s: any) => ({ id: s.id || crypto.randomUUID(), ...s })),
+            find: jest.fn(async () => []),
+            findOne: jest.fn(async () => null),
+          },
         },
       ],
     }).compile();
