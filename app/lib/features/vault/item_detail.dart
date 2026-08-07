@@ -341,6 +341,10 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         icon = Icons.card_membership_outlined;
         color = Colors.indigoAccent;
         break;
+      case VaultItemType.passkey:
+        icon = Icons.fingerprint;
+        color = Colors.lightGreenAccent;
+        break;
     }
 
     return Container(

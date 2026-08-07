@@ -37,6 +37,9 @@ enum VaultItemType {
 
   /// Software product license key.
   softwareLicense,
+
+  /// FIDO2 / WebAuthn Passkey credential.
+  passkey,
 }
 
 /// Extension on [VaultItemType] providing serialization helpers.
@@ -66,6 +69,8 @@ extension VaultItemTypeExtension on VaultItemType {
         return 'crypto_seed';
       case VaultItemType.softwareLicense:
         return 'software_license';
+      case VaultItemType.passkey:
+        return 'passkey';
     }
   }
 
@@ -94,6 +99,8 @@ extension VaultItemTypeExtension on VaultItemType {
         return VaultItemType.cryptoSeed;
       case 'software_license':
         return VaultItemType.softwareLicense;
+      case 'passkey':
+        return VaultItemType.passkey;
       default:
         throw ArgumentError('Invalid VaultItemType value: $value');
     }
@@ -1170,6 +1177,84 @@ class SoftwareLicenseFields implements VaultItemFields {
   }
 }
 
+/// Specialized fields for WebAuthn / FIDO2 Passkey items.
+class PasskeyFields extends VaultItemFields {
+  final String rpId;
+  final String userHandle;
+  final String userName;
+  final String credentialId;
+  final ConcealedValue privateKeyPem;
+  final String publicKeyRaw;
+  final String cosePublicKey;
+  final int signCount;
+
+  PasskeyFields({
+    required this.rpId,
+    required this.userHandle,
+    required this.userName,
+    required this.credentialId,
+    required this.privateKeyPem,
+    required this.publicKeyRaw,
+    required this.cosePublicKey,
+    this.signCount = 0,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'rpId': rpId,
+        'userHandle': userHandle,
+        'userName': userName,
+        'credentialId': credentialId,
+        'privateKeyPem': privateKeyPem.toJson(),
+        'publicKeyRaw': publicKeyRaw,
+        'cosePublicKey': cosePublicKey,
+        'signCount': signCount,
+      };
+
+  factory PasskeyFields.fromJson(Map<String, dynamic> json) {
+    return PasskeyFields(
+      rpId: json['rpId'] as String? ?? '',
+      userHandle: json['userHandle'] as String? ?? '',
+      userName: json['userName'] as String? ?? '',
+      credentialId: json['credentialId'] as String? ?? '',
+      privateKeyPem: json['privateKeyPem'] != null
+          ? ConcealedValue.fromJson(json['privateKeyPem'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      publicKeyRaw: json['publicKeyRaw'] as String? ?? '',
+      cosePublicKey: json['cosePublicKey'] as String? ?? '',
+      signCount: (json['signCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  @override
+  Future<PasskeyFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return PasskeyFields(
+      rpId: rpId,
+      userHandle: userHandle,
+      userName: userName,
+      credentialId: credentialId,
+      privateKeyPem: await privateKeyPem.encrypt(key, crypto),
+      publicKeyRaw: publicKeyRaw,
+      cosePublicKey: cosePublicKey,
+      signCount: signCount,
+    );
+  }
+
+  @override
+  Future<PasskeyFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return PasskeyFields(
+      rpId: rpId,
+      userHandle: userHandle,
+      userName: userName,
+      credentialId: credentialId,
+      privateKeyPem: await privateKeyPem.decrypt(key, crypto),
+      publicKeyRaw: publicKeyRaw,
+      cosePublicKey: cosePublicKey,
+      signCount: signCount,
+    );
+  }
+}
+
 // ── Custom Field ──────────────────────────────────────────────────────────
 
 /// Represents a user-defined custom field extension inside a vault item.
@@ -1345,6 +1430,9 @@ class VaultItem {
         break;
       case VaultItemType.softwareLicense:
         fields = SoftwareLicenseFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.passkey:
+        fields = PasskeyFields.fromJson(fieldsJson);
         break;
     }
 
