@@ -4,6 +4,7 @@ import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../theme/theme.dart';
+import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
 import 'duress_setup_screen.dart';
 
@@ -390,51 +391,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Reference: docs/RUST_CROSS_PLATFORM_REEVALUATION.md §2.
                   if (!widget.isWebOverride) ...[
                     const Divider(color: Colors.white10),
-                    SwitchListTile(
-                      key: const Key('settings-biometric-switch'),
-                      title: const Text('Biometric Quick-Unlock'),
-                      subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
-                      value: _biometricEnabled,
-                      activeThumbColor: AppTheme.primaryColor,
-                      onChanged: (val) async {
-                        if (val) {
-                          final supported = await BiometricAuthService.instance.isBiometricsSupported();
-                          if (!supported) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Biometrics not supported on this device')),
-                              );
-                            }
-                            return;
-                          }
+                    FutureBuilder<String>(
+                      future: BiometricVaultManager.getBiometricLabel(),
+                      builder: (context, snapshot) {
+                        final label = snapshot.data ?? 'Biometrics';
+                        return SwitchListTile(
+                          key: const Key('settings-biometric-switch'),
+                          title: Text('Unlock with $label'),
+                          subtitle: const Text('Caches Vault Key in OS hardware security enclave. Your Master Password is never stored.'),
+                          value: _biometricEnabled,
+                          activeThumbColor: AppTheme.primaryColor,
+                          onChanged: (val) async {
+                            if (val) {
+                              final supported = await BiometricVaultManager.isBiometricAvailable();
+                              if (!supported) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Biometrics not supported on this device')),
+                                  );
+                                }
+                                return;
+                              }
 
-                          final success = await BiometricAuthService.instance.authenticate();
-                          if (success) {
-                            setState(() {
-                              _biometricEnabled = true;
-                            });
-                            _saveSettings();
-                            if (VaultLockManager.instance.masterKey != null &&
-                                VaultLockManager.instance.vaultKey != null) {
-                              await VaultLockManager.instance.enableBiometrics(
-                                VaultLockManager.instance.masterKey!,
-                                VaultLockManager.instance.vaultKey!,
-                              );
+                              setState(() {
+                                _biometricEnabled = true;
+                              });
+                              AppSettings.biometricEnabled = true;
+                              await BiometricVaultManager.setBiometricsEnabled(true);
+                              _saveSettings();
+                              if (VaultLockManager.instance.masterKey != null &&
+                                  VaultLockManager.instance.vaultKey != null) {
+                                await VaultLockManager.instance.enableBiometrics(
+                                  VaultLockManager.instance.masterKey!,
+                                  VaultLockManager.instance.vaultKey!,
+                                );
+                                await BiometricVaultManager.cacheVaultKey(VaultLockManager.instance.vaultKey!);
+                              }
+                            } else {
+                              setState(() {
+                                _biometricEnabled = false;
+                              });
+                              AppSettings.biometricEnabled = false;
+                              await BiometricVaultManager.setBiometricsEnabled(false);
+                              _saveSettings();
+                              VaultLockManager.instance.disableBiometrics();
                             }
-                          } else {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Biometric authentication failed')),
-                              );
-                            }
-                          }
-                        } else {
-                          setState(() {
-                            _biometricEnabled = false;
-                          });
-                          _saveSettings();
-                          VaultLockManager.instance.disableBiometrics();
-                        }
+                          },
+                        );
                       },
                     ),
                   ],

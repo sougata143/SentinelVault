@@ -7,6 +7,7 @@ import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../../app_shell.dart';
 import '../settings/settings_screen.dart';
+import 'biometric_vault_manager.dart';
 import 'shamir_recovery_reconstruct_screen.dart';
 import 'master_password_setup_screen.dart';
 import '../vault/sharing/pqc_sharing_service.dart';
@@ -286,6 +287,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
       if (AppSettings.biometricEnabled) {
         await VaultLockManager.instance.enableBiometrics(masterKey, vaultKey);
       }
+      if (await BiometricVaultManager.isBiometricsEnabled()) {
+        await BiometricVaultManager.cacheVaultKey(vaultKey);
+      }
 
       // Initialize database and open it
       final db = SqliteVaultDatabase.inMemory();
@@ -361,46 +365,49 @@ class _UnlockScreenState extends State<UnlockScreen> {
     });
 
     try {
-      final success = await BiometricAuthService.instance.authenticate();
-      if (success) {
-        final unlocked = await VaultLockManager.instance.unlockWithBiometrics(true);
-        if (unlocked) {
-          final vaultKey = VaultLockManager.instance.vaultKey!;
-          final db = SqliteVaultDatabase.inMemory();
-          db.open(vaultKey);
-
-          // Initialize VaultSyncManager
-          VaultSyncManager.initialize(
-            localDb: db,
-            api: HttpSyncApiClient(
-              baseUrl: widget.syncBaseUrl,
-              userId: widget.email,
-              httpClient: widget.httpClient,
-            ),
-          );
-          VaultSyncManager.instance.sync();
-
-          if (mounted) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (_) => AppShell(
-                  db: db,
-                  vaultKey: vaultKey,
-                  currentEmail: widget.email,
-                  authClient: widget.authClient,
-                  syncBaseUrl: widget.syncBaseUrl,
-                  httpClient: widget.httpClient,
-                ),
-              ),
-              (route) => false,
-            );
-          }
-          return;
-        }
+      List<int>? vaultKey;
+      final unlocked = await VaultLockManager.instance.unlockWithBiometrics(true);
+      if (unlocked) {
+        vaultKey = VaultLockManager.instance.vaultKey;
+      } else {
+        vaultKey = await BiometricVaultManager.authenticateAndGetVaultKey();
       }
-      
+
+      if (vaultKey != null) {
+        final db = SqliteVaultDatabase.inMemory();
+        db.open(vaultKey);
+
+        // Initialize VaultSyncManager
+        VaultSyncManager.initialize(
+          localDb: db,
+          api: HttpSyncApiClient(
+            baseUrl: widget.syncBaseUrl,
+            userId: widget.email,
+            httpClient: widget.httpClient,
+          ),
+        );
+        VaultSyncManager.instance.sync();
+
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => AppShell(
+                db: db,
+                vaultKey: vaultKey!,
+                currentEmail: widget.email,
+                authClient: widget.authClient,
+                syncBaseUrl: widget.syncBaseUrl,
+                httpClient: widget.httpClient,
+              ),
+            ),
+            (route) => false,
+          );
+        }
+        return;
+      }
+
       setState(() {
-        _errorMessage = 'Biometric authentication failed';
+        _errorMessage = 'Biometric authentication failed or key expired';
       });
     } catch (e) {
       setState(() {
