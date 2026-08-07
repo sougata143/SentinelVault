@@ -58,9 +58,9 @@ class PqcSharingService {
         Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=${Uri.encodeComponent(userEmail)}'),
       ).timeout(const Duration(milliseconds: 200), onTimeout: () => http.Response('{}', 408));
       if (lookupRes.statusCode != 200) return;
-      final lookupData = json.decode(lookupRes.body) as Map<String, dynamic>;
-      if (lookupData['ok'] != true || lookupData['userId'] == null) return;
-      final userId = lookupData['userId'] as String;
+      final data = json.decode(lookupRes.body);
+      if (data is! Map || data['userId'] == null) return;
+      final userId = data['userId'] as String;
 
       final fingerprint = await _sharingManager.computeSafetyNumber(bundle);
 

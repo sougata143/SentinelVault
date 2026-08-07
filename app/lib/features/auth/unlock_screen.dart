@@ -305,11 +305,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
         ),
       );
       // Ensure PQC key bundle exists and is published to Key Directory
-      await PqcSharingService.ensureKeysPublished(widget.email);
+      try {
+        await PqcSharingService.ensureKeysPublished(widget.email);
+      } catch (_) {}
       // Sync any PQC folders shared with this user (unwraps shared folder keys)
-      await PqcSharingService.syncSharedFoldersWithMe();
+      try {
+        await PqcSharingService.syncSharedFoldersWithMe();
+      } catch (_) {}
       // Perform initial remote sync pull (fetches shared folder items)
-      await VaultSyncManager.instance.sync();
+      try {
+        await VaultSyncManager.instance.sync();
+      } catch (_) {}
 
       navigated = true;
       if (mounted) {

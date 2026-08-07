@@ -6,6 +6,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+.scannerwork/
 
 # Node dependencies and build files
 node_modules/

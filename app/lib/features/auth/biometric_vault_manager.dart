@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:core/core.dart';
 
 /// Manages biometric-gated vault key caching in platform secure hardware storage
 /// (iOS Keychain, Android Keystore, Windows Credential Manager / DPAPI).
@@ -10,8 +10,12 @@ import 'package:local_auth/local_auth.dart';
 /// 2. Only the derived 32-byte Vault Key is sealed in platform secure storage.
 /// 3. Key unsealing requires passing OS biometric prompt via [local_auth].
 /// 4. Disabling biometrics or explicit locking immediately purges all cached key material.
+///
+/// Storage Architecture:
+/// Simple flags and TTL settings use [SecureStorage.instance] (injectable, testable).
+/// The actual biometric-wrapped key blob is delegated to [VaultLockManager.enableBiometrics]
+/// which also uses [SecureStorage.instance.writeBiometricWrappedVaultKey].
 class BiometricVaultManager {
-  static const _storage = FlutterSecureStorage();
   static final _auth = LocalAuthentication();
 
   static const String keyCachedVaultKey = 'sentinel_cached_vault_key';
@@ -22,8 +26,15 @@ class BiometricVaultManager {
   /// Default inactivity TTL: 15 minutes (900 seconds)
   static const int defaultTtlSeconds = 900;
 
+  /// Override for [isBiometricAvailable] used in widget tests to simulate
+  /// device support without a real platform biometric channel.
+  static bool? isBiometricAvailableOverride;
+
   /// Checks if hardware biometric authentication is available on the device.
   static Future<bool> isBiometricAvailable() async {
+    if (isBiometricAvailableOverride != null) {
+      return isBiometricAvailableOverride!;
+    }
     try {
       final canAuthenticateWithBiometrics = await _auth.canCheckBiometrics;
       final isDeviceSupported = await _auth.isDeviceSupported();
@@ -61,15 +72,17 @@ class BiometricVaultManager {
   }
 
   /// Checks whether the user has enabled biometric unlock in Settings.
+  /// Uses [SecureStorage.instance] so that widget tests can use the in-memory backend.
   static Future<bool> isBiometricsEnabled() async {
-    final val = await _storage.read(key: keyBiometricsEnabled);
+    final val = await SecureStorage.instance.readString(keyBiometricsEnabled);
     return val == 'true';
   }
 
   /// Sets the biometric unlock setting state.
   /// If disabled, immediately purges any cached Vault Key from secure storage.
+  /// Uses [SecureStorage.instance] so that widget tests can use the in-memory backend.
   static Future<void> setBiometricsEnabled(bool enabled) async {
-    await _storage.write(key: keyBiometricsEnabled, value: enabled ? 'true' : 'false');
+    await SecureStorage.instance.writeString(keyBiometricsEnabled, enabled ? 'true' : 'false');
     if (!enabled) {
       await purgeCachedKey();
     }
@@ -77,7 +90,7 @@ class BiometricVaultManager {
 
   /// Gets the configured auto-lock TTL in seconds.
   static Future<int> getAutoLockTtlSeconds() async {
-    final val = await _storage.read(key: keyAutoLockTtlSeconds);
+    final val = await SecureStorage.instance.readString(keyAutoLockTtlSeconds);
     if (val != null) {
       final parsed = int.tryParse(val);
       if (parsed != null) return parsed;
@@ -87,7 +100,7 @@ class BiometricVaultManager {
 
   /// Sets the auto-lock TTL in seconds.
   static Future<void> setAutoLockTtlSeconds(int seconds) async {
-    await _storage.write(key: keyAutoLockTtlSeconds, value: seconds.toString());
+    await SecureStorage.instance.writeString(keyAutoLockTtlSeconds, seconds.toString());
   }
 
   /// Seals the 32-byte derived Vault Key inside platform secure hardware storage.
@@ -98,8 +111,11 @@ class BiometricVaultManager {
     if (!enabled) return;
 
     final hexKey = vaultKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    await _storage.write(key: keyCachedVaultKey, value: hexKey);
-    await _storage.write(key: keyCachedTimestamp, value: DateTime.now().millisecondsSinceEpoch.toString());
+    await SecureStorage.instance.writeString(keyCachedVaultKey, hexKey);
+    await SecureStorage.instance.writeString(
+      keyCachedTimestamp,
+      DateTime.now().millisecondsSinceEpoch.toString(),
+    );
   }
 
   /// Checks if a valid cached Vault Key exists and has not expired past configured TTL.
@@ -107,10 +123,10 @@ class BiometricVaultManager {
     final enabled = await isBiometricsEnabled();
     if (!enabled) return false;
 
-    final cachedHex = await _storage.read(key: keyCachedVaultKey);
+    final cachedHex = await SecureStorage.instance.readString(keyCachedVaultKey);
     if (cachedHex == null || cachedHex.isEmpty) return false;
 
-    final tsStr = await _storage.read(key: keyCachedTimestamp);
+    final tsStr = await SecureStorage.instance.readString(keyCachedTimestamp);
     if (tsStr == null) return false;
     final timestamp = int.tryParse(tsStr);
     if (timestamp == null) return false;
@@ -146,7 +162,7 @@ class BiometricVaultManager {
 
       if (!authenticated) return null;
 
-      final hexKey = await _storage.read(key: keyCachedVaultKey);
+      final hexKey = await SecureStorage.instance.readString(keyCachedVaultKey);
       if (hexKey == null || hexKey.isEmpty) return null;
 
       final List<int> keyBytes = [];
@@ -163,10 +179,10 @@ class BiometricVaultManager {
   /// Called on explicit lock, settings disable, or TTL expiration.
   static Future<void> purgeCachedKey() async {
     try {
-      await _storage.delete(key: keyCachedVaultKey);
+      await SecureStorage.instance.deleteString(keyCachedVaultKey);
     } catch (_) {}
     try {
-      await _storage.delete(key: keyCachedTimestamp);
+      await SecureStorage.instance.deleteString(keyCachedTimestamp);
     } catch (_) {}
   }
 }
