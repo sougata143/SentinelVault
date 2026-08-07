@@ -20,23 +20,30 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
                           ┌────────────────────────────────────────────────────────┐
                           │                      CLIENT LAYER                      │
                           │                                                        │
-                          │    ┌──────────┐        ┌──────────┐        ┌──────────┐│
-                          │    │   Web    │        │   iOS    │        │ Android  ││
-                          │    │ (Flutter)│        │ (Flutter)│        │ (Flutter)││
-                          │    └────┬─────┘        └────┬─────┘        └────┬─────┘│
-                          │         └───────────────────┼───────────────────┘      │
-                          │                      ┌───────────────┐                 │
-                          │                      │  Shared Core  │                 │
-                          │                      │ (Dart Package)│                 │
-                          │                      └───────┬───────┘                 │
-                          │                      ┌───────────────┐                 │
-                          │                      │ Native Crypto │                 │
-                          │                      │ Core (Rust)   │                 │
-                          │                      └───────────────┘                 │
-                          └──────────────────────────────┼─────────────────────────┘
-                                                         │
-                                                         │ TLS 1.3
-                                                         ▼
+                          │ ┌──────────┐  ┌──────────┐  ┌──────────┐ ┌──────────┐ │
+                          │ │   Web    │  │   iOS    │  │ Android  │ │ Desktop  │ │
+                          │ │ (Flutter)│  │ (Flutter)│  │ (Flutter)│ │ (Windows/│ │
+                          │ └────┬─────┘  └────┬─────┘  └────┬─────┘ │ mac/Lnx) │ │
+                          │      │             │             │       └────┬─────┘ │
+                          │      │    ┌────────┴────────┐    │            │       │
+                          │      │    │ iOS AutoFill    │    │            │       │
+                          │      │    │ Cred Extension  │    │            │       │
+                          │      │    └────────┬────────┘    │            │       │
+                          │      │             │             │            │       │
+                          │ ┌────┴─────────────┴─────────────┴────────────┴─────┐ │
+                          │ │            Shared Core (Dart Package)             │ │
+                          │ └──────────────────────────┬────────────────────────┘ │
+                          │ ┌──────────────────────────┴────────────────────────┐ │
+                          │ │           Native Crypto Core (Rust / FFI)         │ │
+                          │ └───────────────────────────────────────────────────┘ │
+                          │                                                       │
+                          │ ┌────────────────────────┐   ┌──────────────────────┐ │
+                          │ │   Thin Extension       │   │  Developer CLI       │ │
+                          │ │ (Chrome/Firefox/Safari)│   │     (svault)         │ │
+                          │ └───────────┬────────────┘   └──────────┬───────────┘ │
+                          └─────────────┼───────────────────────────┼─────────────┘
+                                        │ Native Messaging          │
+                                        ▼                           ▼ TLS 1.3
                           ┌────────────────────────────────────────────────────────┐
                           │                      CLOUD LAYER                       │
                           │                                                        │
@@ -49,9 +56,9 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
                           │  ┌───────────────────┐ ┌────────────────────────┐      │
                           │  │ Security Analysis  │ │ Sharing Service        │      │
                           │  │ Service (NestJS)   │ │ (PQC Key Directory /   │      │
-                          │  └────────────────────┘ │  Share Invites / REST) │      │
-                          │            │             └────────────────────────┘     │
-                          │            ▼                                            │
+                          │  └────────────────────┘ │  Emergency Access /    │      │
+                          │            │             │  Share Invites / REST) │      │
+                          │            ▼             └────────────────────────┘     │
                           │       ┌──────────┐        ┌──────────┐                  │
                           │       │ Postgres │        │  Redis   │                  │
                           │       └──────────┘        └──────────┘                  │
@@ -82,29 +89,36 @@ A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, WebAuthn FIDO2
 
 ```
 .
-├── app/                           # Flutter client application
+├── .github/                       # GitHub Actions CI/CD workflows & security policies
+│   └── workflows/                 # ci.yml, checkmarx-one.yml
+├── app/                           # Cross-platform Flutter client application
+│   ├── android/                   # Android native app & CredentialProviderService (API 34+)
+│   ├── ios/                       # iOS native app & ASCredentialProviderViewController (iOS 17+)
 │   ├── lib/
-│   │   ├── features/              # Feature UI screens (vault, security_center, auth, settings, etc.)
+│   │   ├── features/              # Feature UI screens (vault, security_center, passkey, auth)
 │   │   └── theme/                 # Global theme configuration
-│   └── test/                      # Widget, UI, and navigation tests
-├── core/                          # Shared cryptography & data package
+│   └── test/                      # Widget, UI, and native service interop tests
+├── core/                          # Shared cryptography & data package (Dart)
 │   ├── lib/
 │   │   └── src/                   # Crypto interface, DB, models, security, import/export, sync
 │   └── test/                      # Core unit and crypto round-trip tests
 ├── native/                        # Native Crypto Core (Rust)
 │   └── crypto_core/
-│       ├── src/algorithms/        # Argon2id, AES-GCM, SRP, Shamir, pqc_hybrid.rs
+│       ├── src/algorithms/        # Argon2id, AES-GCM, SRP, Shamir, webauthn.rs, pqc_hybrid.rs
 │       └── Cargo.toml
-├── browser-extension/             # Browser extension (Chrome, Firefox, Safari)
-│   ├── src/                       # Extension popup, content scripts, native messaging host
-│   └── test/                      # Native messaging host + content-script integration tests
+├── cli/                           # SentinelVault Developer CLI (`svault` in Rust)
+│   ├── src/                       # Login, unlock, vault list, env injection commands
+│   └── Cargo.toml
+├── browser-extension/             # Thin Browser Extension (Chrome, Firefox, Safari)
+│   ├── src/                       # Content scripts, background worker, native messaging host
+│   └── test/                      # WebAuthn interceptor & host integration tests
 ├── backend/                       # NestJS cloud microservices
 │   ├── auth-service/              # Account authentication, MFA, passkeys        (:3001)
 │   ├── sync-api/                  # Encrypted vault sync                         (:3002)
 │   ├── security-analysis-service/ # Reputation, breach, and AI insight service   (:3003)
-│   └── sharing-service/           # PQC key directory & folder sharing           (:3004)
+│   └── sharing-service/           # PQC key directory & emergency access         (:3004)
 ├── infra/                         # Cloud Run, Postgres, Redis Terraform templates
-└── docs/                          # Architecture, schemas, and UX definitions
+└── docs/                          # Architecture, schemas, and security definitions
 ```
 
 ---
@@ -146,12 +160,12 @@ This starts:
 The native crate must be built before running `core/` tests or the Flutter app:
 ```bash
 cd native/crypto_core
-cargo build --release
-cargo test               # mandatory before any change to crypto code
+cargo build --release --locked
+cargo test --locked        # mandatory before any change to crypto code
 
 # Web/browser-extension target:
 rustup target add wasm32-unknown-unknown
-cargo build --target wasm32-unknown-unknown --features wasm
+cargo build --release --locked --target wasm32-unknown-unknown --features wasm
 ```
 
 ### 4. Backend Services
@@ -167,8 +181,8 @@ cd backend/sync-api && npm install && npm run start
 # Security Analysis Service — :3003
 cd backend/security-analysis-service && npm install && npm run start
 
-# Sharing Service (PQC Key Directory) — :3004
-cd backend/sharing-service && npm install --legacy-peer-deps && SHARING_PORT=3004 npm run start
+# Sharing Service (PQC Key Directory & Emergency Access) — :3004
+cd backend/sharing-service && npm install && SHARING_PORT=3004 npm run start
 ```
 
 ### 5. Running the Flutter App
@@ -181,15 +195,62 @@ flutter run -d chrome --web-port=8080
 ```
 > Defaults point to local microservice endpoints (`AUTH_BASE_URL=http://localhost:3001`, `SYNC_BASE_URL=http://localhost:3002`, `SECURITY_BASE_URL=http://localhost:3003`, `SHARING_BASE_URL=http://localhost:3004`). Backend CORS dynamically supports any local dev port (e.g. 8080 or dynamic ports).
 
-#### Production & Custom Base URLs (`--dart-define`)
-Backend microservice URLs are configured at build/run time using Dart's compile-time environment variables (`ApiConfig`):
+---
+
+## 📦 Platform Build Commands (Android, iOS, Desktop, Web)
+
+The SentinelVault client compiles to native binaries across all target platforms from the single `app/` codebase:
+
+### 1. Android (APK & App Bundle)
+```bash
+cd app
+
+# Build release APK for testing / direct distribution
+flutter build apk --release
+
+# Build Android App Bundle (AAB) for Google Play Store upload
+flutter build appbundle --release
+```
+
+### 2. iOS (IPA & TestFlight)
+```bash
+cd app
+
+# Build iOS App Store release package (IPA)
+flutter build ipa --release
+```
+
+### 3. Desktop (Windows, macOS, Linux)
+```bash
+cd app
+
+# Windows Desktop executable (.exe)
+flutter build windows --release
+
+# macOS Desktop application (.app / .dmg)
+flutter build macos --release
+
+# Linux Desktop executable
+flutter build linux --release
+```
+
+### 4. Web Build
+```bash
+cd app
+
+# Build production Web bundle
+flutter build web --release
+```
+
+### Production & Custom Microservice Base URLs (`--dart-define`)
+For production deployments, pass your production API domain endpoints at build time using Dart compile-time defines:
 
 ```bash
 flutter build web --release \
-  --dart-define=AUTH_BASE_URL=https://api-auth.vault.example.com \
-  --dart-define=SYNC_BASE_URL=https://api-sync.vault.example.com \
-  --dart-define=SECURITY_BASE_URL=https://api-security.vault.example.com \
-  --dart-define=SHARING_BASE_URL=https://api-sharing.vault.example.com
+  --dart-define=AUTH_BASE_URL=https://auth.sentinelvault.io \
+  --dart-define=SYNC_BASE_URL=https://sync.sentinelvault.io \
+  --dart-define=SECURITY_BASE_URL=https://security.sentinelvault.io \
+  --dart-define=SHARING_BASE_URL=https://sharing.sentinelvault.io
 ```
 
 | Environment Variable | Default Value | Description |
@@ -197,7 +258,7 @@ flutter build web --release \
 | `AUTH_BASE_URL` | `http://localhost:3001` | Base URL for `auth-service` (SRP-6a, login/register, session JWTs) |
 | `SYNC_BASE_URL` | `http://localhost:3002` | Base URL for `sync-api` (encrypted vault blobs & key envelopes) |
 | `SECURITY_BASE_URL` | `http://localhost:3003` | Base URL for `security-analysis-service` (reputation, breach monitor, AI insights) |
-| `SHARING_BASE_URL` | `http://localhost:3004` | Base URL for `sharing-service` (PQC key directory & folder share invites) |
+| `SHARING_BASE_URL` | `http://localhost:3004` | Base URL for `sharing-service` (PQC key directory & emergency access) |
 
 ---
 
@@ -213,7 +274,7 @@ dart test
 ### Flutter App
 ```bash
 cd app
-flutter test     # 97 widget, navigation, multi-select/delete, Export Auth Gate, and Security Dashboard tests
+flutter test     # 103 widget, navigation, passkey, multi-select/delete, and Security Dashboard tests
 flutter analyze  # must report "No issues found"
 ```
 
@@ -221,7 +282,7 @@ flutter analyze  # must report "No issues found"
 ```bash
 cd browser-extension
 dart test
-node test/autofill_test.js
+node test/webauthn_interceptor_test.js
 ```
 
 ### Backend Services
@@ -239,17 +300,17 @@ done
 ```
 
 ### CI Pipeline
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR to `main` and `develop`. All matrix jobs use `fail-fast: false` so a single-leg failure does not cancel sibling legs.
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR to `main`, `develop`, and `feature`. All matrix jobs use `fail-fast: false` so a single-leg failure does not cancel sibling legs.
 
 | Job | What it does |
 |---|---|
 | **flutter-checks** | `flutter analyze` + `flutter test` on `app/` and `core/`; runs `osv-scanner` for Dart SCA |
-| **rust-crypto-test** | Three matrix legs (`aarch64-apple-ios`, `aarch64-linux-android`, `wasm32-unknown-unknown`): `cargo clippy`, `cargo test`, `cargo build --release`, and `cargo audit` |
+| **rust-crypto-test** | Three matrix legs (`aarch64-apple-ios`, `aarch64-linux-android`, `wasm32-unknown-unknown`): `cargo clippy`, `cargo test`, `cargo build --release --locked`, and `cargo audit` |
 | **backend-integration** | Full Jest suites for all NestJS microservices in parallel via matrix; Postgres 15 + Redis 7 service containers provisioned automatically |
-| **sonarqube-analysis** | SonarQube Cloud static analysis via `sonarsource/sonarqube-scan-action@v6` |
-| **codeql-security** | GitHub CodeQL semantic analysis |
+| **sonarqube-analysis** | SonarQube Cloud static analysis via `sonarsource/sonarqube-scan-action@v5` |
+| **checkmarx-scan** | Checkmarx One SAST/SCA security scan via `.github/workflows/checkmarx-one.yml` |
 
-Action versions: `actions/checkout@v5`, `actions/setup-java@v5`, `actions/setup-node@v5`, `actions/cache@v5`, `sonarsource/sonarqube-scan-action@v6`.
+Action versions: `actions/checkout@v4`, `actions/setup-java@v4`, `actions/setup-node@v4`, `actions/cache@v4`, `sonarsource/sonarqube-scan-action@v5`.
 
 ---
 
