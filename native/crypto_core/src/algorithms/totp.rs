@@ -15,6 +15,7 @@ pub enum TotpAlgorithm {
 }
 
 impl TotpAlgorithm {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "SHA256" | "SHA-256" => TotpAlgorithm::Sha256,
@@ -102,9 +103,9 @@ pub fn generate_totp(
 
     let offset = (mac_bytes[mac_bytes.len() - 1] & 0x0f) as usize;
     let binary = ((mac_bytes[offset] & 0x7f) as u32) << 24
-        | ((mac_bytes[offset + 1] & 0xff) as u32) << 16
-        | ((mac_bytes[offset + 2] & 0xff) as u32) << 8
-        | ((mac_bytes[offset + 3] & 0xff) as u32);
+        | (mac_bytes[offset + 1] as u32) << 16
+        | (mac_bytes[offset + 2] as u32) << 8
+        | (mac_bytes[offset + 3] as u32);
 
     let modulus = 10u32.pow(digits);
     let code_num = binary % modulus;
@@ -148,6 +149,6 @@ mod tests {
         assert_eq!(TotpAlgorithm::from_str("sha-512"), TotpAlgorithm::Sha512);
         assert_eq!(TotpAlgorithm::from_str("unknown"), TotpAlgorithm::Sha1);
 
-        assert_eq!(TotpAlgorithm::from_str("sha256").ok(), Some(TotpAlgorithm::Sha256));
+        assert_eq!("sha256".parse::<TotpAlgorithm>(), Ok(TotpAlgorithm::Sha256));
     }
 }

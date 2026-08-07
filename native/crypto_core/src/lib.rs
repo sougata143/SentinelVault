@@ -952,5 +952,5 @@ pub fn wasm_generate_totp(
 ) -> Result<String, JsValue> {
     let algo = algorithms::totp::TotpAlgorithm::from_str(algorithm);
     algorithms::totp::generate_totp(secret, timestamp_sec, period, digits, algo)
-        .map_err(|e| JsValue::from_str(e))
+        .map_err(JsValue::from_str)
 }
