@@ -6,6 +6,7 @@ import '../../config/api_config.dart';
 import '../../theme/theme.dart';
 import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
+import '../emergency/emergency_access_screen.dart';
 import 'duress_setup_screen.dart';
 
 class AppSettings {
@@ -295,6 +296,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Emergency & Inheritance Access Section
+          _buildSectionHeader('Emergency & Inheritance'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.warningColor,
+                child: Icon(Icons.emergency_outlined, color: Colors.black),
+              ),
+              title: const Text('Emergency & Inheritance Access'),
+              subtitle: const Text('Designate trusted contacts and configure access delay periods'),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EmergencyAccessScreen(
+                      currentEmail: widget.currentEmail,
+                      vaultKey: VaultLockManager.instance.vaultKey ?? List<int>.filled(32, 0),
+                      sharingBaseUrl: widget.syncBaseUrl,
+                      httpClient: widget.httpClient,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // Profile section
           _buildSectionHeader('Profile'),
           Card(
