@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'vault_item.dart';
 
 /// Represents a WebAuthn / FIDO2 Passkey credential stored inside the vault.

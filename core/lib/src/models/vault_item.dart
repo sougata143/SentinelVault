@@ -1179,15 +1179,31 @@ class SoftwareLicenseFields implements VaultItemFields {
 
 /// Specialized fields for WebAuthn / FIDO2 Passkey items.
 class PasskeyFields extends VaultItemFields {
+  /// Unique relying party identifier (e.g., "github.com").
   final String rpId;
+
+  /// User handle string provided by the relying party.
   final String userHandle;
+
+  /// Account username or email.
   final String userName;
+
+  /// Base64-encoded credential ID.
   final String credentialId;
+
+  /// Encrypted P-256 private key in SEC1/PKCS#8 PEM format.
   final ConcealedValue privateKeyPem;
+
+  /// Base64-encoded uncompressed P-256 public key point.
   final String publicKeyRaw;
+
+  /// Base64-encoded COSE-formatted public key map bytes.
   final String cosePublicKey;
+
+  /// Signature counter used for WebAuthn assertion replay protection.
   final int signCount;
 
+  /// Creates a new instance of [PasskeyFields].
   PasskeyFields({
     required this.rpId,
     required this.userHandle,
@@ -1211,6 +1227,7 @@ class PasskeyFields extends VaultItemFields {
         'signCount': signCount,
       };
 
+  /// Factory constructor to parse [PasskeyFields] from JSON.
   factory PasskeyFields.fromJson(Map<String, dynamic> json) {
     return PasskeyFields(
       rpId: json['rpId'] as String? ?? '',

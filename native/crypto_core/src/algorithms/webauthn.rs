@@ -110,8 +110,6 @@ pub fn sign_webauthn_assertion(
     auth_data: &[u8],
     client_data_hash: &[u8],
 ) -> Result<Vec<u8>, String> {
-    use p256::pkcs8::DecodePrivateKey;
-
     let secret_key = SecretKey::from_sec1_pem(private_key_pem)
         .map_err(|e| format!("Failed to parse private key: {}", e))?;
     let signing_key = SigningKey::from(&secret_key);
