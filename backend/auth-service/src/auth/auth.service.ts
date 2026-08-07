@@ -15,6 +15,7 @@ import {
 import { Repository, QueryFailedError } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { AuditService } from './audit.service';
 
 interface LoginChallenge {
   username: string;
@@ -65,6 +66,7 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly auditService: AuditService,
   ) {
     this.serverSecret = crypto.randomBytes(32);
   }
@@ -272,6 +274,17 @@ export class AuthService {
           user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000);
         }
         await this.userRepository.save(user);
+        await this.auditService.logEvent({
+          userId: user.id,
+          eventType: 'login_failure',
+          metadata: { reason: 'invalid_credentials', attempts: user.failedAttempts },
+        });
+      } else {
+        await this.auditService.logEvent({
+          userId: challenge.username,
+          eventType: 'login_failure',
+          metadata: { reason: 'user_not_found' },
+        });
       }
       throw new HttpException('Incorrect username or password', HttpStatus.UNAUTHORIZED);
     }
@@ -280,6 +293,11 @@ export class AuthService {
     user.failedAttempts = 0;
     user.lockoutUntil = null;
     await this.userRepository.save(user);
+    await this.auditService.logEvent({
+      userId: user.id,
+      eventType: 'login_success',
+      metadata: { method: 'srp-6a' },
+    });
 
     // ── MFA Gate ───────────────────────────────────────────────────────────
     if (user.totpEnabled || user.webauthnEnabled) {
@@ -634,6 +652,23 @@ export class AuthService {
       .filter(([, s]) => s.createdAt < fiveMinutesAgo)
       .map(([ch]) => ch);
     stalePasskey.forEach(ch => this.passkeyChallenges.delete(ch));
+  }
+
+  public async getAuditLogs(
+    userId: string,
+    eventType?: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{ events: any[]; total: number }> {
+    return await this.auditService.getUserAuditLogs(userId, eventType, limit, offset);
+  }
+
+  public async recordAuditEvent(
+    userId: string,
+    eventType: string,
+    metadata?: Record<string, any>,
+  ): Promise<any> {
+    return await this.auditService.logEvent({ userId, eventType, metadata });
   }
 }
 
