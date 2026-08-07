@@ -46,4 +46,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
+
+  if (request.action === "WEBAUTHN_REGISTER") {
+    chrome.runtime.sendNativeMessage("com.example.sentinel_vault", {
+      type: "WEBAUTHN_REGISTER",
+      origin: request.origin,
+      rpId: request.rpId,
+      userName: request.userName,
+      userHandle: request.userHandle,
+      challenge: request.challenge
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse(response);
+      }
+    });
+    return true;
+  }
+
+  if (request.action === "WEBAUTHN_ASSERT") {
+    chrome.runtime.sendNativeMessage("com.example.sentinel_vault", {
+      type: "WEBAUTHN_ASSERT",
+      origin: request.origin,
+      rpId: request.rpId,
+      challenge: request.challenge
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse(response);
+      }
+    });
+    return true;
+  }
 });
