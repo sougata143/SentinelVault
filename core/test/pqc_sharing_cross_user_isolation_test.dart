@@ -27,7 +27,7 @@ void main() {
       final account2 = await bridge.pqcGenerateKeypairs();
       const account2UserId = 'test-b@sentinelvault.local';
 
-      // Account 3: test-a@sentinelvault.local (Uninvited Third Party)
+      // Account 3: test-c@sentinelvault.local (Uninvited Third Party)
       final account3 = await bridge.pqcGenerateKeypairs();
 
       // 1. Account 1 generates a 32-byte secret Folder Key
@@ -62,7 +62,7 @@ void main() {
       );
       expect(recoveredFolderKeyByAccount2, equals(folderKey), reason: 'Legitimate recipient test-b must be able to decrypt the Folder Key');
 
-      // 4. NEGATIVE VERIFICATION: Uninvited third party (Account 3 - test-a@sentinelvault.local) attempts unwrap
+      // 4. NEGATIVE VERIFICATION: Uninvited third party (Account 3 - test-c@sentinelvault.local) attempts unwrap
       expect(
         () => sharing.unwrapFolderKey(
           wrappedKeyData: invite['wrappedFolderKey'] as Map<String, dynamic>,
@@ -70,7 +70,7 @@ void main() {
           recipientMlkemDk: account3.mlkemDk,
         ),
         throwsA(anything),
-        reason: 'Account 3 (test-a@sentinelvault.local - uninvited) MUST NOT be able to decrypt Folder Key wrapped for test-b',
+        reason: 'Account 3 (test-c@sentinelvault.local - uninvited) MUST NOT be able to decrypt Folder Key wrapped for test-b',
       );
     });
 
