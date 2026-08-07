@@ -104,6 +104,42 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   int _totpPeriod = 30;
   bool _obscureTotpSecret = true;
 
+  // SSH Key Pair
+  final _sshKeyNameController = TextEditingController();
+  final _sshPrivateKeyController = TextEditingController();
+  final _sshPublicKeyController = TextEditingController();
+  final _sshPassphraseController = TextEditingController();
+  String _sshKeyType = 'Ed25519';
+  bool _obscureSshPrivateKey = true;
+  bool _obscureSshPassphrase = true;
+
+  // API Key / Token
+  final _apiServiceNameController = TextEditingController();
+  final _apiKeyValueController = TextEditingController();
+  final _apiSecretValueController = TextEditingController();
+  final _apiExpiryDateController = TextEditingController();
+  final _apiNotesController = TextEditingController();
+  bool _obscureApiKey = true;
+  bool _obscureApiSecret = true;
+
+  // Crypto Seed Phrase
+  final _cryptoWalletNameController = TextEditingController();
+  final _cryptoSeedPhraseController = TextEditingController();
+  final _cryptoDerivationPathController = TextEditingController();
+  final _cryptoNotesController = TextEditingController();
+  bool _obscureCryptoSeed = true;
+
+  // Software License
+  final _licenseProductNameController = TextEditingController();
+  final _licenseKeyController = TextEditingController();
+  final _licensePurchaseDateController = TextEditingController();
+  final _licenseSeatsController = TextEditingController();
+  final _licenseVendorController = TextEditingController();
+  bool _obscureLicenseKey = true;
+
+  // File Attachments for Secure Notes
+  final List<VaultItemAttachment> _attachments = [];
+
   @override
   void initState() {
     super.initState();
@@ -169,6 +205,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       _idPhones.addAll(fields.phoneNumbers);
     } else if (fields is SecureNoteFields) {
       _noteContentController.text = fields.content.plaintext ?? '';
+      _attachments.addAll(fields.attachments);
     } else if (fields is BankAccountFields) {
       _bankNameController.text = fields.bankName;
       _bankAccType = fields.accountType;
@@ -185,6 +222,29 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       _totpAlgorithm = fields.algorithm;
       _totpDigits = fields.digits;
       _totpPeriod = fields.period;
+    } else if (fields is SshKeyFields) {
+      _sshKeyNameController.text = fields.keyName;
+      _sshPrivateKeyController.text = fields.privateKey.plaintext ?? '';
+      _sshPublicKeyController.text = fields.publicKey;
+      _sshPassphraseController.text = fields.passphrase.plaintext ?? '';
+      _sshKeyType = fields.keyType;
+    } else if (fields is ApiKeyFields) {
+      _apiServiceNameController.text = fields.serviceName;
+      _apiKeyValueController.text = fields.keyValue.plaintext ?? '';
+      _apiSecretValueController.text = fields.apiSecret.plaintext ?? '';
+      _apiExpiryDateController.text = fields.expiryDate ?? '';
+      _apiNotesController.text = fields.notes ?? '';
+    } else if (fields is CryptoSeedFields) {
+      _cryptoWalletNameController.text = fields.walletName;
+      _cryptoSeedPhraseController.text = fields.seedPhrase.plaintext ?? '';
+      _cryptoDerivationPathController.text = fields.derivationPath ?? '';
+      _cryptoNotesController.text = fields.notes ?? '';
+    } else if (fields is SoftwareLicenseFields) {
+      _licenseProductNameController.text = fields.productName;
+      _licenseKeyController.text = fields.licenseKey.plaintext ?? '';
+      _licensePurchaseDateController.text = fields.purchaseDate ?? '';
+      _licenseSeatsController.text = fields.seatsOrVersion ?? '';
+      _licenseVendorController.text = fields.vendor ?? '';
     }
   }
 
@@ -340,6 +400,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       case VaultItemType.secureNote:
         fields = SecureNoteFields(
           content: ConcealedValue.plain(_noteContentController.text),
+          attachments: _attachments,
         );
         break;
       case VaultItemType.bankAccount:
@@ -365,6 +426,41 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           algorithm: _totpAlgorithm,
           digits: _totpDigits,
           period: _totpPeriod,
+        );
+        break;
+      case VaultItemType.sshKey:
+        fields = SshKeyFields(
+          keyName: _sshKeyNameController.text,
+          privateKey: ConcealedValue.plain(_sshPrivateKeyController.text),
+          publicKey: _sshPublicKeyController.text,
+          passphrase: ConcealedValue.plain(_sshPassphraseController.text),
+          keyType: _sshKeyType,
+        );
+        break;
+      case VaultItemType.apiKey:
+        fields = ApiKeyFields(
+          serviceName: _apiServiceNameController.text,
+          keyValue: ConcealedValue.plain(_apiKeyValueController.text),
+          apiSecret: ConcealedValue.plain(_apiSecretValueController.text),
+          expiryDate: _apiExpiryDateController.text.isNotEmpty ? _apiExpiryDateController.text : null,
+          notes: _apiNotesController.text.isNotEmpty ? _apiNotesController.text : null,
+        );
+        break;
+      case VaultItemType.cryptoSeed:
+        fields = CryptoSeedFields(
+          walletName: _cryptoWalletNameController.text,
+          seedPhrase: ConcealedValue.plain(_cryptoSeedPhraseController.text),
+          derivationPath: _cryptoDerivationPathController.text.isNotEmpty ? _cryptoDerivationPathController.text : null,
+          notes: _cryptoNotesController.text.isNotEmpty ? _cryptoNotesController.text : null,
+        );
+        break;
+      case VaultItemType.softwareLicense:
+        fields = SoftwareLicenseFields(
+          productName: _licenseProductNameController.text,
+          licenseKey: ConcealedValue.plain(_licenseKeyController.text),
+          purchaseDate: _licensePurchaseDateController.text.isNotEmpty ? _licensePurchaseDateController.text : null,
+          seatsOrVersion: _licenseSeatsController.text.isNotEmpty ? _licenseSeatsController.text : null,
+          vendor: _licenseVendorController.text.isNotEmpty ? _licenseVendorController.text : null,
         );
         break;
     }
@@ -628,6 +724,10 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           _buildTypeTile(VaultItemType.bankAccount, 'Bank Account', Icons.account_balance_outlined, Colors.lightBlueAccent),
           _buildTypeTile(VaultItemType.password, 'Password', Icons.vpn_key_outlined, AppTheme.primaryColor),
           _buildTypeTile(VaultItemType.totp, 'TOTP / 2FA', Icons.qr_code_2_outlined, Colors.cyanAccent),
+          _buildTypeTile(VaultItemType.sshKey, 'SSH Key Pair', Icons.terminal_outlined, Colors.orangeAccent),
+          _buildTypeTile(VaultItemType.apiKey, 'API Key / Token', Icons.api_outlined, Colors.greenAccent),
+          _buildTypeTile(VaultItemType.cryptoSeed, 'Crypto Seed Phrase', Icons.currency_bitcoin, Colors.amber),
+          _buildTypeTile(VaultItemType.softwareLicense, 'Software License', Icons.card_membership_outlined, Colors.indigoAccent),
         ],
       ),
     );
@@ -1268,6 +1368,264 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.sshKey:
+        return [
+          _buildSectionCard(
+            title: 'SSH Key Pair Details',
+            titleIcon: Icons.terminal,
+            children: [
+              TextFormField(
+                controller: _sshKeyNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Key Name / Label',
+                  hintText: 'e.g. Production Server Key',
+                  prefixIcon: Icon(Icons.label_outlined),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Key name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _sshKeyType,
+                decoration: const InputDecoration(labelText: 'Key Type / Algorithm'),
+                items: const [
+                  DropdownMenuItem(value: 'Ed25519', child: Text('Ed25519 (Recommended)')),
+                  DropdownMenuItem(value: 'RSA', child: Text('RSA (2048/4096)')),
+                  DropdownMenuItem(value: 'ECDSA', child: Text('ECDSA')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _sshKeyType = val);
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _sshPrivateKeyController,
+                obscureText: _obscureSshPrivateKey,
+                maxLines: _obscureSshPrivateKey ? 1 : 6,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Private Key (PEM format)',
+                  hintText: '-----BEGIN OPENSSH PRIVATE KEY-----...',
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureSshPrivateKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureSshPrivateKey = !_obscureSshPrivateKey),
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Private key is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _sshPublicKeyController,
+                maxLines: 2,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Public Key (OpenSSH format)',
+                  hintText: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...',
+                  prefixIcon: Icon(Icons.public),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _sshPassphraseController,
+                obscureText: _obscureSshPassphrase,
+                decoration: InputDecoration(
+                  labelText: 'Key Passphrase (optional)',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureSshPassphrase ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureSshPassphrase = !_obscureSshPassphrase),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.apiKey:
+        return [
+          _buildSectionCard(
+            title: 'API Credentials & Tokens',
+            titleIcon: Icons.api,
+            children: [
+              TextFormField(
+                controller: _apiServiceNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Service Name / Provider',
+                  hintText: 'e.g. OpenAI, Stripe, AWS, GitHub',
+                  prefixIcon: Icon(Icons.cloud_outlined),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Service name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _apiKeyValueController,
+                obscureText: _obscureApiKey,
+                decoration: InputDecoration(
+                  labelText: 'API Key / Token Value',
+                  hintText: 'sk_live_51M...',
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureApiKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'API Key is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _apiSecretValueController,
+                obscureText: _obscureApiSecret,
+                decoration: InputDecoration(
+                  labelText: 'API Secret / Signing Key (optional)',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureApiSecret ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureApiSecret = !_obscureApiSecret),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _apiExpiryDateController,
+                decoration: const InputDecoration(
+                  labelText: 'Expiration Date (optional, YYYY-MM-DD)',
+                  prefixIcon: Icon(Icons.calendar_today_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _apiNotesController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Notes / Scope / Permissions',
+                  prefixIcon: Icon(Icons.note_outlined),
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.cryptoSeed:
+        return [
+          _buildSectionCard(
+            title: 'Crypto Wallet Seed Phrase',
+            titleIcon: Icons.currency_bitcoin,
+            children: [
+              TextFormField(
+                controller: _cryptoWalletNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Wallet Name / Label',
+                  hintText: 'e.g. MetaMask Primary, Ledger Hardware',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Wallet name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _cryptoSeedPhraseController,
+                obscureText: _obscureCryptoSeed,
+                maxLines: _obscureCryptoSeed ? 1 : 3,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: '12 or 24-Word Seed Phrase (Mnemonic)',
+                  hintText: 'word1 word2 word3 ... word12',
+                  prefixIcon: const Icon(Icons.vpn_key),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureCryptoSeed ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureCryptoSeed = !_obscureCryptoSeed),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Seed phrase is required';
+                  final words = v.trim().split(RegExp(r'\s+'));
+                  if (words.length != 12 && words.length != 15 && words.length != 18 && words.length != 24) {
+                    return 'Seed phrase should typically contain 12 or 24 words (got ${words.length})';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _cryptoDerivationPathController,
+                decoration: const InputDecoration(
+                  labelText: "Derivation Path (optional, e.g. m/44'/60'/0'/0/0)",
+                  prefixIcon: Icon(Icons.alt_route_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _cryptoNotesController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Notes / Public Addresses',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case VaultItemType.softwareLicense:
+        return [
+          _buildSectionCard(
+            title: 'Software License Details',
+            titleIcon: Icons.card_membership,
+            children: [
+              TextFormField(
+                controller: _licenseProductNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Software Product Name',
+                  hintText: 'e.g. JetBrains All Products Pack',
+                  prefixIcon: Icon(Icons.computer),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Product name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _licenseKeyController,
+                obscureText: _obscureLicenseKey,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'License Serial Key',
+                  hintText: 'XXXXX-XXXXX-XXXXX-XXXXX',
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureLicenseKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscureLicenseKey = !_obscureLicenseKey),
+                  ),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'License key is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _licensePurchaseDateController,
+                decoration: const InputDecoration(
+                  labelText: 'Purchase Date (optional, YYYY-MM-DD)',
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _licenseSeatsController,
+                decoration: const InputDecoration(
+                  labelText: 'Seats / Version (optional)',
+                  hintText: 'e.g. 5 Seats, v2.5',
+                  prefixIcon: Icon(Icons.groups_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _licenseVendorController,
+                decoration: const InputDecoration(
+                  labelText: 'Publisher / Vendor (optional)',
+                  hintText: 'e.g. JetBrains, Adobe, Microsoft',
+                  prefixIcon: Icon(Icons.storefront_outlined),
+                ),
               ),
             ],
           ),

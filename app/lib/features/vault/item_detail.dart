@@ -325,6 +325,22 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         icon = Icons.qr_code_2_outlined;
         color = Colors.cyanAccent;
         break;
+      case VaultItemType.sshKey:
+        icon = Icons.terminal_outlined;
+        color = Colors.orangeAccent;
+        break;
+      case VaultItemType.apiKey:
+        icon = Icons.api_outlined;
+        color = Colors.greenAccent;
+        break;
+      case VaultItemType.cryptoSeed:
+        icon = Icons.currency_bitcoin;
+        color = Colors.amber;
+        break;
+      case VaultItemType.softwareLicense:
+        icon = Icons.card_membership_outlined;
+        color = Colors.indigoAccent;
+        break;
     }
 
     return Container(
@@ -371,6 +387,40 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
     } else if (fields is SecureNoteFields) {
       return [
         _buildDetailField('Secure Note Content', fields.content.plaintext ?? '', isSecret: true, obscureKey: 'note_content'),
+        if (fields.attachments.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('ENCRYPTED FILE ATTACHMENTS', style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const SizedBox(height: 8),
+          ...fields.attachments.map((att) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.surfaceColor),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.attach_file, color: AppTheme.primaryColor, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(att.fileName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('${att.mimeType} • ${(att.fileSize / 1024).toStringAsFixed(1)} KB', style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.download, size: 18, color: AppTheme.primaryColor),
+                      onPressed: () => _copyToClipboard('Attachment Ciphertext', att.encryptedData.ciphertext ?? ''),
+                      tooltip: 'Copy Encrypted Blob',
+                    ),
+                  ],
+                ),
+              )),
+        ],
       ];
     } else if (fields is BankAccountFields) {
       return [
@@ -396,11 +446,58 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         _buildDetailField('Digits', fields.digits.toString()),
         _buildDetailField('Period', '${fields.period}s'),
       ];
+    } else if (fields is SshKeyFields) {
+      return [
+        _buildDetailField('Key Name', fields.keyName),
+        _buildDetailField('Key Type', fields.keyType),
+        _buildDetailField('Private Key (PEM)', fields.privateKey.plaintext ?? '', isSecret: true, obscureKey: 'ssh_priv', isMonospace: true),
+        if (fields.publicKey.isNotEmpty) _buildDetailField('Public Key (OpenSSH)', fields.publicKey, isMonospace: true),
+        if (fields.passphrase.plaintext != null && fields.passphrase.plaintext!.isNotEmpty)
+          _buildDetailField('Key Passphrase', fields.passphrase.plaintext!, isSecret: true, obscureKey: 'ssh_pass'),
+      ];
+    } else if (fields is ApiKeyFields) {
+      return [
+        _buildDetailField('Service Name', fields.serviceName),
+        _buildDetailField('API Key / Token', fields.keyValue.plaintext ?? '', isSecret: true, obscureKey: 'api_key', isMonospace: true),
+        if (fields.apiSecret.plaintext != null && fields.apiSecret.plaintext!.isNotEmpty)
+          _buildDetailField('API Secret', fields.apiSecret.plaintext!, isSecret: true, obscureKey: 'api_sec', isMonospace: true),
+        if (fields.expiryDate != null) _buildDetailField('Expiration Date', fields.expiryDate!),
+        if (fields.notes != null) _buildDetailField('Notes', fields.notes!),
+      ];
+    } else if (fields is CryptoSeedFields) {
+      return [
+        _buildDetailField('Wallet Name', fields.walletName),
+        _buildDetailField(
+          'Seed Phrase (Mnemonic)',
+          fields.seedPhrase.plaintext ?? '',
+          isSecret: true,
+          obscureKey: 'crypto_seed',
+          isMonospace: true,
+          isMaximallySensitive: true,
+        ),
+        if (fields.derivationPath != null) _buildDetailField('Derivation Path', fields.derivationPath!, isMonospace: true),
+        if (fields.notes != null) _buildDetailField('Notes', fields.notes!),
+      ];
+    } else if (fields is SoftwareLicenseFields) {
+      return [
+        _buildDetailField('Product Name', fields.productName),
+        _buildDetailField('License Key', fields.licenseKey.plaintext ?? '', isSecret: true, obscureKey: 'license_key', isMonospace: true),
+        if (fields.purchaseDate != null) _buildDetailField('Purchase Date', fields.purchaseDate!),
+        if (fields.seatsOrVersion != null) _buildDetailField('Seats / Version', fields.seatsOrVersion!),
+        if (fields.vendor != null) _buildDetailField('Publisher / Vendor', fields.vendor!),
+      ];
     }
     return const [];
   }
 
-  Widget _buildDetailField(String label, String value, {bool isSecret = false, String? obscureKey}) {
+  Widget _buildDetailField(
+    String label,
+    String value, {
+    bool isSecret = false,
+    String? obscureKey,
+    bool isMonospace = false,
+    bool isMaximallySensitive = false,
+  }) {
     if (value.isEmpty) return const SizedBox.shrink();
     final obscured = isSecret && obscureKey != null && _isObscured(obscureKey);
 
@@ -409,7 +506,25 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12)),
+          Row(
+            children: [
+              Text(label, style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12)),
+              if (isMaximallySensitive) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'MAX SENSITIVE',
+                    style: TextStyle(color: AppTheme.errorColor, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -417,8 +532,8 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 child: Text(
                   obscured ? '••••••••••••••••' : value,
                   style: TextStyle(
-                    fontFamily: obscured ? null : 'Inter',
-                    fontSize: 15,
+                    fontFamily: obscured ? null : (isMonospace ? 'monospace' : 'Inter'),
+                    fontSize: 14,
                     fontWeight: obscured ? FontWeight.bold : FontWeight.w500,
                     letterSpacing: obscured ? 2.0 : 0.0,
                   ),
@@ -427,7 +542,13 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
               if (isSecret && obscureKey != null)
                 IconButton(
                   icon: Icon(obscured ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                  onPressed: () => _toggleObscure(obscureKey),
+                  onPressed: () {
+                    if (isMaximallySensitive && obscured) {
+                      _showSensitiveRevealDialog(label, obscureKey);
+                    } else {
+                      _toggleObscure(obscureKey);
+                    }
+                  },
                   tooltip: obscured ? 'Reveal' : 'Mask',
                 ),
               IconButton(
@@ -436,6 +557,39 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 tooltip: 'Copy to Clipboard',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSensitiveRevealDialog(String label, String obscureKey) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.errorColor),
+            SizedBox(width: 8),
+            Text('Security Alert'),
+          ],
+        ),
+        content: Text(
+          'You are about to reveal $label.\n\nEnsure no one is looking over your shoulder or recording your screen before confirming.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _toggleObscure(obscureKey);
+            },
+            child: const Text('Confirm & Reveal'),
           ),
         ],
       ),
