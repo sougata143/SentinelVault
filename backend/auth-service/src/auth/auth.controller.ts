@@ -140,4 +140,27 @@ export class AuthController {
   ): Promise<{ token: string }> {
     return await this.authService.verifyPasskeyLogin(body.challenge, body.response);
   }
+
+  // ── Audit Log Endpoints ──────────────────────────────────────────────────
+
+  @Get('audit-log')
+  public async getAuditLogs(
+    @Query('userId') userId: string,
+    @Query('eventType') eventType?: string,
+    @Query('limit') limitStr?: string,
+    @Query('offset') offsetStr?: string,
+  ): Promise<{ events: any[]; total: number }> {
+    const limit = limitStr ? parseInt(limitStr, 10) : 50;
+    const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
+    return await this.authService.getAuditLogs(userId, eventType, limit, offset);
+  }
+
+  @Post('audit-log/event')
+  @HttpCode(HttpStatus.CREATED)
+  public async recordAuditEvent(
+    @Body() body: { userId: string; eventType: string; metadata?: Record<string, any> },
+  ): Promise<{ success: boolean; id: string }> {
+    const event = await this.authService.recordAuditEvent(body.userId, body.eventType, body.metadata);
+    return { success: true, id: event.id };
+  }
 }

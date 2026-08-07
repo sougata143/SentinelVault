@@ -60,21 +60,21 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 
 ### 1. Unified Frontend Client (`app/`)
 A cross-platform Flutter application providing:
-- **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane). Supports **multi-item selection** (long-press or checklist-mode toggle) with batch soft-delete of selected items and a confirmation-guarded Delete All action — both paths use the same soft-delete sync mechanism as single-item deletion (`isDeleted = true`, version-incremented, synced via `VaultSyncManager`).
-- **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data-breach feed, a weekly AI-generated digest, and quick-scan triggers.
-- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Plaintext exports require Master Password re-verification.
+- **Vault Tab**: 3-column layout (sidebar categories, item list with sorting/filtering/search, and a detail pane). Supports **multi-item selection** (long-press or checklist-mode toggle) with batch soft-delete of selected items and a confirmation-guarded Delete All action — both paths use the same soft-delete sync mechanism as single-item deletion (`isDeleted = true`, version-incremented, synced via `VaultSyncManager`). Supports specialized vault item templates for **TOTP / Authenticator**, **SSH Key Pairs** (monospaced formatting), **API Keys & Tokens** (masked secrets), **Crypto Wallet Seed Phrases** (maximally sensitive UI with double-confirmation reveal modal), **Software Licenses**, and **Secure Notes with encrypted file attachments** (10 MB per file limit). Features **Biometric-Gated Vault Unlock Caching** (Face ID, Touch ID, Fingerprint, Windows Hello via `local_auth` and OS secure hardware enclaves) with configurable auto-lock TTL, zero Master Password caching, and instant key purging upon lock or toggle disable.
+- **Security Center Tab**: Posture dashboard tracking password health scores, local reused-password detection, a chronological data-breach feed, a weekly AI-generated digest, quick-scan triggers, and a **Zero-Knowledge Security Audit Log Feed** surfacing chronological activity stream events (logins, exports, unlocks, sharing) with status indicators and zero sensitive data leakage.
+- **Import/Export Suite**: Local in-memory parsers for 1Password (`.1pux`), Bitwarden (`.json`), LastPass (`.csv`), Chrome/Firefox/Safari native export presets, Dashlane/Keeper/NordPass/RoboForm CSV, Proton Pass JSON, and KeePass `.kdbx` decryption/parsing (with local password/keyfile decryption and strict memory scrubbing). Seamlessly maps imported TOTP keys, SSH keys, API keys, software licenses, and secure notes into native SentinelVault templates. Plaintext exports require Master Password re-verification.
 
 ### 2. Shared Core (`core/`)
-A platform-agnostic Dart package managing local databases (SQLite), the Dart-side crypto interface (delegating to the native Rust core), data normalization, import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`, sync client).
+A platform-agnostic Dart package managing local databases (SQLite), the Dart-side crypto interface (delegating to the native Rust core), data normalization, TOTP code generation (RFC 6238 SHA1/SHA256/SHA512), encrypted file attachment blobs (`VaultItemAttachment`), import parsers, and backend API clients (`AiInsightsClient`, `BackendBreachMonitor`, sync client, `SecurityActivityLog`).
 
 ### 3. Native Crypto Core (`native/crypto_core/`)
-A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, Shamir's Secret Sharing (via `blahaj` — an audited GF(256) SSS implementation that resolves RUSTSEC-2024-0398), and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
+A single Rust crate providing Argon2id, AES-256-GCM, SRP-6a math, RFC 6238 TOTP code generation, Shamir's Secret Sharing (via `blahaj` — an audited GF(256) SSS implementation that resolves RUSTSEC-2024-0398), and the hybrid PQC (X25519 + ML-KEM-768, Ed25519 + ML-DSA-65) primitives. Compiled natively (`.so`/`.dylib`/`.dll`) for iOS/Android/desktop via `dart:ffi`, and to WebAssembly for both the Flutter Web build and the browser extension via `dart:js_interop`, sharing one build output across both. Native builds additionally get hardware memory protections (page locking, guard pages) where the OS supports it; all platforms get explicit zeroization of key material after use.
 
 ### 4. Backend Services (`backend/`)
-- **auth-service** (`:3001`): Account authentication via SRP-6a (zero-knowledge), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Issues HS256 JWTs with 24 h expiry. TypeORM-backed Postgres persistence for user records — verified to survive service restarts.
+- **auth-service** (`:3001`): Account authentication via SRP-6a (zero-knowledge), passwordless passkeys (WebAuthn/FIDO2), TOTP MFA, and rate limiting. Uses a Redis-backed store for active SRP-6a login challenges (`srp:challenge:<challengeId>`) featuring 5-minute native key TTL expiration (`EX 300`) and atomic `GETDEL` single-pass challenge consumption for replay protection and horizontal pod scalability. Issues HS256 JWTs with 24 h expiry. TypeORM-backed Postgres persistence for user records — verified to survive service restarts.
 - **sync-api** (`:3002`): Stores and serves only encrypted vault blobs, per-item version numbers for conflict detection, and the wrapped Vault Key envelope needed for cross-device Master Password unlock. All endpoints are protected by `JwtAuthGuard`; the acting user ID is extracted from the verified JWT `sub` claim.
 - **security-analysis-service** (`:3003`): URL reputation scanning, SPF/DKIM/DMARC email parsing, macro/signature file scanning, scheduled HIBP breach checks, and redacted-signal AI insight generation via Gemini. All identity-gated endpoints verify the JWT before processing.
-- **sharing-service** (`:3004`): Key-directory microservice publishing classical + post-quantum public key bundles and managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing. All key-directory and share-invite endpoints are protected by `JwtAuthGuard`.
+- **sharing-service** (`:3004`): Key-directory microservice publishing classical + post-quantum public key bundles, managing per-recipient wrapped (ciphertext) Folder Keys for PQC hybrid folder sharing, and orchestrating **Emergency & Inheritance Access** (`EmergencyContactEntity` & `AccessRequestEntity`). Uses ML-KEM-768 + X25519 hybrid key wrapping with owner-configurable waiting periods (24h/72h/7 days), pending request alert delivery, mandatory owner denial windows, and instant revocation. All key-directory, share-invite, and emergency access endpoints are protected by `JwtAuthGuard`.
 
 ---
 
@@ -350,6 +350,54 @@ TRUNCATE TABLE encrypted_vault_items CASCADE;
    *(The backend sets `revokedAt = NOW()` for `test-b@sentinelvault.local` and rotates the Folder Key).*
 4. In DBeaver, query `SELECT "recipientUserId", "folderId", "revokedAt" FROM wrapped_key_recipients;` to confirm `revokedAt` is populated.
 5. Log back in as **`test-b@sentinelvault.local`** — `test-b@sentinelvault.local` can no longer access new items or future updates in that folder.
+
+---
+
+## 🛠️ SentinelVault Developer CLI (`svault`)
+
+A high-performance standalone Rust CLI tool (`cli/svault`) for developer workflows, shell scripts, and CI/CD pipelines.
+
+### Key Commands & Usage:
+```bash
+# 1. Authenticate with auth-service via SRP-6a (stores JWT in OS Keyring)
+svault login --email dev@sentinelvault.io
+
+# 2. Unlock vault in memory (Argon2id KDF, TTL in-memory cache)
+svault unlock --session-timeout 15m
+
+# 3. List vault items
+svault list --folder Development
+
+# 4. Fetch single secret / field
+svault get "Database Password" --field password
+
+# 5. Export folder secrets to .env file
+svault env Development > .env
+```
+
+### Common Workflows:
+
+#### 1. Local Development (`.env` Output Piping)
+Inject secrets directly from a SentinelVault folder into local development config without storing credentials in git:
+```bash
+# Inject all items in the 'Development' folder as KEY=VALUE pairs
+svault env Development > .env
+```
+
+#### 2. Shell Profile Integration (`.zshrc` / `.bashrc`)
+Add an alias to quickly inject decrypted secrets into shell environment variables:
+```bash
+# In ~/.zshrc or ~/.bash_profile
+alias load-dev-env="eval \$(svault env Development | sed 's/^/export /')"
+```
+
+#### 3. Docker Build Step Integration
+Pass API keys into Docker builds without writing secrets to layer caches or git history:
+```bash
+# Fetch secret directly from vault and pass via build-arg
+export STRIPE_KEY=$(svault get Stripe --field password)
+docker build --build-arg STRIPE_KEY=$STRIPE_KEY -t my-app:latest .
+```
 
 ---
 

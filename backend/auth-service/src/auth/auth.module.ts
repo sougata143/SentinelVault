@@ -4,12 +4,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UserRepository } from './user.repository';
+import { RedisService } from './redis.service';
 import { User } from './entities/user.entity';
 import { WebauthnCredential } from './entities/webauthn-credential.entity';
+import { AuditEventEntity } from './entities/audit-event.entity';
+import { AuditService } from './audit.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, WebauthnCredential]),
+    TypeOrmModule.forFeature([User, WebauthnCredential, AuditEventEntity]),
     JwtModule.registerAsync({
       /** JWT_SECRET is already present in the root .env (see RUNNING_LOCALLY.md).
        *  It is shared across all four backend services so each can verify tokens
@@ -21,7 +24,7 @@ import { WebauthnCredential } from './entities/webauthn-credential.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, UserRepository],
-  exports: [AuthService, UserRepository, JwtModule],
+  providers: [AuthService, UserRepository, RedisService, AuditService],
+  exports: [AuthService, UserRepository, JwtModule, RedisService, AuditService],
 })
 export class AuthModule {}

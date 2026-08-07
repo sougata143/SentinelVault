@@ -891,3 +891,66 @@ pub unsafe extern "C" fn pqc_verify_invitation(
         Err(_)    => -3,
     }
 }
+
+// 15. TOTP Code Generator (RFC 6238)
+/// # Safety
+///
+/// Caller must ensure `secret_ptr` is a valid null-terminated C string, `algo_ptr` is null or
+/// a valid C string, `output_ptr` points to a writable buffer of `output_capacity`, and `written_ptr` receives byte count.
+#[no_mangle]
+pub unsafe extern "C" fn generate_totp_code(
+    secret_ptr:      *const std::os::raw::c_char,
+    timestamp_sec:   u64,
+    period:          u32,
+    digits:          u32,
+    algo_ptr:        *const std::os::raw::c_char,
+    output_ptr:      *mut u8,
+    output_capacity: usize,
+    written_ptr:     *mut usize,
+) -> i32 {
+    if secret_ptr.is_null() || output_ptr.is_null() || written_ptr.is_null() {
+        return -1;
+    }
+
+    let secret = match unsafe { std::ffi::CStr::from_ptr(secret_ptr) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+
+    let algo_str = if !algo_ptr.is_null() {
+        unsafe { std::ffi::CStr::from_ptr(algo_ptr) }.to_str().unwrap_or("SHA1")
+    } else {
+        "SHA1"
+    };
+
+    let algorithm = algorithms::totp::TotpAlgorithm::from_str(algo_str);
+
+    match algorithms::totp::generate_totp(secret, timestamp_sec, period, digits, algorithm) {
+        Ok(code) => {
+            let bytes = code.as_bytes();
+            if bytes.len() > output_capacity {
+                return -3;
+            }
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), output_ptr, bytes.len());
+                *written_ptr = bytes.len();
+            }
+            0
+        }
+        Err(_) => -4,
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn wasm_generate_totp(
+    secret: &str,
+    timestamp_sec: u64,
+    period: u32,
+    digits: u32,
+    algorithm: &str,
+) -> Result<String, JsValue> {
+    let algo = algorithms::totp::TotpAlgorithm::from_str(algorithm);
+    algorithms::totp::generate_totp(secret, timestamp_sec, period, digits, algo)
+        .map_err(JsValue::from_str)
+}

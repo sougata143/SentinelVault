@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { KeyDirectoryModule } from './key-directory/key-directory.module';
 import { ShareInviteModule } from './share-invite/share-invite.module';
+import { EmergencyModule } from './emergency/emergency.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { HealthController } from './health.controller';
     }),
     KeyDirectoryModule,
     ShareInviteModule,
+    EmergencyModule,
   ],
   controllers: [HealthController],
 })

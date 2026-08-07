@@ -22,6 +22,21 @@ enum VaultItemType {
 
   /// A standalone plaintext password entry.
   password,
+
+  /// Standalone TOTP / Authenticator 2FA secret entry.
+  totp,
+
+  /// SSH Key Pair (PEM private key, public key, passphrase).
+  sshKey,
+
+  /// API Key / Token credential.
+  apiKey,
+
+  /// Crypto wallet seed phrase (mnemonic 12/24 words).
+  cryptoSeed,
+
+  /// Software product license key.
+  softwareLicense,
 }
 
 /// Extension on [VaultItemType] providing serialization helpers.
@@ -41,6 +56,16 @@ extension VaultItemTypeExtension on VaultItemType {
         return 'bank_account';
       case VaultItemType.password:
         return 'password';
+      case VaultItemType.totp:
+        return 'totp';
+      case VaultItemType.sshKey:
+        return 'ssh_key';
+      case VaultItemType.apiKey:
+        return 'api_key';
+      case VaultItemType.cryptoSeed:
+        return 'crypto_seed';
+      case VaultItemType.softwareLicense:
+        return 'software_license';
     }
   }
 
@@ -59,6 +84,16 @@ extension VaultItemTypeExtension on VaultItemType {
         return VaultItemType.bankAccount;
       case 'password':
         return VaultItemType.password;
+      case 'totp':
+        return VaultItemType.totp;
+      case 'ssh_key':
+        return VaultItemType.sshKey;
+      case 'api_key':
+        return VaultItemType.apiKey;
+      case 'crypto_seed':
+        return VaultItemType.cryptoSeed;
+      case 'software_license':
+        return VaultItemType.softwareLicense;
       default:
         throw ArgumentError('Invalid VaultItemType value: $value');
     }
@@ -519,19 +554,99 @@ class IdentityFields implements VaultItemFields {
   Future<IdentityFields> decrypt(List<int> key, VaultCrypto crypto) async => this;
 }
 
+// ── Vault Item Attachment ──────────────────────────────────────────────────
+
+/// Represents a zero-knowledge encrypted file attachment inside a vault item.
+class VaultItemAttachment {
+  /// Unique identifier (UUID v4) for the attachment.
+  final String id;
+
+  /// Original display file name (e.g., 'contract.pdf').
+  final String fileName;
+
+  /// MIME content type of the file.
+  final String mimeType;
+
+  /// Original file size in bytes.
+  final int fileSize;
+
+  /// Symmetrically encrypted binary payload of the file (Base64).
+  final ConcealedValue encryptedData;
+
+  /// Creates a new [VaultItemAttachment] instance.
+  VaultItemAttachment({
+    required this.id,
+    required this.fileName,
+    required this.mimeType,
+    required this.fileSize,
+    required this.encryptedData,
+  });
+
+  /// Serializes the attachment object to JSON.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'file_name': fileName,
+        'mime_type': mimeType,
+        'file_size': fileSize,
+        'encrypted_data': encryptedData.toJson(),
+      };
+
+  /// Deserializes a [VaultItemAttachment] from JSON.
+  factory VaultItemAttachment.fromJson(Map<String, dynamic> json) {
+    return VaultItemAttachment(
+      id: json['id'] as String? ?? '',
+      fileName: json['file_name'] as String? ?? '',
+      mimeType: json['mime_type'] as String? ?? 'application/octet-stream',
+      fileSize: json['file_size'] as int? ?? 0,
+      encryptedData: json['encrypted_data'] != null
+          ? ConcealedValue.fromJson(json['encrypted_data'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+    );
+  }
+
+  /// Encrypts the attachment file payload using [VaultCrypto].
+  Future<VaultItemAttachment> encrypt(List<int> key, VaultCrypto crypto) async {
+    return VaultItemAttachment(
+      id: id,
+      fileName: fileName,
+      mimeType: mimeType,
+      fileSize: fileSize,
+      encryptedData: await encryptedData.encrypt(key, crypto),
+    );
+  }
+
+  /// Decrypts the attachment file payload using [VaultCrypto].
+  Future<VaultItemAttachment> decrypt(List<int> key, VaultCrypto crypto) async {
+    return VaultItemAttachment(
+      id: id,
+      fileName: fileName,
+      mimeType: mimeType,
+      fileSize: fileSize,
+      encryptedData: await encryptedData.decrypt(key, crypto),
+    );
+  }
+}
+
 // ── Secure Note Fields ────────────────────────────────────────────────────
 
-/// Vault item payload containing a raw text secure note.
+/// Vault item payload containing a raw text secure note and optional encrypted file attachments.
 class SecureNoteFields implements VaultItemFields {
   /// The sensitive text content of the secure note.
   final ConcealedValue content;
 
+  /// List of encrypted file attachments associated with this secure note.
+  final List<VaultItemAttachment> attachments;
+
   /// Creates secure note fields.
-  SecureNoteFields({required this.content});
+  SecureNoteFields({
+    required this.content,
+    this.attachments = const [],
+  });
 
   @override
   Map<String, dynamic> toJson() => {
         'content': content.toJson(),
+        'attachments': attachments.map((e) => e.toJson()).toList(),
       };
 
   /// Deserializes a [SecureNoteFields] payload from a JSON map.
@@ -540,17 +655,24 @@ class SecureNoteFields implements VaultItemFields {
       content: json['content'] != null
           ? ConcealedValue.fromJson(json['content'] as Map<String, dynamic>)
           : const ConcealedValue.plain(''),
+      attachments: (json['attachments'] as List? ?? [])
+          .map((e) => VaultItemAttachment.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
   @override
   Future<SecureNoteFields> encrypt(List<int> key, VaultCrypto crypto) async {
-    return SecureNoteFields(content: await content.encrypt(key, crypto));
+    final encContent = await content.encrypt(key, crypto);
+    final encAttachments = await Future.wait(attachments.map((a) => a.encrypt(key, crypto)));
+    return SecureNoteFields(content: encContent, attachments: encAttachments);
   }
 
   @override
   Future<SecureNoteFields> decrypt(List<int> key, VaultCrypto crypto) async {
-    return SecureNoteFields(content: await content.decrypt(key, crypto));
+    final decContent = await content.decrypt(key, crypto);
+    final decAttachments = await Future.wait(attachments.map((a) => a.decrypt(key, crypto)));
+    return SecureNoteFields(content: decContent, attachments: decAttachments);
   }
 }
 
@@ -676,6 +798,375 @@ class PasswordFields implements VaultItemFields {
   @override
   Future<PasswordFields> decrypt(List<int> key, VaultCrypto crypto) async {
     return PasswordFields(password: await password.decrypt(key, crypto));
+  }
+}
+
+// ── TOTP / Authenticator Fields ───────────────────────────────────────────
+
+/// Vault item payload containing a TOTP / Authenticator seed and parameters.
+class TotpFields implements VaultItemFields {
+  /// Service or issuer label (e.g., 'GitHub', 'Google', 'AWS').
+  final String issuer;
+
+  /// Account name or email identifier (e.g., 'user@example.com').
+  final String accountName;
+
+  /// Base32 encoded TOTP secret key (symmetrically encrypted).
+  final ConcealedValue secret;
+
+  /// HMAC digest algorithm ('SHA1', 'SHA256', 'SHA512').
+  final String algorithm;
+
+  /// Number of digits in generated code (typically 6 or 8).
+  final int digits;
+
+  /// Code refresh period in seconds (typically 30).
+  final int period;
+
+  /// Creates TOTP fields.
+  TotpFields({
+    required this.issuer,
+    required this.accountName,
+    required this.secret,
+    this.algorithm = 'SHA1',
+    this.digits = 6,
+    this.period = 30,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'issuer': issuer,
+        'account_name': accountName,
+        'secret': secret.toJson(),
+        'algorithm': algorithm,
+        'digits': digits,
+        'period': period,
+      };
+
+  /// Deserializes a [TotpFields] instance from a JSON map.
+  factory TotpFields.fromJson(Map<String, dynamic> json) {
+    return TotpFields(
+      issuer: json['issuer'] as String? ?? '',
+      accountName: json['account_name'] as String? ?? '',
+      secret: json['secret'] != null
+          ? ConcealedValue.fromJson(json['secret'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      algorithm: json['algorithm'] as String? ?? 'SHA1',
+      digits: json['digits'] as int? ?? 6,
+      period: json['period'] as int? ?? 30,
+    );
+  }
+
+  @override
+  Future<TotpFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return TotpFields(
+      issuer: issuer,
+      accountName: accountName,
+      secret: await secret.encrypt(key, crypto),
+      algorithm: algorithm,
+      digits: digits,
+      period: period,
+    );
+  }
+
+  @override
+  Future<TotpFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return TotpFields(
+      issuer: issuer,
+      accountName: accountName,
+      secret: await secret.decrypt(key, crypto),
+      algorithm: algorithm,
+      digits: digits,
+      period: period,
+    );
+  }
+}
+
+// ── SSH Key Pair Fields ───────────────────────────────────────────────────
+
+/// Vault item payload containing an SSH Key Pair.
+class SshKeyFields implements VaultItemFields {
+  /// User-defined key name or descriptor (e.g. 'Production Server Key').
+  final String keyName;
+
+  /// Sensitive multi-line private key string in PEM format (encrypted).
+  final ConcealedValue privateKey;
+
+  /// Public key string (OpenSSH format).
+  final String publicKey;
+
+  /// Optional passphrase used to protect the private key (encrypted).
+  final ConcealedValue passphrase;
+
+  /// Key algorithm family ('RSA', 'Ed25519', 'ECDSA').
+  final String keyType;
+
+  /// Creates SSH key fields.
+  SshKeyFields({
+    required this.keyName,
+    required this.privateKey,
+    required this.publicKey,
+    required this.passphrase,
+    this.keyType = 'Ed25519',
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'key_name': keyName,
+        'private_key': privateKey.toJson(),
+        'public_key': publicKey,
+        'passphrase': passphrase.toJson(),
+        'key_type': keyType,
+      };
+
+  /// Deserializes an [SshKeyFields] instance from a JSON map.
+  factory SshKeyFields.fromJson(Map<String, dynamic> json) {
+    return SshKeyFields(
+      keyName: json['key_name'] as String? ?? '',
+      privateKey: json['private_key'] != null
+          ? ConcealedValue.fromJson(json['private_key'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      publicKey: json['public_key'] as String? ?? '',
+      passphrase: json['passphrase'] != null
+          ? ConcealedValue.fromJson(json['passphrase'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      keyType: json['key_type'] as String? ?? 'Ed25519',
+    );
+  }
+
+  @override
+  Future<SshKeyFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return SshKeyFields(
+      keyName: keyName,
+      privateKey: await privateKey.encrypt(key, crypto),
+      publicKey: publicKey,
+      passphrase: await passphrase.encrypt(key, crypto),
+      keyType: keyType,
+    );
+  }
+
+  @override
+  Future<SshKeyFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return SshKeyFields(
+      keyName: keyName,
+      privateKey: await privateKey.decrypt(key, crypto),
+      publicKey: publicKey,
+      passphrase: await passphrase.decrypt(key, crypto),
+      keyType: keyType,
+    );
+  }
+}
+
+// ── API Key / Token Fields ────────────────────────────────────────────────
+
+/// Vault item payload containing API credentials and tokens.
+class ApiKeyFields implements VaultItemFields {
+  /// Name of the target service or API provider (e.g., 'Stripe', 'OpenAI', 'AWS').
+  final String serviceName;
+
+  /// Primary API key or Bearer token value (encrypted).
+  final ConcealedValue keyValue;
+
+  /// Optional secondary API secret (e.g., OAuth client secret, HMAC signing secret).
+  final ConcealedValue apiSecret;
+
+  /// Optional ISO-8601 string for key expiration date.
+  final String? expiryDate;
+
+  /// Optional notes or usage instructions.
+  final String? notes;
+
+  /// Creates API key fields.
+  ApiKeyFields({
+    required this.serviceName,
+    required this.keyValue,
+    required this.apiSecret,
+    this.expiryDate,
+    this.notes,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'service_name': serviceName,
+        'key_value': keyValue.toJson(),
+        'api_secret': apiSecret.toJson(),
+        'expiry_date': expiryDate,
+        'notes': notes,
+      };
+
+  /// Deserializes an [ApiKeyFields] instance from a JSON map.
+  factory ApiKeyFields.fromJson(Map<String, dynamic> json) {
+    return ApiKeyFields(
+      serviceName: json['service_name'] as String? ?? '',
+      keyValue: json['key_value'] != null
+          ? ConcealedValue.fromJson(json['key_value'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      apiSecret: json['api_secret'] != null
+          ? ConcealedValue.fromJson(json['api_secret'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      expiryDate: json['expiry_date'] as String?,
+      notes: json['notes'] as String?,
+    );
+  }
+
+  @override
+  Future<ApiKeyFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return ApiKeyFields(
+      serviceName: serviceName,
+      keyValue: await keyValue.encrypt(key, crypto),
+      apiSecret: await apiSecret.encrypt(key, crypto),
+      expiryDate: expiryDate,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<ApiKeyFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return ApiKeyFields(
+      serviceName: serviceName,
+      keyValue: await keyValue.decrypt(key, crypto),
+      apiSecret: await apiSecret.decrypt(key, crypto),
+      expiryDate: expiryDate,
+      notes: notes,
+    );
+  }
+}
+
+// ── Crypto Wallet Seed Phrase Fields ──────────────────────────────────────
+
+/// Vault item payload containing a cryptocurrency wallet seed phrase (mnemonic).
+class CryptoSeedFields implements VaultItemFields {
+  /// Name of the wallet or blockchain profile (e.g. 'MetaMask Main', 'Hardware Backup').
+  final String walletName;
+
+  /// Maximally sensitive 12 or 24-word BIP-39 mnemonic seed phrase string (encrypted).
+  final ConcealedValue seedPhrase;
+
+  /// Optional derivation path (e.g., "m/44'/60'/0'/0/0").
+  final String? derivationPath;
+
+  /// Optional notes or wallet addresses.
+  final String? notes;
+
+  /// Creates crypto wallet seed fields.
+  CryptoSeedFields({
+    required this.walletName,
+    required this.seedPhrase,
+    this.derivationPath,
+    this.notes,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'wallet_name': walletName,
+        'seed_phrase': seedPhrase.toJson(),
+        'derivation_path': derivationPath,
+        'notes': notes,
+      };
+
+  /// Deserializes a [CryptoSeedFields] instance from a JSON map.
+  factory CryptoSeedFields.fromJson(Map<String, dynamic> json) {
+    return CryptoSeedFields(
+      walletName: json['wallet_name'] as String? ?? '',
+      seedPhrase: json['seed_phrase'] != null
+          ? ConcealedValue.fromJson(json['seed_phrase'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      derivationPath: json['derivation_path'] as String?,
+      notes: json['notes'] as String?,
+    );
+  }
+
+  @override
+  Future<CryptoSeedFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return CryptoSeedFields(
+      walletName: walletName,
+      seedPhrase: await seedPhrase.encrypt(key, crypto),
+      derivationPath: derivationPath,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<CryptoSeedFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return CryptoSeedFields(
+      walletName: walletName,
+      seedPhrase: await seedPhrase.decrypt(key, crypto),
+      derivationPath: derivationPath,
+      notes: notes,
+    );
+  }
+}
+
+// ── Software License Fields ────────────────────────────────────────────────
+
+/// Vault item payload containing a software license agreement and serial key.
+class SoftwareLicenseFields implements VaultItemFields {
+  /// Name of the software product (e.g., 'JetBrains All Products', 'Photoshop').
+  final String productName;
+
+  /// Product registration serial / license key string (encrypted).
+  final ConcealedValue licenseKey;
+
+  /// Optional purchase date string (YYYY-MM-DD).
+  final String? purchaseDate;
+
+  /// Optional seats or version details (e.g., '5 Seats / v2.0').
+  final String? seatsOrVersion;
+
+  /// Software publisher or vendor name.
+  final String? vendor;
+
+  /// Creates software license fields.
+  SoftwareLicenseFields({
+    required this.productName,
+    required this.licenseKey,
+    this.purchaseDate,
+    this.seatsOrVersion,
+    this.vendor,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'product_name': productName,
+        'license_key': licenseKey.toJson(),
+        'purchase_date': purchaseDate,
+        'seats_or_version': seatsOrVersion,
+        'vendor': vendor,
+      };
+
+  /// Deserializes a [SoftwareLicenseFields] instance from a JSON map.
+  factory SoftwareLicenseFields.fromJson(Map<String, dynamic> json) {
+    return SoftwareLicenseFields(
+      productName: json['product_name'] as String? ?? '',
+      licenseKey: json['license_key'] != null
+          ? ConcealedValue.fromJson(json['license_key'] as Map<String, dynamic>)
+          : const ConcealedValue.plain(''),
+      purchaseDate: json['purchase_date'] as String?,
+      seatsOrVersion: json['seats_or_version'] as String?,
+      vendor: json['vendor'] as String?,
+    );
+  }
+
+  @override
+  Future<SoftwareLicenseFields> encrypt(List<int> key, VaultCrypto crypto) async {
+    return SoftwareLicenseFields(
+      productName: productName,
+      licenseKey: await licenseKey.encrypt(key, crypto),
+      purchaseDate: purchaseDate,
+      seatsOrVersion: seatsOrVersion,
+      vendor: vendor,
+    );
+  }
+
+  @override
+  Future<SoftwareLicenseFields> decrypt(List<int> key, VaultCrypto crypto) async {
+    return SoftwareLicenseFields(
+      productName: productName,
+      licenseKey: await licenseKey.decrypt(key, crypto),
+      purchaseDate: purchaseDate,
+      seatsOrVersion: seatsOrVersion,
+      vendor: vendor,
+    );
   }
 }
 
@@ -839,6 +1330,21 @@ class VaultItem {
         break;
       case VaultItemType.password:
         fields = PasswordFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.totp:
+        fields = TotpFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.sshKey:
+        fields = SshKeyFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.apiKey:
+        fields = ApiKeyFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.cryptoSeed:
+        fields = CryptoSeedFields.fromJson(fieldsJson);
+        break;
+      case VaultItemType.softwareLicense:
+        fields = SoftwareLicenseFields.fromJson(fieldsJson);
         break;
     }
 

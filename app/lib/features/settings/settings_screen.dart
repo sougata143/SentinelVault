@@ -4,7 +4,9 @@ import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../theme/theme.dart';
+import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
+import '../emergency/emergency_access_screen.dart';
 import 'duress_setup_screen.dart';
 
 class AppSettings {
@@ -23,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onLogout;
   final String currentEmail;
   final String syncBaseUrl;
+  final String sharingBaseUrl;
   final http.Client? httpClient;
 
   /// Platform override used exclusively in tests to simulate Web or native
@@ -44,6 +47,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLogout,
     this.currentEmail = 'auditor@sentinelvault.io',
     this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
     this.httpClient,
     this.isWebOverride = kIsWeb,
     this.cryptoOverride,
@@ -294,6 +298,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Emergency & Inheritance Access Section
+          _buildSectionHeader('Emergency & Inheritance'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.warningColor,
+                child: Icon(Icons.emergency_outlined, color: Colors.black),
+              ),
+              title: const Text('Emergency & Inheritance Access'),
+              subtitle: const Text('Designate trusted contacts and configure access delay periods'),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EmergencyAccessScreen(
+                      currentEmail: widget.currentEmail,
+                      vaultKey: VaultLockManager.instance.vaultKey ?? List<int>.filled(32, 0),
+                      sharingBaseUrl: widget.sharingBaseUrl,
+                      httpClient: widget.httpClient,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // Profile section
           _buildSectionHeader('Profile'),
           Card(
@@ -390,51 +423,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Reference: docs/RUST_CROSS_PLATFORM_REEVALUATION.md §2.
                   if (!widget.isWebOverride) ...[
                     const Divider(color: Colors.white10),
-                    SwitchListTile(
-                      key: const Key('settings-biometric-switch'),
-                      title: const Text('Biometric Quick-Unlock'),
-                      subtitle: const Text('Unlock the vault using Face ID or fingerprint after in-app locks'),
-                      value: _biometricEnabled,
-                      activeThumbColor: AppTheme.primaryColor,
-                      onChanged: (val) async {
-                        if (val) {
-                          final supported = await BiometricAuthService.instance.isBiometricsSupported();
-                          if (!supported) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Biometrics not supported on this device')),
-                              );
-                            }
-                            return;
-                          }
+                    FutureBuilder<String>(
+                      future: BiometricVaultManager.getBiometricLabel(),
+                      builder: (context, snapshot) {
+                        final label = snapshot.data ?? 'Biometrics';
+                        return SwitchListTile(
+                          key: const Key('settings-biometric-switch'),
+                          title: Text('Unlock with $label'),
+                          subtitle: const Text('Caches Vault Key in OS hardware security enclave. Your Master Password is never stored.'),
+                          value: _biometricEnabled,
+                          activeThumbColor: AppTheme.primaryColor,
+                          onChanged: (val) async {
+                            if (val) {
+                              final supported = await BiometricVaultManager.isBiometricAvailable();
+                              if (!supported) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Biometrics not supported on this device')),
+                                  );
+                                }
+                                return;
+                              }
 
-                          final success = await BiometricAuthService.instance.authenticate();
-                          if (success) {
-                            setState(() {
-                              _biometricEnabled = true;
-                            });
-                            _saveSettings();
-                            if (VaultLockManager.instance.masterKey != null &&
-                                VaultLockManager.instance.vaultKey != null) {
-                              await VaultLockManager.instance.enableBiometrics(
-                                VaultLockManager.instance.masterKey!,
-                                VaultLockManager.instance.vaultKey!,
-                              );
+                              setState(() {
+                                _biometricEnabled = true;
+                              });
+                              AppSettings.biometricEnabled = true;
+                              await BiometricVaultManager.setBiometricsEnabled(true);
+                              _saveSettings();
+                              if (VaultLockManager.instance.masterKey != null &&
+                                  VaultLockManager.instance.vaultKey != null) {
+                                await VaultLockManager.instance.enableBiometrics(
+                                  VaultLockManager.instance.masterKey!,
+                                  VaultLockManager.instance.vaultKey!,
+                                );
+                                await BiometricVaultManager.cacheVaultKey(VaultLockManager.instance.vaultKey!);
+                              }
+                            } else {
+                              setState(() {
+                                _biometricEnabled = false;
+                              });
+                              AppSettings.biometricEnabled = false;
+                              await BiometricVaultManager.setBiometricsEnabled(false);
+                              _saveSettings();
+                              VaultLockManager.instance.disableBiometrics();
                             }
-                          } else {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Biometric authentication failed')),
-                              );
-                            }
-                          }
-                        } else {
-                          setState(() {
-                            _biometricEnabled = false;
-                          });
-                          _saveSettings();
-                          VaultLockManager.instance.disableBiometrics();
-                        }
+                          },
+                        );
                       },
                     ),
                   ],

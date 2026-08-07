@@ -9,6 +9,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'native_crypto_bridge.dart';
 import 'native_crypto_bridge_selector.dart';
+export 'totp_helper.dart';
 
 /// Cryptographic services for SentinelVault key management and encryption.
 class VaultCrypto {

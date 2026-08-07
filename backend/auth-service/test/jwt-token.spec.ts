@@ -18,7 +18,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/auth/auth.service';
+import { AuditService } from '../src/auth/audit.service';
 import { UserRepository } from '../src/auth/user.repository';
+import { RedisService } from '../src/auth/redis.service';
 import { User } from '../src/auth/entities/user.entity';
 import { WebauthnCredential } from '../src/auth/entities/webauthn-credential.entity';
 import { SrpServer, bigIntToBuffer, bufferToBigInt, sha256 } from '../src/auth/srp';
@@ -159,6 +161,22 @@ describe('JWT token issued by AuthService', () => {
       providers: [
         AuthService,
         UserRepository,
+        {
+          provide: RedisService,
+          useValue: {
+            set: jest.fn(async (k: string, v: string) => { (global as any)._redisMap = (global as any)._redisMap || new Map(); (global as any)._redisMap.set(k, v); }),
+            setex: jest.fn(async (k: string, t: number, v: string) => { (global as any)._redisMap = (global as any)._redisMap || new Map(); (global as any)._redisMap.set(k, v); }),
+            getdel: jest.fn(async (k: string) => {
+              const map = (global as any)._redisMap || new Map();
+              const val = map.get(k);
+              map.delete(k);
+              return val ?? null;
+            }),
+            get: jest.fn(async (k: string) => ((global as any)._redisMap || new Map()).get(k) ?? null),
+            del: jest.fn(async (k: string) => { ((global as any)._redisMap || new Map()).delete(k); }),
+          },
+        },
+        { provide: AuditService, useValue: { logEvent: jest.fn() } },
         // Provide fake in-memory repositories so no Postgres connection is needed
         {
           provide: getRepositoryToken(User),

@@ -18,6 +18,7 @@ class AppShell extends StatefulWidget {
   final AuthClient? authClient;
   final Duration? autoLockTimeoutOverride;
   final String syncBaseUrl;
+  final String sharingBaseUrl;
   final http.Client? httpClient;
 
   const AppShell({
@@ -28,6 +29,7 @@ class AppShell extends StatefulWidget {
     this.authClient,
     this.autoLockTimeoutOverride,
     this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
     this.httpClient,
   });
 
@@ -239,6 +241,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                             onLogout: _triggerLogout,
                             currentEmail: widget.currentEmail ?? 'auditor@sentinelvault.io',
                             syncBaseUrl: widget.syncBaseUrl,
+                            sharingBaseUrl: widget.sharingBaseUrl,
                             httpClient: widget.httpClient,
                           ),
                         ),
@@ -309,6 +312,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       onLogout: _triggerLogout,
                       currentEmail: widget.currentEmail ?? 'auditor@sentinelvault.io',
                       syncBaseUrl: widget.syncBaseUrl,
+                      sharingBaseUrl: widget.sharingBaseUrl,
                       httpClient: widget.httpClient,
                     ),
                   ),

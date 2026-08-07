@@ -78,16 +78,20 @@ void main() {
       await tester.ensureVisible(buttonFinder);
       await tester.pumpAndSettle();
 
-      await tester.runAsync(() async {
-        await tester.tap(buttonFinder);
-        // Wait dynamically for KDF derivation to complete
-        const maxWait = Duration(seconds: 30);
-        final deadline = DateTime.now().add(maxWait);
-        while (VaultLockManager.instance.isLocked && DateTime.now().isBefore(deadline)) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-        await Future.delayed(const Duration(milliseconds: 200));
-      });
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      // Wait for the full async unlock + sync + navigation chain to complete.
+      // We pump in short increments; runAsync lets real async work (KDF, network)
+      // run while tester.pump() advances the Flutter frame/microtask queue.
+      const maxWait = Duration(seconds: 30);
+      final deadline = DateTime.now().add(maxWait);
+      while (find.byType(AppShell).evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+        await tester.runAsync(() async {
+          await Future.delayed(const Duration(milliseconds: 200));
+        });
+        await tester.pump(const Duration(milliseconds: 200));
+      }
       await tester.pumpAndSettle();
 
       // Verify we navigated to AppShell
