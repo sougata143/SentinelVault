@@ -13,16 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@3a44f27d4556a07675993bc03036495d4e138a0c # v4.7.0
         with:
           distribution: "zulu"
           java-version: "17"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@f2c080a31a2c03560f640693a105fa9609600125 # v2.18.0
         with:
           channel: "stable"
           cache: true
@@ -32,13 +32,13 @@ jobs:
 
       # ── Rust native crypto core (needed by dart:ffi tests) ─────────────────
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e12dea5c040523ed808798939c3e23ae92a5d5c0
         with:
           # wasm32 target is also needed for wasm-pack build below
           targets: wasm32-unknown-unknown
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@f0deed1e0edfc26ca800578d06a29f7da645e998 # v2.7.7
         with:
           workspaces: native/crypto_core -> target
           # Include wasm-pack binary in the cache key so a version bump
@@ -47,7 +47,7 @@ jobs:
           key: flutter-test-${{ hashFiles('native/crypto_core/Cargo.lock') }}
 
       - name: Build native libcrypto_core (host — for dart:ffi tests)
-        run: cargo build --release
+        run: cargo build --release --locked
         working-directory: native/crypto_core
         # Produces: native/crypto_core/target/release/libcrypto_core.so
         # _loadLibrary() in native_crypto_bridge_io.dart probes
@@ -178,10 +178,10 @@ jobs:
       JWT_SECRET: super_secret_jwt_key_do_not_use_in_production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
           cache: "npm"
@@ -215,15 +215,15 @@ jobs:
             os: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e12dea5c040523ed808798939c3e23ae92a5d5c0
         with:
           targets: ${{ matrix.target }}
 
       - name: Cargo Cache
-        uses: actions/cache@v5
+        uses: actions/cache@d4323d4df104b026a6aa633fdb12d779910d05a8 # v4.2.2
         with:
           path: |
             ~/.cargo/bin/
@@ -267,7 +267,7 @@ jobs:
 
       - name: SAST — cargo clippy
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
         working-directory: native/crypto_core
 
       # Host tests run on the native architecture only.
@@ -275,20 +275,20 @@ jobs:
       # compiled binaries cannot execute on the x86_64/aarch64-apple host.
       - name: Run Crate Correctness Tests on Host
         if: matrix.target == 'wasm32-unknown-unknown' || matrix.target == 'aarch64-apple-ios' || matrix.os == 'macos-latest' && matrix.target == 'aarch64-apple-ios'
-        run: cargo test
+        run: cargo test --locked
         working-directory: native/crypto_core
 
       - name: Run Crate Correctness Tests on Host (native linux)
         if: matrix.target == 'aarch64-linux-android'
-        run: cargo test --target x86_64-unknown-linux-gnu
+        run: cargo test --locked --target x86_64-unknown-linux-gnu
         working-directory: native/crypto_core
 
       - name: Cross-compile Crate for Target
         run: |
           if [ "${{ matrix.target }}" = "wasm32-unknown-unknown" ]; then
-            cargo build --release --target ${{ matrix.target }} --features wasm
+            cargo build --release --locked --target ${{ matrix.target }} --features wasm
           else
-            cargo build --release --target ${{ matrix.target }}
+            cargo build --release --locked --target ${{ matrix.target }}
           fi
         working-directory: native/crypto_core
 
@@ -298,18 +298,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e12dea5c040523ed808798939c3e23ae92a5d5c0
         with:
           components: clippy
 
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@48d79a29e46a78fcb39a8c62c3e1762193b2a265 # v5.0.0
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
