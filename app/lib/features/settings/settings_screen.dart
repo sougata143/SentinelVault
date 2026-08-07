@@ -25,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onLogout;
   final String currentEmail;
   final String syncBaseUrl;
+  final String sharingBaseUrl;
   final http.Client? httpClient;
 
   /// Platform override used exclusively in tests to simulate Web or native
@@ -46,6 +47,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLogout,
     this.currentEmail = 'auditor@sentinelvault.io',
     this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
     this.httpClient,
     this.isWebOverride = kIsWeb,
     this.cryptoOverride,
@@ -315,7 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (_) => EmergencyAccessScreen(
                       currentEmail: widget.currentEmail,
                       vaultKey: VaultLockManager.instance.vaultKey ?? List<int>.filled(32, 0),
-                      sharingBaseUrl: widget.syncBaseUrl,
+                      sharingBaseUrl: widget.sharingBaseUrl,
                       httpClient: widget.httpClient,
                     ),
                   ),
