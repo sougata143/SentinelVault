@@ -132,7 +132,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 MaterialPageRoute(
                   builder: (context) => SharingScreen(
                     folderId: targetId,
-                    folderName: item.vaultId.isNotEmpty ? item.vaultId : item.title,
+                    folderName: targetId,
                     currentFolderKey: folderKey,
                     senderUserId: VaultLockManager.instance.sessionToken ?? 'current-user',
                     itemToShare: item,

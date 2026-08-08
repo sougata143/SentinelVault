@@ -1674,7 +1674,7 @@ class VaultItem {
       tags: item.tags,
       favorite: item.favorite,
       isAvailableInWidget: item.isAvailableInWidget,
-      vaultId: item.vaultId,
+      vaultId: item.vaultId.isNotEmpty ? item.vaultId : (encryptedItem.folderId ?? ''),
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       fields: decryptedFields,
