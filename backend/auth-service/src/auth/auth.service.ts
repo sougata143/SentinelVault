@@ -176,7 +176,10 @@ export class AuthService {
   }
 
   public async lookupUserById(id: string): Promise<{ id: string; username: string } | null> {
-    const user = await this.userRepository.findById(id);
+    let user = await this.userRepository.findById(id);
+    if (!user) {
+      user = await this.userRepository.findByUsername(id);
+    }
     if (!user || !user.id) return null;
     return { id: user.id, username: user.username };
   }

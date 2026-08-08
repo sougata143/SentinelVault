@@ -2,7 +2,11 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
+  Param,
+  Query,
   BadRequestException,
   HttpCode,
   HttpException,
@@ -13,41 +17,76 @@ import { SyncService, EncryptedVaultItemDto } from './sync.service';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 
-/**
- * SyncController
- *
- * All endpoints are protected by JwtAuthGuard, which:
- *   1. Extracts the `Authorization: Bearer <token>` header
- *   2. Verifies the token signature against JWT_SECRET
- *   3. Attaches `req.user = { id: payload.sub, username }` on success
- *   4. Rejects with 401 UNAUTHORIZED if the token is absent, malformed, or expired
- *
- * @CurrentUser() then provides the server-verified user id — the client cannot
- * override this value by sending an `x-user-id` header or any other means.
- */
 @Controller('sync')
 @UseGuards(JwtAuthGuard)
 export class SyncController {
   constructor(private readonly syncService: SyncService) {}
 
-  /** GET /sync/pull — returns all encrypted vault items for the authenticated user. */
-  @Get('pull')
-  async pull(@CurrentUser() userId: string) {
-    return this.syncService.pull(userId);
+  // ── Multi-Vault Management Endpoints ────────────────────────────────────────
+
+  /** GET /sync/vaults — returns all vault envelopes for the authenticated user. */
+  @Get('vaults')
+  async getUserVaults(@CurrentUser() userId: string) {
+    return this.syncService.getUserVaults(userId);
   }
 
-  /** POST /sync/push — upserts encrypted vault items for the authenticated user. */
+  /** POST /sync/vaults — creates a new vault envelope for the authenticated user. */
+  @Post('vaults')
+  @HttpCode(HttpStatus.CREATED)
+  async createUserVault(
+    @CurrentUser() userId: string,
+    @Body() body: { name: string; salt: string; wrappedKey: string; recoverySalt?: string; recoveryWrappedKey?: string; isDefault?: boolean },
+  ) {
+    if (!body.salt || !body.wrappedKey) {
+      throw new BadRequestException('Missing salt or wrappedKey in body');
+    }
+    return this.syncService.createUserVault(userId, body);
+  }
+
+  /** PUT /sync/vaults/:id — updates vault metadata or key wrapping. */
+  @Put('vaults/:id')
+  async updateUserVault(
+    @CurrentUser() userId: string,
+    @Param('id') vaultId: string,
+    @Body() body: { name?: string; salt?: string; wrappedKey?: string },
+  ) {
+    return this.syncService.updateUserVault(userId, vaultId, body);
+  }
+
+  /** DELETE /sync/vaults/:id — deletes a user vault. */
+  @Delete('vaults/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteUserVault(
+    @CurrentUser() userId: string,
+    @Param('id') vaultId: string,
+  ) {
+    await this.syncService.deleteUserVault(userId, vaultId);
+  }
+
+  // ── Sync Pull & Push Endpoints ─────────────────────────────────────────────
+
+  /** GET /sync/pull — returns encrypted vault items (optionally filtered by vaultId). */
+  @Get('pull')
+  async pull(
+    @CurrentUser() userId: string,
+    @Query('vaultId') vaultId?: string,
+  ) {
+    return this.syncService.pull(userId, vaultId);
+  }
+
+  /** POST /sync/push — upserts encrypted vault items. */
   @Post('push')
   @HttpCode(HttpStatus.OK)
   async push(
     @CurrentUser() userId: string,
     @Body() items: EncryptedVaultItemDto[],
+    @Query('vaultId') targetVaultId?: string,
   ) {
     if (!Array.isArray(items)) {
       throw new BadRequestException('Body must be an array of vault items');
     }
 
-    const conflicts = await this.syncService.push(userId, items);
+    const conflicts = await this.syncService.push(userId, items, targetVaultId);
     if (conflicts) {
       throw new HttpException(
         {
@@ -62,7 +101,9 @@ export class SyncController {
     return { success: true };
   }
 
-  /** POST /sync/vault-key — stores the server-side wrapped vault key envelope. */
+  // ── Legacy Single-Vault Endpoints (Backward Compatibility) ────────────────
+
+  /** POST /sync/vault-key — stores default vault key envelope. */
   @Post('vault-key')
   @HttpCode(HttpStatus.OK)
   async saveVaultKey(
@@ -82,7 +123,7 @@ export class SyncController {
     return { success: true };
   }
 
-  /** GET /sync/vault-key — retrieves the wrapped vault key envelope for the authenticated user. */
+  /** GET /sync/vault-key — retrieves default vault key envelope. */
   @Get('vault-key')
   async getVaultKey(@CurrentUser() userId: string) {
     const data = await this.syncService.getVaultKey(userId);

@@ -24,6 +24,8 @@ class EncryptedVaultItem {
   final bool isDeleted;
   /// Optional folder / vault ID this item belongs to.
   final String? folderId;
+  /// Optional vault ID this item belongs to.
+  final String? vaultId;
 
   /// Creates a new instance of [EncryptedVaultItem].
   ///
@@ -36,6 +38,7 @@ class EncryptedVaultItem {
     required this.version,
     required this.updatedAt,
     this.isDeleted = false,
+    this.vaultId,
     this.folderId,
   });
 
@@ -48,6 +51,7 @@ class EncryptedVaultItem {
       version: json['version'] as int,
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       isDeleted: json['isDeleted'] as bool? ?? false,
+      vaultId: json['vaultId'] as String?,
       folderId: json['folderId'] as String?,
     );
   }
@@ -61,6 +65,7 @@ class EncryptedVaultItem {
       'version': version,
       'updatedAt': updatedAt.toIso8601String(),
       'isDeleted': isDeleted,
+      if (vaultId != null) 'vaultId': vaultId,
       if (folderId != null) 'folderId': folderId,
     };
   }

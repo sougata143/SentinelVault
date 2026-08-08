@@ -34,7 +34,10 @@ class AiInsightsClient {
   final String backendUrl;
 
   /// Creates a new [AiInsightsClient], optionally specifying a custom [backendUrl].
-  AiInsightsClient({this.backendUrl = 'http://localhost:3003'});
+  ///
+  /// When [backendUrl] is `''` (the default), requests use same-origin
+  /// relative paths (e.g. `/security-analysis/insights`).
+  AiInsightsClient({this.backendUrl = ''});
 
   /// Requests AI-generated insights for the given [payload].
   ///

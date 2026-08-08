@@ -100,7 +100,7 @@ class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
       final wrappedKey = 'pqc_mlkem768_wrapped:$hexKey';
 
       final res = await client.post(
-        Uri.parse('${widget.sharingBaseUrl}/emergency/contacts'),
+        Uri.parse('$_effectiveSharingBaseUrl/emergency/contacts'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'ownerUserId': widget.currentEmail,
@@ -135,7 +135,7 @@ class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
     try {
       final client = widget.httpClient ?? http.Client();
       await client.post(
-        Uri.parse('${widget.sharingBaseUrl}/emergency/requests/$requestId/deny'),
+        Uri.parse('$_effectiveSharingBaseUrl/emergency/requests/$requestId/deny'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'ownerUserId': widget.currentEmail}),
       );
@@ -152,7 +152,7 @@ class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
     try {
       final client = widget.httpClient ?? http.Client();
       await client.post(
-        Uri.parse('${widget.sharingBaseUrl}/emergency/contacts/$contactId/revoke'),
+        Uri.parse('$_effectiveSharingBaseUrl/emergency/contacts/$contactId/revoke'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'ownerUserId': widget.currentEmail}),
       );

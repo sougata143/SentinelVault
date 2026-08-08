@@ -1,0 +1,105 @@
+openapi: 3.0.3
+info:
+  title: SentinelVault Public API
+  description: >
+    Public REST API for SentinelVault third-party integrations and personal access tokens (PATs).
+    Maintains zero-knowledge cryptographic invariants: API tokens authenticate requests and enforce scopes,
+    while payload encryption/decryption remains strictly client-side using Master-Password-derived Vault Keys.
+  version: 1.0.0
+servers:
+  - url: https://api.sentinelvault.app/v1
+    description: Production API Server
+paths:
+  /auth/pats:
+    post:
+      summary: Create Personal Access Token
+      description: Generates a new PAT with configurable scopes and optional expiration. Plaintext token is returned ONLY ONCE.
+      security:
+        - SessionJwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scopes]
+              properties:
+                name:
+                  type: string
+                  example: "CI/CD Pipeline Bot"
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                  example: ["vault:read", "vault:write"]
+                expiryDays:
+                  type: integer
+                  example: 90
+      responses:
+        '201':
+          description: Token created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  rawToken:
+                    type: string
+                    example: "pat_sv_live_a1b2c3d4e5f60718293a4b5c6d7e8f90"
+                  tokenPrefix:
+                    type: string
+                    example: "pat_sv_live_a1b2..."
+    get:
+      summary: List Active Personal Access Tokens
+      security:
+        - SessionJwtAuth: []
+      responses:
+        '200':
+          description: List of user tokens.
+
+  /sync/pull:
+    get:
+      summary: Pull Encrypted Vault Items
+      description: Fetches encrypted item blobs for the authenticated user/vault.
+      security:
+        - PatBearerAuth: []
+        - SessionJwtAuth: []
+      parameters:
+        - name: vaultId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Encrypted vault items array.
+        '403':
+          description: Insufficient scope (requires vault:read).
+
+  /sync/push:
+    post:
+      summary: Push Encrypted Vault Items
+      description: Pushes encrypted item blobs to server storage.
+      security:
+        - PatBearerAuth: []
+        - SessionJwtAuth: []
+      responses:
+        '200':
+          description: Sync confirmation.
+        '403':
+          description: Insufficient scope (requires vault:write).
+
+components:
+  securitySchemes:
+    SessionJwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User session authentication token.
+    PatBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PAT
+      description: Personal Access Token (e.g. pat_sv_live_...).

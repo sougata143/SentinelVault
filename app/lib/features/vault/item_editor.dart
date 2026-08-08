@@ -47,6 +47,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   final _folderController = TextEditingController();
   final _notesController = TextEditingController();
   bool _favorite = false;
+  bool _isAvailableInWidget = false;
   final List<CustomField> _customFields = [];
 
   // Type Specific Controllers
@@ -174,6 +175,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     _folderController.text = item.vaultId;
     _notesController.text = item.notes.plaintext ?? '';
     _favorite = item.favorite;
+    _isAvailableInWidget = item.isAvailableInWidget;
     _customFields.addAll(item.customFields);
 
     final fields = item.fields;
@@ -493,6 +495,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       title: _titleController.text,
       tags: tags,
       favorite: _favorite,
+      isAvailableInWidget: _isAvailableInWidget,
       vaultId: targetVaultId,
       createdAt: widget.item?.createdAt ?? DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
@@ -523,52 +526,62 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     IconData? titleIcon,
     required List<Widget> children,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-            child: Row(
-              children: [
-                if (titleIcon != null) ...[
-                  Icon(titleIcon, size: 16, color: AppTheme.primaryColor),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
+    // Use Material(color:) as the opaque surface so that any nested
+    // ListTile / SwitchListTile / CheckboxListTile can paint ink splashes
+    // onto the nearest Material ancestor.  The visual shadow and border come
+    // from a DecoratedBox that wraps the Material — painting behind it — so
+    // the ListTile assertion is never triggered.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+                child: Row(
+                  children: [
+                    if (titleIcon != null) ...[
+                      Icon(titleIcon, size: 16, color: AppTheme.primaryColor),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      title.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Divider(height: 1, color: Colors.white10),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: children,
+                ),
+              ),
+            ],
           ),
-          const Divider(height: 1, color: Colors.white10),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -915,6 +928,20 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     tooltip: 'Scan QR Code (Mock)',
                   ),
                 ],
+              ),
+            ],
+          ),
+          _buildSectionCard(
+            title: 'Home Screen Widget Access',
+            titleIcon: Icons.widgets_outlined,
+            children: [
+              SwitchListTile(
+                key: const Key('widget-availability-switch'),
+                title: const Text('Available in Home Widget'),
+                subtitle: const Text('Allows live TOTP codes to appear on your device home screen when vault is unlocked.'),
+                value: _isAvailableInWidget,
+                activeThumbColor: AppTheme.primaryColor,
+                onChanged: (val) => setState(() => _isAvailableInWidget = val),
               ),
             ],
           ),
@@ -1379,6 +1406,20 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          _buildSectionCard(
+            title: 'Home Screen Widget Access',
+            titleIcon: Icons.widgets_outlined,
+            children: [
+              SwitchListTile(
+                key: const Key('totp-widget-availability-switch'),
+                title: const Text('Available in Home Widget'),
+                subtitle: const Text('Allows live TOTP codes to appear on your device home screen when vault is unlocked.'),
+                value: _isAvailableInWidget,
+                activeThumbColor: AppTheme.primaryColor,
+                onChanged: (val) => setState(() => _isAvailableInWidget = val),
               ),
             ],
           ),

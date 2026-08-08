@@ -4,6 +4,7 @@
 library core;
 
 export 'src/crypto/crypto.dart';
+export 'src/crypto/secure_share_helper.dart';
 export 'src/crypto/native_crypto_bridge.dart';
 export 'src/crypto/native_crypto_bridge_selector.dart';
 export 'src/crypto/srp.dart';
@@ -33,6 +34,8 @@ export 'src/security/ai_insights_client.dart';
 export 'src/auth/auth_client.dart';
 export 'src/auth/vault_lock_manager.dart';
 export 'src/auth/biometric_auth_service.dart';
+export 'src/auth/sso_auth_helper.dart';
+export 'src/auth/pat_helper.dart';
 export 'src/platform/secure_storage.dart';
 export 'src/sync/http_sync_api_client.dart';
 export 'src/crypto/hardware_key_unlock.dart';

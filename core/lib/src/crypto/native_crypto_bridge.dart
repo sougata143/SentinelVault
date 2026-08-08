@@ -137,6 +137,15 @@ abstract class NativeCryptoBridge {
     required Uint8List mldsaVk,       // 1952 bytes
     required PqcSignatureBundle signatures,
   });
+
+  /// Generates a TOTP code string for a given secret key and parameters using the Rust core.
+  Future<String> generateTotpCode({
+    required String secret,
+    required int timestampSec,
+    int period = 30,
+    int digits = 6,
+    String algorithm = 'SHA1',
+  });
 }
 
 // ─── PQC Data Structures ─────────────────────────────────────────────────────

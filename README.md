@@ -11,6 +11,59 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 3. **Local Cryptography**: All symmetric encryption uses AES-256-GCM. Keys are derived using Argon2id with a unique local salt per user. Cryptographic key material is held only in volatile memory while the vault is unlocked and is explicitly zeroized afterward.
 4. **Privacy-Preserving Breach Monitoring**: Password breach checks use k-anonymity (only the first 5 characters of the SHA-1 password hash are sent to Have I Been Pwned). Email breach checks are opt-in only, with explicit disclosure before any email address is sent to a third party.
 5. **Least-Privilege AI Insights**: The AI Insights layer (Gemini) receives only redacted, non-sensitive structural signals (e.g. password strength scores, file extensions, signature-mismatch flags) — never raw passwords, emails, files, or vault content.
+6. **URL Fragment Security Invariant for Share Links**: Ephemeral decryption keys for unauthenticated one-time share links travel **exclusively in the URL fragment** (`#<keyHex>`). Per RFC 3986, URL fragments are processed strictly client-side by the browser and are **never sent over the wire** in HTTP request lines or logged in server access logs.
+
+---
+
+## 🚀 Unified Build & Container Deployment
+
+SentinelVault features an automated build suite (`build-all.bat` / `build-all.sh`) and unified Docker Compose orchestration (`docker-compose.yml`) that compiles the native Rust crypto core to WebAssembly, packages the static Flutter Web client into an optimized Nginx container, and runs all 4 NestJS backend microservices alongside PostgreSQL and Redis.
+
+### Quick Start (Local Docker Compose)
+
+#### Option 1: Automated Script + Docker Compose (Recommended)
+
+1. **Run the Unified Build Script**:
+   - **Windows**:
+     ```cmd
+     build-all.bat
+     ```
+   - **Linux / macOS**:
+     ```bash
+     chmod +x build-all.sh
+     ./build-all.sh
+     ```
+   *This compiles `native/crypto_core` to `wasm32-unknown-unknown`, bundles Web assets, and containerizes the 5 service images (`sentinelvault-frontend`, `sentinelvault-auth`, `sentinelvault-sync`, `sentinelvault-security-analysis`, `sentinelvault-sharing`).*
+
+2. **Start the Stack**:
+   ```bash
+   docker compose up -d
+   ```
+
+3. **Access Services**:
+   - **Web Client Application**: [http://localhost:8080](http://localhost:8080) (Nginx serving Flutter Web SPA + WASM crypto core)
+   - **Auth Service**: `http://localhost:3001` (Nginx proxies `http://localhost:8080/auth/`)
+   - **Sync Service**: `http://localhost:3002` (Nginx proxies `http://localhost:8080/sync/`)
+   - **Security Analysis Service**: `http://localhost:3003` (Nginx proxies `http://localhost:8080/security/`)
+   - **Sharing Service**: `http://localhost:3004` (Nginx proxies `http://localhost:8080/sharing/`)
+
+#### Option 2: Direct Build & Run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+### Network Architecture & Reverse Proxying
+
+The Nginx container (`sentinelvault-frontend` on port `8080`) handles both static client serving and API reverse-proxying to avoid browser CORS restrictions and allow unified single-port hosting:
+
+- `/` -> Static Flutter Web Assets (`/usr/share/nginx/html`)
+- `/auth/` -> `http://auth-service:3001/auth/`
+- `/sync/` -> `http://sync-api:3002/sync/`
+- `/security/` -> `http://security-analysis-service:3003/security/`
+- `/sharing/` -> `http://sharing-service:3004/sharing/`
 
 ---
 
@@ -339,6 +392,11 @@ Action versions: `actions/checkout@v4`, `actions/setup-java@v4`, `actions/setup-
 - **Team & Family Shared Vaults (PQC Hybrid Multi-Member Sharing)**: Multi-member shared vault architecture generalizing PQC hybrid encryption (X25519 + ML-KEM-768 key wrapping with Ed25519 + ML-DSA-65 signatures). Supports strict role-based access control (`Admin`, `Member`, `Viewer`). One-to-many key wrapping assigns independent wrapped keys per member. Member removal automatically enforces Shared Vault Key rotation (e.g. `SVK_v1` -> `SVK_v2`), re-encrypting all shared vault items and re-wrapping `SVK_v2` for remaining active members to maintain zero-knowledge isolation. Integrated in `backend/sharing-service` and Flutter `SharedVaultsScreen`.
 - **System-Wide Native OS Autofill Integration (Android Framework)**: Native system-wide Android autofill service (`SentinelAutofillService` implementing `android.service.autofill.AutofillService`). Parses native `AssistStructure` nodes to extract target app package names (`structure.activityComponent.packageName`) and web domains. Reads encrypted local vault caches from `EncryptedSharedPreferences` directly in native Kotlin for fast zero-knowledge matching without spinning up the main Flutter engine. Integrated via `AndroidAutofillBridge` platform channel and configured in `SettingsScreen`.
 - **Account-Level "Download My Data" Export**: Zero-knowledge client-assembled account export service (`AccountDataExportService`). Packages account profile metadata, vault items, active device sessions, sharing relationships (strictly isolated to requesting caller), and audit log history into a single human-inspectable JSON archive. Assembled 100% client-side with zero server-side decryption capability. Enforces Master Password re-entry before generation and displays high-visibility warnings prompting secure storage. Integrated in `SettingsScreen`.
+- **Multi-Vault Support**: Allows a single account to hold multiple independent vaults (Personal, Work, Finances) with separate Master Passwords and independent 256-bit Vault Keys. Zero shared cryptographic material across vaults under the same account. Integrated `VaultSwitcher` UI component in mobile/web navigation shells.
+- **Home-Screen TOTP Quick-Access Widgets**: Native Android App Widgets (`SentinelVaultWidgetProvider`) and iOS WidgetKit Extensions (`SentinelVaultWidget.swift`) for one-tap live TOTP verification codes. Strictly gated by per-item opt-in (`isAvailableInWidget: true`) and automatically purged on vault lock or logout.
+- **Time-Limited, One-Time-View Secure Share Links**: Ephemeral AES-256-GCM encryption for unauthenticated recipients. The 32-byte decryption key travels **exclusively in the URL fragment** (`#<keyHex>`) per RFC 3986 — never sent over the wire or logged in server access logs. Supports configurable expiry (1h to 7d) and automatic one-time-view destruction (`HTTP 410 Gone`).
+- **SAML / OIDC Single Sign-On (SSO) for Team Vaults**: Enterprise OpenID Connect (OIDC) Authorization Code flow with PKCE ($S256$). SSO authenticates account identity, while vault decryption **strictly requires entering the Master Password on-device**. Dynamic email domain auto-detection (`GET /auth/sso/config/:domain`), `SsoLoginButton`, and `SsoConfigDialog` for team admins.
+- **Public API & Scoped Personal Access Tokens (PATs)**: Personal Access Tokens (`pat_sv_live_<32_hex_chars>`) for CLI, CI/CD, and developer integrations. Plaintext token is displayed ONCE upon creation; the server stores only `SHA-256(raw_token)` hashes. Supports granular scopes (`vault:read`, `vault:write`, `sharing:read`), OpenAPI 3.0 spec (`docs/openapi.yaml`), audit logging (`pat_created`, `pat_used`, `pat_revoked`), and instant revocation via Settings (`PatManagementScreen`).
 
 ---
 

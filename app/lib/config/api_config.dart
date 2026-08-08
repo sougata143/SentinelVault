@@ -1,10 +1,21 @@
 /// Configuration class providing base URLs for backend microservices.
-/// Supports both compile-time defaults (`--dart-define`) and runtime custom server overrides.
+///
+/// **Production default (Docker/nginx):** all four base URLs return `''`
+/// (empty string), so every API call becomes a same-origin relative path
+/// (e.g. `/auth/register`, `/sync/pull`).  The nginx reverse-proxy routes
+/// each path to the correct upstream container.
+///
+/// **Self-hosted / local-dev override:** set [customServerUrl] at runtime
+/// (e.g. `'https://vault.mycompany.com'`).  If the URL is host-only (no
+/// explicit port or path), per-service ports are appended automatically.
 abstract class ApiConfig {
-  static const String _defaultAuth = String.fromEnvironment('AUTH_BASE_URL', defaultValue: 'http://localhost:3001');
-  static const String _defaultSync = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://localhost:3002');
-  static const String _defaultSecurity = String.fromEnvironment('SECURITY_BASE_URL', defaultValue: 'http://localhost:3003');
-  static const String _defaultSharing = String.fromEnvironment('SHARING_BASE_URL', defaultValue: 'http://localhost:3004');
+  // Compile-time overrides — only needed when running Flutter directly
+  // outside Docker and hitting raw microservice ports.  The Dockerfile no
+  // longer passes these; they default to '' (same-origin).
+  static const String _defaultAuth = String.fromEnvironment('AUTH_BASE_URL', defaultValue: '');
+  static const String _defaultSync = String.fromEnvironment('SYNC_BASE_URL', defaultValue: '');
+  static const String _defaultSecurity = String.fromEnvironment('SECURITY_BASE_URL', defaultValue: '');
+  static const String _defaultSharing = String.fromEnvironment('SHARING_BASE_URL', defaultValue: '');
 
   /// Runtime custom self-hosted server base URL override (e.g. 'https://vault.mycompany.com').
   static String? customServerUrl;

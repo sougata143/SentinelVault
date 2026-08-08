@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'config/api_config.dart';
 import 'theme/theme.dart';
 import 'features/vault/vault_tab.dart';
+import 'features/vault/vault_switcher.dart';
 import 'features/vault/sync_status_indicator.dart';
 import 'features/security_center/security_center_tab.dart';
 import 'features/settings/settings_screen.dart';
@@ -49,6 +50,169 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   /// If the user returns within [_gracePeriod] the vault stays unlocked.
   Timer? _graceLockTimer;
   static const _gracePeriod = Duration(seconds: 30);
+
+  String _activeVaultId = 'default';
+  List<UserVaultInfo> _userVaults = const [
+    UserVaultInfo(
+      id: 'default',
+      name: 'Personal Vault',
+      salt: '',
+      wrappedKey: '',
+      isDefault: true,
+      isUnlocked: true,
+    ),
+    UserVaultInfo(
+      id: 'work-vault-1',
+      name: 'Work Vault',
+      salt: '',
+      wrappedKey: '',
+      isDefault: false,
+      isUnlocked: false,
+    ),
+  ];
+
+  void _handleSelectVault(UserVaultInfo vault) {
+    if (vault.isUnlocked) {
+      setState(() {
+        _activeVaultId = vault.id;
+        VaultLockManager.instance.activeVaultId = vault.id;
+      });
+    } else {
+      _promptVaultUnlock(vault);
+    }
+  }
+
+  void _promptVaultUnlock(UserVaultInfo vault) {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        title: Text('Unlock ${vault.name}', style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the Master Password for this vault:',
+              style: TextStyle(color: AppTheme.textSecondaryColor),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Master Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              final crypto = VaultCrypto();
+              final masterKey = crypto.generateRandomBytes(32);
+              final vaultKey = crypto.generateRandomBytes(32);
+              VaultLockManager.instance.unlockVault(vault.id, masterKey, vaultKey);
+              setState(() {
+                _activeVaultId = vault.id;
+                _userVaults = _userVaults.map((v) {
+                  if (v.id == vault.id) {
+                    return UserVaultInfo(
+                      id: v.id,
+                      name: v.name,
+                      salt: v.salt,
+                      wrappedKey: v.wrappedKey,
+                      isDefault: v.isDefault,
+                      isUnlocked: true,
+                    );
+                  }
+                  return v;
+                }).toList();
+              });
+            },
+            child: const Text('Unlock'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _promptCreateVault() {
+    final nameController = TextEditingController();
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        title: const Text('Create New Vault', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Vault Name (e.g. Work, Finances)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Independent Master Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+              Navigator.of(ctx).pop();
+              final newId = 'vault-${DateTime.now().millisecondsSinceEpoch}';
+              final crypto = VaultCrypto();
+              final masterKey = crypto.generateRandomBytes(32);
+              final vaultKey = crypto.generateRandomBytes(32);
+              VaultLockManager.instance.unlockVault(newId, masterKey, vaultKey);
+              setState(() {
+                _activeVaultId = newId;
+                _userVaults = [
+                  ..._userVaults,
+                  UserVaultInfo(
+                    id: newId,
+                    name: name,
+                    salt: 'salt-hex',
+                    wrappedKey: 'wrapped-key-hex',
+                    isDefault: false,
+                    isUnlocked: true,
+                  ),
+                ];
+              });
+            },
+            child: const Text('Create Vault'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -248,6 +412,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                             syncBaseUrl: _effectiveSyncBaseUrl,
                             sharingBaseUrl: _effectiveSharingBaseUrl,
                             httpClient: widget.httpClient,
+                            db: widget.db,
                           ),
                         ),
                       );
@@ -273,7 +438,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       // Mobile View: App bar with settings + Bottom Navigation Bar
       content = Scaffold(
         appBar: AppBar(
-          title: Text(_selectedTabIndex == 0 ? 'SentinelVault' : 'Security Center'),
+          title: _selectedTabIndex == 0
+              ? VaultSwitcher(
+                  activeVaultId: _activeVaultId,
+                  vaults: _userVaults,
+                  onSelectVault: _handleSelectVault,
+                  onCreateVault: _promptCreateVault,
+                )
+              : const Text('Security Center'),
           actions: [
             const SyncStatusIndicator(),
             IconButton(
@@ -319,6 +491,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       syncBaseUrl: widget.syncBaseUrl,
                       sharingBaseUrl: widget.sharingBaseUrl,
                       httpClient: widget.httpClient,
+                      db: widget.db,
                     ),
                   ),
                 );

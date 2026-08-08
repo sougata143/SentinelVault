@@ -7,15 +7,15 @@ void main() {
       ApiConfig.customServerUrl = null;
     });
 
-    test('returns default URLs when customServerUrl is null or empty', () {
+    test('returns empty-string (origin-relative) URLs when customServerUrl is null or empty', () {
       ApiConfig.customServerUrl = null;
-      expect(ApiConfig.authBaseUrl, contains('3001'));
-      expect(ApiConfig.syncBaseUrl, contains('3002'));
-      expect(ApiConfig.securityBaseUrl, contains('3003'));
-      expect(ApiConfig.sharingBaseUrl, contains('3004'));
+      expect(ApiConfig.authBaseUrl, equals(''));
+      expect(ApiConfig.syncBaseUrl, equals(''));
+      expect(ApiConfig.securityBaseUrl, equals(''));
+      expect(ApiConfig.sharingBaseUrl, equals(''));
 
       ApiConfig.customServerUrl = '   ';
-      expect(ApiConfig.authBaseUrl, contains('3001'));
+      expect(ApiConfig.authBaseUrl, equals(''));
     });
 
     test('dynamically appends microservice ports for host-only inputs', () {

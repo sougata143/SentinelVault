@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -45,12 +43,13 @@ services:
       - ./backend/auth-service:/app
       - auth_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       AUTH_PORT: ${AUTH_PORT:-3001}
     ports:
       - "${AUTH_PORT:-3001}:${AUTH_PORT:-3001}"
@@ -58,8 +57,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${AUTH_PORT:-3001}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,12 +76,13 @@ services:
       - ./backend/sync-api:/app
       - sync_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SYNC_PORT: ${SYNC_PORT:-3002}
     ports:
       - "${SYNC_PORT:-3002}:${SYNC_PORT:-3002}"
@@ -90,8 +90,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SYNC_PORT:-3002}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,12 +109,13 @@ services:
       - ./backend/security-analysis-service:/app
       - security_analysis_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SECURITY_ANALYSIS_PORT: ${SECURITY_ANALYSIS_PORT:-3003}
     ports:
       - "${SECURITY_ANALYSIS_PORT:-3003}:${SECURITY_ANALYSIS_PORT:-3003}"
@@ -122,8 +123,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SECURITY_ANALYSIS_PORT:-3003}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,6 +151,7 @@ services:
       npm_config_cache: /root/.npm
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SHARING_PORT: ${SHARING_PORT:-3004}
     ports:
       - "${SHARING_PORT:-3004}:${SHARING_PORT:-3004}"
@@ -157,8 +159,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SHARING_PORT:-3004}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,17 +171,10 @@ services:
       - sentinelvault-net
 
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:3001}
-        - SYNC_BASE_URL=${SYNC_BASE_URL:-http://localhost:3002}
-        - SECURITY_BASE_URL=${SECURITY_BASE_URL:-http://localhost:3003}
-        - SHARING_BASE_URL=${SHARING_BASE_URL:-http://localhost:3004}
+    image: sentinelvault-frontend:latest
     container_name: sentinelvault-frontend
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-8080}:8080"
     restart: unless-stopped
     depends_on:
       auth-service:
