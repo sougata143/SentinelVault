@@ -47,9 +47,10 @@ class _VaultTabState extends State<VaultTab> {
     super.initState();
     _loadItems();
     if (VaultSyncManager.isInitialized) {
-      _syncSubscription = VaultSyncManager.statusStream.listen((status) {
+      _syncSubscription = VaultSyncManager.statusStream.listen((status) async {
         if (status == SyncStatus.success && mounted) {
-          _loadItems();
+          await PqcSharingService.syncSharedFoldersWithMe();
+          await _loadItems();
         }
       });
     }
@@ -62,6 +63,7 @@ class _VaultTabState extends State<VaultTab> {
   }
 
   Future<void> _loadItems() async {
+    await PqcSharingService.loadCachedFolderKeys();
     final encItems = widget.db.getAllItems();
     final crypto = VaultCrypto();
 
@@ -73,7 +75,15 @@ class _VaultTabState extends State<VaultTab> {
         return await VaultItem.decrypt(item, widget.vaultKey, crypto);
       } catch (_) {}
 
-      // 2. Try decrypting with unwrapped shared folder keys
+      // 2. If item belongs to a folder, try deriving folder key from user's master key
+      if (item.folderId != null && item.folderId!.isNotEmpty) {
+        try {
+          final derivedKey = deriveFolderKey(widget.vaultKey, item.folderId!);
+          return await VaultItem.decrypt(item, derivedKey, crypto);
+        } catch (_) {}
+      }
+
+      // 3. Try decrypting with unwrapped shared folder keys (for recipients of shared items)
       for (final entry in PqcSharingService.unwrappedFolderKeys.entries) {
         try {
           return await VaultItem.decrypt(item, entry.value, crypto);

@@ -268,6 +268,9 @@ Uint8List safeBase64Decode(String input) {
       if (widget.itemToShare != null && widget.db != null) {
         try {
           final crypto = VaultCrypto();
+          final existingEncItem = widget.db!.getItem(widget.itemToShare!.id);
+          final currentVersion = existingEncItem?.version ?? 1;
+
           final updatedItem = VaultItem(
             id: widget.itemToShare!.id,
             type: widget.itemToShare!.type,
@@ -283,8 +286,18 @@ Uint8List safeBase64Decode(String input) {
             notes: widget.itemToShare!.notes,
           );
 
-          final encItem = await updatedItem.encrypt(widget.currentFolderKey, crypto);
-          widget.db!.updateItem(encItem);
+          final newEncItem = await updatedItem.encrypt(widget.currentFolderKey, crypto);
+          final encItemToSave = EncryptedVaultItem(
+            id: newEncItem.id,
+            encryptedBlob: newEncItem.encryptedBlob,
+            nonce: newEncItem.nonce,
+            version: currentVersion + 1,
+            updatedAt: DateTime.now().toUtc(),
+            isDeleted: false,
+            folderId: targetFolderId,
+          );
+
+          widget.db!.updateItem(encItemToSave);
           if (VaultSyncManager.isInitialized) {
             await VaultSyncManager.instance.sync();
           }
