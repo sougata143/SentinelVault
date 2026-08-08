@@ -4,7 +4,7 @@
 FROM node:20-alpine AS dependencies
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # ---- Build ----
 FROM node:20-alpine AS build
@@ -23,7 +23,7 @@ ENV AUTH_PORT=3001
 RUN addgroup -S sentinel && adduser -S sentinel -G sentinel
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 COPY --from=build /app/dist ./dist
 
 USER sentinel
