@@ -412,6 +412,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                             syncBaseUrl: _effectiveSyncBaseUrl,
                             sharingBaseUrl: _effectiveSharingBaseUrl,
                             httpClient: widget.httpClient,
+                            db: widget.db,
                           ),
                         ),
                       );
@@ -490,6 +491,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       syncBaseUrl: widget.syncBaseUrl,
                       sharingBaseUrl: widget.sharingBaseUrl,
                       httpClient: widget.httpClient,
+                      db: widget.db,
                     ),
                   ),
                 );

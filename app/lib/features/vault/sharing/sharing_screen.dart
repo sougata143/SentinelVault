@@ -35,7 +35,10 @@ class _SharingScreenState extends State<SharingScreen> {
   bool _loading = false;
   List<Map<String, dynamic>> _recipients = []; // { userId, email, fingerprint }
 
-  String get _storageKey => 'sharing_recipients_${widget.folderId}';
+  String get _effectiveFolderId =>
+      getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
+
+  String get _storageKey => 'sharing_recipients_$_effectiveFolderId';
 
   @override
   void initState() {
@@ -46,10 +49,10 @@ class _SharingScreenState extends State<SharingScreen> {
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
     try {
-      final token = await _storage.read(key: 'session_token') ?? '';
+      final token = VaultLockManager.instance.sessionToken ?? await _storage.read(key: 'session_token') ?? '';
       if (token.isNotEmpty) {
         final res = await http.get(
-          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/${widget.folderId}/recipients'),
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$_effectiveFolderId/recipients'),
           headers: {'Authorization': 'Bearer $token'},
         );
         if (res.statusCode == 200) {
@@ -150,7 +153,7 @@ class _SharingScreenState extends State<SharingScreen> {
       final recipientUserId = lookupData['userId'] as String;
 
       // Read JWT session token
-      final token = await _storage.read(key: 'session_token') ?? '';
+      final token = VaultLockManager.instance.sessionToken ?? await _storage.read(key: 'session_token') ?? '';
 
       // 2. Fetch target user's public key bundle from key-directory service
       final keyRes = await http.get(
@@ -203,7 +206,7 @@ Uint8List safeBase64Decode(String input) {
       final senderBundle = await bridge.pqcGenerateKeypairs();
 
       final invitePayload = await _sharingManager.createSignedInvitation(
-        folderId: widget.folderId,
+        folderId: _effectiveFolderId,
         recipientUserId: recipientUserId,
         senderUserId: widget.senderUserId,
         ed25519Priv: senderBundle.ed25519Priv,
@@ -213,7 +216,7 @@ Uint8List safeBase64Decode(String input) {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
-      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
+      final targetFolderId = _effectiveFolderId;
       final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
 
       int nextVersion = 1;

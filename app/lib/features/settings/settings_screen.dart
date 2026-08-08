@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:universal_html/html.dart' as html;
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
@@ -43,6 +47,7 @@ class SettingsScreen extends StatefulWidget {
   /// [VaultCrypto] instance so tests can avoid running the full Argon2id KDF.
   /// Leave null in production; [VaultCrypto()] is constructed normally.
   final VaultCrypto? cryptoOverride;
+  final VaultDatabase? db;
 
   const SettingsScreen({
     super.key,
@@ -54,6 +59,7 @@ class SettingsScreen extends StatefulWidget {
     this.httpClient,
     this.isWebOverride = kIsWeb,
     this.cryptoOverride,
+    this.db,
   });
 
   @override
@@ -374,12 +380,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final messenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(dialogCtx);
 
+                      List<VaultItem> localItems = [];
+                      try {
+                        final vaultKey = VaultLockManager.instance.vaultKey;
+                        if (widget.db != null && vaultKey != null && vaultKey.isNotEmpty) {
+                          localItems = await widget.db!.getAllVaultItems(vaultKey);
+                        }
+                      } catch (_) {}
+
                       final exportBundle = await AccountDataExportService.generateAccountDataExport(
                         userEmail: widget.currentEmail,
-                        localVaultItems: const [],
+                        localVaultItems: localItems,
                         sharingBaseUrl: _effectiveSharingBaseUrl,
                         httpClient: widget.httpClient,
                       );
+
+                      final jsonStr = const JsonEncoder.withIndent('  ').convert(exportBundle);
+                      final bytes = utf8.encode(jsonStr);
+                      final filename = 'sentinelvault_account_export_${DateTime.now().millisecondsSinceEpoch}.json';
+
+                      if (kIsWeb) {
+                        final blob = html.Blob([bytes], 'application/json');
+                        final url = html.Url.createObjectUrl(blob);
+                        html.AnchorElement(href: url)
+                          ..setAttribute('download', filename)
+                          ..click();
+                        html.Url.revokeObjectUrl(url);
+                      } else {
+                        try {
+                          await FilePicker.platform.saveFile(
+                            dialogTitle: 'Save Account Data Export',
+                            fileName: filename,
+                            bytes: Uint8List.fromList(bytes),
+                          );
+                        } catch (_) {}
+                      }
 
                       navigator.pop();
                       messenger.showSnackBar(
@@ -534,8 +569,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('System-Wide Android Autofill'),
               subtitle: const Text('Fill credentials natively inside third-party apps & browsers'),
               trailing: const Icon(Icons.open_in_new, color: AppTheme.primaryColor),
-              onTap: () {
-                AndroidAutofillBridge.requestSetAutofillService();
+              onTap: () async {
+                final success = await AndroidAutofillBridge.requestSetAutofillService();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        success
+                            ? 'Opened Android Autofill settings.'
+                            : 'Android Autofill is only available on Android devices.',
+                      ),
+                    ),
+                  );
+                }
               },
             ),
           ),
