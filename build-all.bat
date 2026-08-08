@@ -47,7 +47,8 @@ echo %BLUE%[Step 2/3] Packaging Flutter Web Frontend Container (using Dockerfile
 docker build ^
   --build-arg AUTH_BASE_URL=http://localhost:3001 ^
   --build-arg SYNC_BASE_URL=http://localhost:3002 ^
-  -t sentinelvault-frontend:^3.12.2 ^
+  -t sentinelvault-frontend:latest ^
+  -t sentinelvault-frontend:3.12.2 ^
   -f Dockerfile-v7 .
 if %ERRORLEVEL% neq 0 goto :failed
 echo %GREEN%^o^/ Flutter Web Frontend containerized successfully.%NC%
