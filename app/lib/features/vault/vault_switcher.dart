@@ -101,50 +101,53 @@ class _VaultSwitcherState extends State<VaultSwitcher> {
                       final vault = widget.vaults[index];
                       final isSelected = vault.id == widget.activeVaultId;
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? SentinelTheme.accentCyan.withValues(alpha: 0.12)
-                              : SentinelTheme.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
+                      return Material(
+                        type: MaterialType.transparency,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
                             color: isSelected
-                                ? SentinelTheme.accentCyan
-                                : SentinelTheme.borderDark,
-                            width: isSelected ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: ListTile(
-                          leading: Icon(
-                            vault.isUnlocked ? Icons.lock_open : Icons.lock_outline,
-                            color: vault.isUnlocked
-                                ? SentinelTheme.accentCyan
-                                : SentinelTheme.warningYellow,
-                          ),
-                          title: Text(
-                            vault.name,
-                            style: const TextStyle(
-                              color: SentinelTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
+                                ? SentinelTheme.accentCyan.withValues(alpha: 0.12)
+                                : SentinelTheme.cardDark,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? SentinelTheme.accentCyan
+                                  : SentinelTheme.borderDark,
+                              width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
-                          subtitle: Text(
-                            vault.isUnlocked ? 'Unlocked' : 'Locked — Tap to enter password',
-                            style: TextStyle(
+                          child: ListTile(
+                            leading: Icon(
+                              vault.isUnlocked ? Icons.lock_open : Icons.lock_outline,
                               color: vault.isUnlocked
                                   ? SentinelTheme.accentCyan
-                                  : SentinelTheme.textMuted,
-                              fontSize: 12,
+                                  : SentinelTheme.warningYellow,
                             ),
+                            title: Text(
+                              vault.name,
+                              style: const TextStyle(
+                                color: SentinelTheme.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              vault.isUnlocked ? 'Unlocked' : 'Locked — Tap to enter password',
+                              style: TextStyle(
+                                color: vault.isUnlocked
+                                    ? SentinelTheme.accentCyan
+                                    : SentinelTheme.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle, color: SentinelTheme.accentCyan)
+                                : null,
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              widget.onSelectVault(vault);
+                            },
                           ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: SentinelTheme.accentCyan)
-                              : null,
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            widget.onSelectVault(vault);
-                          },
                         ),
                       );
                     },
