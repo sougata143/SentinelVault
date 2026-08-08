@@ -1,6 +1,6 @@
-# SentinelVault — Production Deployment Guide
+# SentinelVault — Production Deployment Guide & Cost Analysis
 
-This guide provides comprehensive, step-by-step instructions for deploying the **SentinelVault** hybrid zero-knowledge password management platform in a production cloud environment.
+This guide provides comprehensive, step-by-step instructions and itemized cost breakdowns for deploying the **SentinelVault** hybrid zero-knowledge password management platform across multiple cloud providers and infrastructure tiers.
 
 ---
 
@@ -52,13 +52,14 @@ SentinelVault comprises five primary infrastructure components:
 
 ---
 
-## Deployment Options at a Glance
+## Deployment Options & Itemized Cost Summary
 
-| Option | Ideal For | Monthly Cost | Operational Complexity |
-| :--- | :--- | :--- | :--- |
-| **[Option 1: Single VPS + Docker Compose](#option-1-single-vps-with-docker-compose-recommended)** *(Recommended)* | Small to Medium Deployments, Self-Hosters, Startups | **$10 – $20** | ⚡ Low |
-| **[Option 2: Managed PaaS (Railway / Render)](#option-2-managed-paas-railway--render)** | Dev Teams wanting zero server management | **$15 – $35** | ⚡ Low |
-| **[Option 3: Enterprise Cloud (AWS ECS / GCP Cloud Run)](#option-3-enterprise-aws-cloud-architecture-ecs--rds)** | High Availability, Multi-AZ Data Centers, Large Scale | **$60 – $150+** | 🛠️ Moderate to High |
+| Option | Cloud Platform | Estimated Cost / Month | Infrastructure Components Included | Operational Complexity |
+| :--- | :--- | :--- | :--- | :--- |
+| **[Option 1](#option-1-single-vps-with-docker-compose-recommended)** | **Single VPS (Hetzner / DigitalOcean / AWS EC2)** | **$7.00 – $20.00** | All-in-one VPS container stack + Let's Encrypt SSL | ⚡ Low (15 mins) |
+| **[Option 2](#option-2-managed-paas-railway--render)** | **PaaS (Railway / Render)** | **$15.00 – $35.00** | Managed Postgres + Redis + 4 App Services + CDN | ⚡ Low (Zero Infra) |
+| **[Option 3](#option-3-enterprise-aws-cloud-architecture-terraform)** | **AWS Cloud (ECS Fargate + RDS)** | **$68.00 – $145.00** | Multi-AZ RDS + ElastiCache + ECS Fargate + ALB + CloudFront | 🛠️ Moderate |
+| **[Option 4](#option-4-enterprise-gcp-cloud-architecture-terraform)** | **GCP Cloud (Cloud Run + Cloud SQL)** | **$45.00 – $110.00** | Cloud SQL + Memorystore + Cloud Run v2 + GCS/Cloud CDN | 🛠️ Moderate |
 
 ---
 
@@ -66,11 +67,16 @@ SentinelVault comprises five primary infrastructure components:
 
 Deploying to a single Linux Virtual Private Server (VPS) via Docker Compose is the most straightforward, performant, and cost-effective deployment method.
 
-### Prerequisites
-- **Recommended Cloud Providers**: Hetzner Cloud (CPX21), DigitalOcean (4GB Droplet), AWS EC2 (`t4g.medium`), Linode, or Vultr.
-- **Hardware Specifications**: Minimum 2 vCPU, 4 GB RAM, 40 GB SSD.
-- **Operating System**: Ubuntu 24.04 LTS (or Ubuntu 22.04 LTS).
-- **Domain Name**: Registered domain with DNS pointing to your VPS IP address (e.g., `vault.yourdomain.com`).
+### 💰 Itemized Monthly Cost Breakdown
+
+| Component | Provider & Specification | Cost / Month |
+| :--- | :--- | :--- |
+| **Compute Server** | Hetzner Cloud CPX21 (3 vCPU, 4GB RAM, 80GB NVMe) | **€7.05 (~$7.60)** |
+| *Alternative Compute* | DigitalOcean Droplet (2 vCPU, 4GB RAM, 80GB SSD) | $24.00 |
+| *Alternative Compute* | AWS EC2 `t4g.medium` (2 vCPU ARM, 4GB RAM) | $24.20 |
+| **SSL/TLS Certificate** | Let's Encrypt (Certbot) | **$0.00** (Free) |
+| **Domain DNS** | Cloudflare DNS / Route 53 | **$0.00 - $0.50** |
+| **Estimated Total** | **Hetzner Base** | **~$8.00 / month** |
 
 ---
 
@@ -144,19 +150,11 @@ Verify all containers are healthy:
 ```bash
 docker compose ps
 ```
-You should see `sentinelvault-db`, `sentinelvault-cache`, `sentinelvault-auth`, `sentinelvault-sync`, `sentinelvault-security-analysis`, and `sentinelvault-sharing` running in healthy state.
 
 #### Step 6: Configure SSL/TLS Certificate via Let's Encrypt
 Run Certbot to obtain a free SSL/TLS certificate for your domain:
 ```bash
 sudo certbot --nginx -d vault.yourdomain.com
-```
-Certbot automatically updates Nginx configuration and enables automatic certificate renewal.
-
-#### Step 7: Verify Health Endpoints
-```bash
-curl -I https://vault.yourdomain.com/health
-curl -I https://vault.yourdomain.com/auth/health
 ```
 
 ---
@@ -165,10 +163,15 @@ curl -I https://vault.yourdomain.com/auth/health
 
 For teams preferring zero infrastructure maintenance, automatic Git push deployments, and fully managed databases.
 
-### Architecture Topology
-- **Databases**: Managed PostgreSQL & Managed Redis on Railway or Render.
-- **Backend Services**: 4 Web Services running NestJS containers on Railway/Render.
-- **Frontend App**: Deployed to Cloudflare Pages, Vercel, or Netlify CDN.
+### 💰 Itemized Monthly Cost Breakdown
+
+| Resource | Service Tiers | Cost / Month |
+| :--- | :--- | :--- |
+| **PostgreSQL Database** | Managed PostgreSQL (8GB Storage, Shared CPU) | $7.00 |
+| **Redis Cache** | Managed Redis (256MB RAM) | $3.00 |
+| **4 Backend Services** | Railway/Render Web Services (512MB RAM each x 4) | $20.00 |
+| **Frontend CDN** | Cloudflare Pages / Vercel Hobby | **$0.00** (Free) |
+| **Estimated Total** | **PaaS Stack** | **~$30.00 / month** |
 
 ---
 
@@ -182,44 +185,19 @@ For teams preferring zero infrastructure maintenance, automatic Git push deploym
 #### Step 2: Deploy Backend Microservices
 In your PaaS dashboard, connect your GitHub repository `SentinelVault` and create four Web Services:
 
-1. **`auth-service`**:
-   - Root Directory: `backend/auth-service`
-   - Build Command: `npm install --legacy-peer-deps && npm run build`
-   - Start Command: `npm run start:prod`
-   - Environment Variables: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `AUTH_PORT=3001`
+1. **`auth-service`**: Root `backend/auth-service`, Build Command: `npm install --legacy-peer-deps && npm run build`, Start Command: `npm run start:prod`
+2. **`sync-api`**: Root `backend/sync-api`, Build Command: `npm install --legacy-peer-deps && npm run build`, Start Command: `npm run start:prod`
+3. **`sharing-service`**: Root `backend/sharing-service`, Build Command: `npm install --legacy-peer-deps && npm run build`, Start Command: `npm run start:prod`
+4. **`security-analysis-service`**: Root `backend/security-analysis-service`, Build Command: `npm install --legacy-peer-deps && npm run build`, Start Command: `npm run start:prod`
 
-2. **`sync-api`**:
-   - Root Directory: `backend/sync-api`
-   - Build Command: `npm install --legacy-peer-deps && npm run build`
-   - Start Command: `npm run start:prod`
-   - Environment Variables: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `SYNC_PORT=3002`
-
-3. **`sharing-service`**:
-   - Root Directory: `backend/sharing-service`
-   - Build Command: `npm install --legacy-peer-deps && npm run build`
-   - Start Command: `npm run start:prod`
-   - Environment Variables: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `SHARING_PORT=3004`
-
-4. **`security-analysis-service`**:
-   - Root Directory: `backend/security-analysis-service`
-   - Build Command: `npm install --legacy-peer-deps && npm run build`
-   - Start Command: `npm run start:prod`
-   - Environment Variables: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `SECURITY_ANALYSIS_PORT=3003`
-
-#### Step 3: Deploy Flutter Web Client to Cloudflare Pages / Vercel
-1. Build Flutter Web locally or in GitHub Actions:
-   ```bash
-   cd app
-   flutter build web --release
-   ```
-2. Deploy the `app/build/web` directory to **Cloudflare Pages** or **Vercel**.
-3. Set custom domain (e.g., `app.sentinelvault.io`).
+#### Step 3: Deploy Flutter Web Client to Cloudflare Pages
+Deploy compiled `app/build/web` to **Cloudflare Pages** or **Vercel** with custom domain binding (`app.sentinelvault.io`).
 
 ---
 
-## Option 3: Enterprise AWS Cloud Architecture (ECS + RDS)
+## Option 3: Enterprise AWS Cloud Architecture (Terraform)
 
-Designed for enterprise grade high availability, multi-AZ database replication, and auto-scaling container fleets.
+Designed for enterprise grade high availability, multi-AZ database replication, and auto-scaling container fleets using AWS ECS Fargate, RDS, and ElastiCache.
 
 ```
                               ┌─────────────────────────────┐
@@ -249,64 +227,113 @@ Designed for enterprise grade high availability, multi-AZ database replication, 
                               └──────────────┘└──────────────┘
 ```
 
+### 💰 Itemized Monthly Cost Breakdown
+
+| AWS Resource | Specification / Tier | Cost / Month |
+| :--- | :--- | :--- |
+| **AWS RDS PostgreSQL** | `db.t4g.medium` (2 vCPU, 4GB RAM, 20GB Storage) | $32.40 |
+| **AWS ElastiCache Redis** | `cache.t4g.small` (1 node, 1.37GB RAM) | $12.10 |
+| **AWS ECS Fargate Tasks** | 4 Services x 0.25 vCPU, 0.5GB RAM | $18.40 |
+| **Application Load Balancer** | 1 ALB + LCU traffic | $18.00 |
+| **NAT Gateway + EIP** | 1 NAT Gateway in Public Subnet | $32.00 |
+| **S3 + CloudFront CDN** | Static Web Assets + Data Egress | $2.00 |
+| **Estimated Total** | **AWS Enterprise Infrastructure** | **~$114.90 / month** |
+
 ---
 
-### Detailed Steps
+### Detailed Automated Provisioning via Terraform
 
-#### Step 1: AWS VPC Setup
-1. Create a VPC with 2 Public Subnets (for ALB) and 2 Private Subnets (for ECS Fargate, RDS, and ElastiCache) across 2 Availability Zones.
-2. Provision a NAT Gateway in public subnet for outbound internet access from private tasks.
+SentinelVault includes a pre-configured Terraform manifest at `terraform/aws/main.tf`.
 
-#### Step 2: Provision Database Infrastructure
-1. **AWS RDS PostgreSQL**:
-   - Engine: PostgreSQL 15.x
-   - Instance Class: `db.t4g.medium` (Multi-AZ deployment enabled)
-   - Master Credentials saved in AWS Secrets Manager.
-2. **AWS ElastiCache Redis**:
-   - Engine: Redis 7.x
-   - Node Type: `cache.t4g.small` (Replication group across 2 AZs).
-
-#### Step 3: Containerize and Push to AWS ECR
-Create AWS ECR repositories:
+#### Step 1: Install Terraform & AWS CLI
 ```bash
-aws ecr create-repository --repository-name sentinelvault/auth-service
-aws ecr create-repository --repository-name sentinelvault/sync-api
-aws ecr create-repository --repository-name sentinelvault/sharing-service
-aws ecr create-repository --repository-name sentinelvault/security-analysis-service
-```
-Build and push images:
-```bash
-# Login to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
-
-# Build & Push Auth Service
-docker build -t sentinelvault/auth-service ./backend/auth-service
-docker tag sentinelvault/auth-service:latest <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentinelvault/auth-service:latest
-docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentinelvault/auth-service:latest
+# Install Terraform
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform awscli -y
 ```
 
-#### Step 4: Configure ECS Fargate Tasks & Application Load Balancer
-1. Create ECS Cluster named `sentinelvault-cluster`.
-2. Define Fargate Task Definitions for each microservice with container ports `3001`, `3002`, `3003`, `3004`.
-3. Create Application Load Balancer (ALB) with HTTPS listener (ACM SSL Certificate).
-4. Configure ALB Path Routing Rules:
-   - `/auth/*` → `auth-service` target group (3001)
-   - `/sync/*` → `sync-api` target group (3002)
-   - `/key-directory/*` → `sharing-service` target group (3004)
-   - `/security/*` → `security-analysis-service` target group (3003)
+#### Step 2: Configure AWS Credentials
+```bash
+aws configure
+```
 
-#### Step 5: Static Web App Hosting on S3 + CloudFront
-1. Create private S3 bucket `sentinelvault-web-assets`.
-2. Upload compiled Flutter web output `app/build/web/*` to S3.
-3. Create CloudFront distribution with Origin Access Control (OAC) pointing to S3 bucket.
-4. Bind custom domain (`app.yourcompany.com`) via AWS Route 53.
+#### Step 3: Initialize & Provision Infrastructure
+```bash
+cd terraform/aws
+terraform init
+terraform apply -var="db_password=YOUR_STRONG_DB_PASSWORD" -var="jwt_secret=YOUR_JWT_SECRET"
+```
+
+#### Step 4: Build and Push Docker Images to ECR
+```bash
+# ECR Login
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+
+# Build & Push Services
+for SERVICE in auth-service sync-api sharing-service security-analysis-service; do
+  docker build -t sentinelvault/$SERVICE ../backend/$SERVICE
+  docker tag sentinelvault/$SERVICE:latest <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentinelvault/$SERVICE:latest
+  docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentinelvault/$SERVICE:latest
+done
+```
+
+---
+
+## Option 4: Enterprise GCP Cloud Architecture (Terraform)
+
+Serverless enterprise deployment utilizing **Google Cloud Run v2**, **Cloud SQL PostgreSQL**, **Memorystore Redis**, and **Cloud Storage / Cloud CDN**.
+
+### 💰 Itemized Monthly Cost Breakdown
+
+| GCP Resource | Specification / Tier | Cost / Month |
+| :--- | :--- | :--- |
+| **Cloud SQL PostgreSQL** | `db-custom-2-7680` (2 vCPU, 7.5GB RAM, 20GB SSD) | $48.00 |
+| **Memorystore for Redis** | Basic Tier (2GB Memory) | $26.00 |
+| **Cloud Run v2 Fleet** | 4 Microservices (Auto-scale 0 to N instances) | ~$10.00 (Pay per request) |
+| **Artifact Registry** | Container image storage | $1.50 |
+| **Cloud Storage + Cloud CDN**| Web frontend hosting + CDN caching | $1.50 |
+| **Estimated Total** | **GCP Cloud Infrastructure** | **~$87.00 / month** |
+
+---
+
+### Detailed Automated Provisioning via Terraform
+
+SentinelVault includes a pre-configured GCP Terraform manifest at `terraform/gcp/main.tf`.
+
+#### Step 1: Authenticate with Google Cloud
+```bash
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project YOUR_GCP_PROJECT_ID
+```
+
+#### Step 2: Initialize & Provision Infrastructure
+```bash
+cd terraform/gcp
+terraform init
+terraform apply \
+  -var="gcp_project_id=YOUR_GCP_PROJECT_ID" \
+  -var="db_password=YOUR_STRONG_DB_PASSWORD" \
+  -var="jwt_secret=YOUR_JWT_SECRET"
+```
+
+#### Step 3: Build & Push Microservice Containers to Artifact Registry
+```bash
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+for SERVICE in auth-service sync-api sharing-service security-analysis-service; do
+  docker build -t us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/sentinelvault/$SERVICE:latest ../backend/$SERVICE
+  docker push us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/sentinelvault/$SERVICE:latest
+done
+```
 
 ---
 
 ## Production Operations & Security Checklist
 
 ### 1. Database Backups & Disaster Recovery
-Automate daily PostgreSQL backups using `pg_dump` pushed to encrypted S3 storage:
+Automate daily PostgreSQL backups using `pg_dump` pushed to encrypted storage:
 ```bash
 #!/bin/bash
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -334,8 +361,8 @@ Add to crontab: `0 3 * * * /usr/local/bin/backup-db.sh`
 
 ---
 
-## Summary Recommendation
+## Summary & Final Recommendation
 
-- For **fastest setup with minimal cost**: Choose **Option 1 (VPS + Docker Compose)** on Hetzner or DigitalOcean.
-- For **managed convenience**: Choose **Option 2 (Railway/Render)**.
-- For **enterprise scale**: Choose **Option 3 (AWS ECS Fargate + RDS)**.
+- **Best Value / Easiest**: Deploy **Option 1 (Single Hetzner/DigitalOcean VPS with Docker Compose)** for **~$8/month**.
+- **Best Managed PaaS**: Deploy **Option 2 (Railway / Render)** for **~$30/month**.
+- **Best Cloud Native Enterprise**: Deploy **Option 4 (GCP Cloud Run + Cloud SQL via Terraform)** for **~$87/month** or **Option 3 (AWS ECS Fargate via Terraform)** for **~$114/month**.
