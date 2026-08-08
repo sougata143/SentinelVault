@@ -133,6 +133,8 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                     folderName: item.vaultId.isNotEmpty ? item.vaultId : item.title,
                     currentFolderKey: folderKey,
                     senderUserId: VaultLockManager.instance.sessionToken ?? 'current-user',
+                    itemToShare: item,
+                    db: widget.db,
                   ),
                 ),
               );

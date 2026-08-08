@@ -14,6 +14,8 @@ class SharingScreen extends StatefulWidget {
   final String folderName;
   final List<int> currentFolderKey; // 32-byte Folder Key
   final String senderUserId;
+  final VaultItem? itemToShare;
+  final VaultDatabase? db;
 
   const SharingScreen({
     super.key,
@@ -21,6 +23,8 @@ class SharingScreen extends StatefulWidget {
     required this.folderName,
     required this.currentFolderKey,
     required this.senderUserId,
+    this.itemToShare,
+    this.db,
   });
 
   @override
@@ -35,8 +39,7 @@ class _SharingScreenState extends State<SharingScreen> {
   bool _loading = false;
   List<Map<String, dynamic>> _recipients = []; // { userId, email, fingerprint }
 
-  String get _effectiveFolderId =>
-      getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
+  String get _effectiveFolderId => getFolderUuid(widget.folderId);
 
   String get _storageKey => 'sharing_recipients_$_effectiveFolderId';
 
@@ -261,6 +264,32 @@ Uint8List safeBase64Decode(String input) {
       }
 
       PqcSharingService.unwrappedFolderKeys[targetFolderId] = Uint8List.fromList(widget.currentFolderKey);
+
+      if (widget.itemToShare != null && widget.db != null) {
+        try {
+          final crypto = VaultCrypto();
+          final updatedItem = VaultItem(
+            id: widget.itemToShare!.id,
+            type: widget.itemToShare!.type,
+            title: widget.itemToShare!.title,
+            tags: widget.itemToShare!.tags,
+            favorite: widget.itemToShare!.favorite,
+            isAvailableInWidget: widget.itemToShare!.isAvailableInWidget,
+            vaultId: targetFolderId,
+            createdAt: widget.itemToShare!.createdAt,
+            updatedAt: DateTime.now().toUtc(),
+            fields: widget.itemToShare!.fields,
+            customFields: widget.itemToShare!.customFields,
+            notes: widget.itemToShare!.notes,
+          );
+
+          final encItem = await updatedItem.encrypt(widget.currentFolderKey, crypto);
+          widget.db!.updateItem(encItem);
+          if (VaultSyncManager.isInitialized) {
+            await VaultSyncManager.instance.sync();
+          }
+        } catch (_) {}
+      }
 
       if (!mounted) return;
 
