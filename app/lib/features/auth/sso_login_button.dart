@@ -132,8 +132,8 @@ class _SsoLoginButtonState extends State<SsoLoginButton> {
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🔒 SSO Identity Authenticated. Enter Master Password to unlock vault.'),
+              SnackBar(
+                content: const Text('🔒 SSO Identity Authenticated. Enter Master Password to unlock vault.'),
                 backgroundColor: SentinelTheme.accentCyan,
               ),
             );
@@ -148,8 +148,8 @@ class _SsoLoginButtonState extends State<SsoLoginButton> {
   @override
   Widget build(BuildContext context) {
     if (_checkingDomain) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: SentinelTheme.accentCyan)),
       );
     }
@@ -170,7 +170,7 @@ class _SsoLoginButtonState extends State<SsoLoginButton> {
             style: ElevatedButton.styleFrom(
               backgroundColor: SentinelTheme.cardDark,
               foregroundColor: SentinelTheme.accentCyan,
-              side: const BorderSide(color: SentinelTheme.accentCyan),
+              side: BorderSide(color: SentinelTheme.accentCyan),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),

@@ -122,12 +122,14 @@ class _PatManagementScreenState extends State<PatManagementScreen> {
       );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Access Token revoked successfully.')),
         );
         _fetchTokens();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error revoking token: $e')),
       );
@@ -192,7 +194,7 @@ class _PatManagementScreenState extends State<PatManagementScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<int>(
-                        value: expiryDays,
+                        initialValue: expiryDays,
                         dropdownColor: SentinelTheme.cardDark,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
@@ -395,8 +397,8 @@ class _PatManagementScreenState extends State<PatManagementScreen> {
                               children: [
                                 Chip(
                                   label: Text(statusText, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  backgroundColor: statusColor.withOpacity(0.12),
-                                  side: BorderSide(color: statusColor.withOpacity(0.4)),
+                                  backgroundColor: statusColor.withValues(alpha: 0.12),
+                                  side: BorderSide(color: statusColor.withValues(alpha: 0.4)),
                                 ),
                                 if (!token.isRevoked)
                                   IconButton(

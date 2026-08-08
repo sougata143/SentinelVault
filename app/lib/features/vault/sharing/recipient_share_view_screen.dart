@@ -105,8 +105,9 @@ class _RecipientShareViewScreenState extends State<RecipientShareViewScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Container(
-            maxWidth: 500,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: SentinelTheme.cardDark,
@@ -156,9 +157,9 @@ class _RecipientShareViewScreenState extends State<RecipientShareViewScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: SentinelTheme.accentCyan.withOpacity(0.12),
+                                color: SentinelTheme.accentCyan.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: SentinelTheme.accentCyan.withOpacity(0.5)),
+                                border: Border.all(color: SentinelTheme.accentCyan.withValues(alpha: 0.5)),
                               ),
                               child: const Row(
                                 children: [
@@ -177,9 +178,10 @@ class _RecipientShareViewScreenState extends State<RecipientShareViewScreen> {
                           const Divider(color: SentinelTheme.borderDark),
                           const SizedBox(height: 12),
                           ..._buildFieldsList(_decryptedItemJson!),
-                        ],
+                         ],
                       ),
-          ),
+            ),
+          ), // end ConstrainedBox
         ),
       ),
     );

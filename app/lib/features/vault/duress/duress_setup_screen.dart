@@ -108,9 +108,9 @@ class _DuressSetupScreenState extends State<DuressSetupScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: SentinelTheme.warningYellow.withOpacity(0.12),
+                color: SentinelTheme.warningYellow.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: SentinelTheme.warningYellow.withOpacity(0.5)),
+                border: Border.all(color: SentinelTheme.warningYellow.withValues(alpha: 0.5)),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +181,7 @@ class _DuressSetupScreenState extends State<DuressSetupScreen> {
             const SizedBox(height: 16),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              activeColor: SentinelTheme.accentCyan,
+              activeThumbColor: SentinelTheme.accentCyan,
               title: const Text('Pre-populate Harmless Fake Entries', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
               subtitle: const Text('Populates decoy vault with plausible sample passwords (Google account, shopping card, to-do list).', style: TextStyle(color: SentinelTheme.textMuted, fontSize: 12)),
               value: _prepopulateItems,

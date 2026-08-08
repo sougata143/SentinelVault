@@ -126,9 +126,9 @@ class _ShareItemDialogState extends State<ShareItemDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: SentinelTheme.warningYellow.withOpacity(0.12),
+                color: SentinelTheme.warningYellow.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: SentinelTheme.warningYellow.withOpacity(0.5)),
+                border: Border.all(color: SentinelTheme.warningYellow.withValues(alpha: 0.5)),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +153,7 @@ class _ShareItemDialogState extends State<ShareItemDialog> {
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<int>(
-                value: _selectedExpiryHours,
+              initialValue: _selectedExpiryHours,
                 dropdownColor: SentinelTheme.cardDark,
                 style: const TextStyle(color: SentinelTheme.textPrimary),
                 decoration: InputDecoration(
@@ -175,7 +175,7 @@ class _ShareItemDialogState extends State<ShareItemDialog> {
               const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeColor: SentinelTheme.accentCyan,
+                activeThumbColor: SentinelTheme.accentCyan,
                 title: const Text(
                   'One-Time View',
                   style: TextStyle(color: SentinelTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),

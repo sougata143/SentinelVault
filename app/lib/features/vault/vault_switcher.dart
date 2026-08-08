@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:core/core.dart';
 import '../../theme/theme.dart';
 
 /// Data class representing a user's vault envelope in UI state.
@@ -106,7 +105,7 @@ class _VaultSwitcherState extends State<VaultSwitcher> {
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? SentinelTheme.accentCyan.withOpacity(0.12)
+                              ? SentinelTheme.accentCyan.withValues(alpha: 0.12)
                               : SentinelTheme.cardDark,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
@@ -165,7 +164,7 @@ class _VaultSwitcherState extends State<VaultSwitcher> {
                       style: TextStyle(color: SentinelTheme.accentCyan, fontWeight: FontWeight.bold),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: SentinelTheme.accentCyan),
+                      side: BorderSide(color: SentinelTheme.accentCyan),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -204,14 +203,14 @@ class _VaultSwitcherState extends State<VaultSwitcher> {
             const SizedBox(width: 6),
             Text(
               _activeVault.name,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SentinelTheme.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, color: SentinelTheme.textMuted, size: 20),
+            Icon(Icons.arrow_drop_down, color: SentinelTheme.textMuted, size: 20),
           ],
         ),
       ),

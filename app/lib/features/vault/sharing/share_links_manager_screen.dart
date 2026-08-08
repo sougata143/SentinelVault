@@ -119,12 +119,14 @@ class _ShareLinksManagerScreenState extends State<ShareLinksManagerScreen> {
       );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Share link revoked successfully.')),
         );
         _fetchLinks();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error revoking link: $e')),
       );
@@ -205,8 +207,8 @@ class _ShareLinksManagerScreenState extends State<ShareLinksManagerScreen> {
                               children: [
                                 Chip(
                                   label: Text(statusText, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  backgroundColor: statusColor.withOpacity(0.12),
-                                  side: BorderSide(color: statusColor.withOpacity(0.4)),
+                                  backgroundColor: statusColor.withValues(alpha: 0.12),
+                                  side: BorderSide(color: statusColor.withValues(alpha: 0.4)),
                                 ),
                                 if (!link.isRevoked && !link.isConsumed && !isExpired)
                                   IconButton(
