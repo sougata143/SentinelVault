@@ -15,6 +15,9 @@ void main() {
   final crypto = VaultCrypto(bridge: bridge);
 
   test('E2E PQC Hybrid Sharing Pass: Test-A shares with Test-B, Test-B decrypts, Test-C rejected with 404', () async {
+    final authBaseUrl = ApiConfig.authBaseUrl.isNotEmpty ? ApiConfig.authBaseUrl : 'http://localhost:3001';
+    final sharingBaseUrl = ApiConfig.sharingBaseUrl.isNotEmpty ? ApiConfig.sharingBaseUrl : 'http://localhost:3004';
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final emailA = 'test-a-$timestamp@example.com';
     final emailB = 'test-b-$timestamp@example.com';
@@ -29,7 +32,7 @@ void main() {
     final mkA = await crypto.deriveMasterKey(masterPassword: password, salt: saltA);
     final verifierA = await SrpClient.calculateVerifier(emailA, mkA, saltA);
     final regResA = await httpClient.post(
-      Uri.parse('${ApiConfig.authBaseUrl}/auth/register'),
+      Uri.parse('$authBaseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': emailA,
@@ -43,7 +46,7 @@ void main() {
     final mkB = await crypto.deriveMasterKey(masterPassword: password, salt: saltB);
     final verifierB = await SrpClient.calculateVerifier(emailB, mkB, saltB);
     final regResB = await httpClient.post(
-      Uri.parse('${ApiConfig.authBaseUrl}/auth/register'),
+      Uri.parse('$authBaseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': emailB,
@@ -57,7 +60,7 @@ void main() {
     final mkC = await crypto.deriveMasterKey(masterPassword: password, salt: saltC);
     final verifierC = await SrpClient.calculateVerifier(emailC, mkC, saltC);
     final regResC = await httpClient.post(
-      Uri.parse('${ApiConfig.authBaseUrl}/auth/register'),
+      Uri.parse('$authBaseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': emailC,
@@ -70,13 +73,13 @@ void main() {
 
     // 2. Lookup user IDs for test-a and test-b
     final lookupResA = await httpClient.get(
-      Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=$emailA'),
+      Uri.parse('$authBaseUrl/auth/users/lookup?email=$emailA'),
     );
     expect(lookupResA.statusCode, equals(200));
     final userIdA = (json.decode(lookupResA.body) as Map<String, dynamic>)['userId'] as String;
 
     final lookupResB = await httpClient.get(
-      Uri.parse('${ApiConfig.authBaseUrl}/auth/users/lookup?email=$emailB'),
+      Uri.parse('$authBaseUrl/auth/users/lookup?email=$emailB'),
     );
     expect(lookupResB.statusCode, equals(200));
     final userIdB = (json.decode(lookupResB.body) as Map<String, dynamic>)['userId'] as String;
@@ -85,7 +88,7 @@ void main() {
     final bundleA = await bridge.pqcGenerateKeypairs();
     final fpA = await sharingManager.computeSafetyNumber(bundleA);
     final pubResA = await httpClient.post(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys'),
+      Uri.parse('$sharingBaseUrl/key-directory/keys'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $tokenA',
@@ -104,7 +107,7 @@ void main() {
     final bundleB = await bridge.pqcGenerateKeypairs();
     final fpB = await sharingManager.computeSafetyNumber(bundleB);
     final pubResB = await httpClient.post(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys'),
+      Uri.parse('$sharingBaseUrl/key-directory/keys'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $tokenB',
@@ -133,7 +136,7 @@ void main() {
 
     // 5. Test-a fetches Test-b's public key bundle
     final fetchResB = await httpClient.get(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/keys/$userIdB'),
+      Uri.parse('$sharingBaseUrl/key-directory/keys/$userIdB'),
       headers: {'Authorization': 'Bearer $tokenA'},
     );
     expect(fetchResB.statusCode, equals(200));
@@ -166,7 +169,7 @@ void main() {
 
     // 7. Test-a publishes wrapped keys to POST /key-directory/wrapped-keys (writes to Postgres DB)
     final publishWrappedRes = await httpClient.post(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys'),
+      Uri.parse('$sharingBaseUrl/key-directory/wrapped-keys'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $tokenA',
@@ -189,7 +192,7 @@ void main() {
 
     // 8. Test-b (intended recipient) fetches wrapped key
     final fetchWrappedResB = await httpClient.get(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$folderId'),
+      Uri.parse('$sharingBaseUrl/key-directory/wrapped-keys/$folderId'),
       headers: {'Authorization': 'Bearer $tokenB'},
     );
     expect(fetchWrappedResB.statusCode, equals(200));
@@ -214,7 +217,7 @@ void main() {
 
     // 11. Test-c (uninvited third party) attempts to fetch wrapped key
     final fetchWrappedResC = await httpClient.get(
-      Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$folderId'),
+      Uri.parse('$sharingBaseUrl/key-directory/wrapped-keys/$folderId'),
       headers: {'Authorization': 'Bearer $tokenC'},
     );
     expect(fetchWrappedResC.statusCode, equals(404));

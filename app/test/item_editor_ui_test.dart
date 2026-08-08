@@ -72,7 +72,12 @@ void main() {
       expect(find.text('WEBSITE URLS'), findsOneWidget);
       expect(find.text('ONE-TIME PASSWORD (TOTP)'), findsOneWidget);
 
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      // Scroll until the Save button is visible (form length varies by viewport)
+      await tester.scrollUntilVisible(
+        find.text('Save Vault Item'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('ORGANIZATION & NOTES'), findsOneWidget);

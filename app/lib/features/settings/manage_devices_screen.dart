@@ -23,6 +23,8 @@ class ManageDevicesScreen extends StatefulWidget {
 class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
   String get _effectiveAuthBaseUrl =>
       widget.authBaseUrl.isNotEmpty ? widget.authBaseUrl : ApiConfig.authBaseUrl;
+  String get _effectiveJwtToken =>
+      VaultLockManager.instance.sessionToken ?? widget.jwtToken;
   late final AuthClient _authClient;
   bool _isLoading = true;
   String? _errorMessage;
@@ -45,7 +47,7 @@ class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
     });
 
     try {
-      final sessions = await _authClient.getSessions(widget.jwtToken);
+      final sessions = await _authClient.getSessions(_effectiveJwtToken);
       if (mounted) {
         setState(() {
           _sessions = sessions;
@@ -93,7 +95,7 @@ class _ManageDevicesScreenState extends State<ManageDevicesScreen> {
     if (confirm != true) return;
 
     try {
-      await _authClient.revokeSession(widget.jwtToken, sessionId);
+      await _authClient.revokeSession(_effectiveJwtToken, sessionId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Session for "$deviceLabel" revoked successfully.')),

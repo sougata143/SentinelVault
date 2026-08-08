@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import 'native_crypto_bridge.dart';
 import 'srp.dart';
+import 'totp_helper.dart';
 
 // --- FFI Function Types ---
 
@@ -238,6 +239,27 @@ typedef _PqcVerifyInvitationDart = int Function(
   int mldsaSigLen,
 );
 
+typedef _GenerateTotpCodeC = Int32 Function(
+  Pointer<Utf8> secretPtr,
+  Uint64 timestampSec,
+  Uint32 period,
+  Uint32 digits,
+  Pointer<Utf8> algoPtr,
+  Pointer<Uint8> outputPtr,
+  IntPtr outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+typedef _GenerateTotpCodeDart = int Function(
+  Pointer<Utf8> secretPtr,
+  int timestampSec,
+  int period,
+  int digits,
+  Pointer<Utf8> algoPtr,
+  Pointer<Uint8> outputPtr,
+  int outputCapacity,
+  Pointer<IntPtr> writtenPtr,
+);
+
 // --- Library Loader ---
 
 DynamicLibrary _loadLibrary() {
@@ -315,6 +337,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
   late final _PqcHybridUnwrapDart _pqcHybridUnwrapFn;
   late final _PqcSignInvitationDart _pqcSignInvitationFn;
   late final _PqcVerifyInvitationDart _pqcVerifyInvitationFn;
+  late final _GenerateTotpCodeDart _generateTotpCodeFn;
 
   bool _isBound = false;
 
@@ -338,6 +361,7 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       _pqcHybridUnwrapFn = _lib.lookupFunction<_PqcHybridUnwrapC, _PqcHybridUnwrapDart>('pqc_hybrid_unwrap');
       _pqcSignInvitationFn = _lib.lookupFunction<_PqcSignInvitationC, _PqcSignInvitationDart>('pqc_sign_invitation');
       _pqcVerifyInvitationFn = _lib.lookupFunction<_PqcVerifyInvitationC, _PqcVerifyInvitationDart>('pqc_verify_invitation');
+      _generateTotpCodeFn = _lib.lookupFunction<_GenerateTotpCodeC, _GenerateTotpCodeDart>('generate_totp_code');
       _isBound = true;
     } catch (_) {
       _isBound = false;
@@ -1111,6 +1135,56 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
         throw Exception('Native pqc_verify_invitation failed with error code: $res');
       }
       return res == 1;
+    });
+  }
+
+  @override
+  Future<String> generateTotpCode({
+    required String secret,
+    required int timestampSec,
+    int period = 30,
+    int digits = 6,
+    String algorithm = 'SHA1',
+  }) async {
+    if (!_isBound) {
+      return TotpHelper.generateTotpCode(
+        secret: secret,
+        timestampSec: timestampSec,
+        period: period,
+        digits: digits,
+        algorithm: algorithm,
+      );
+    }
+    return using((Arena arena) {
+      final secretPtr = secret.toNativeUtf8(allocator: arena);
+      final algoPtr = algorithm.toNativeUtf8(allocator: arena);
+      final outputPtr = arena<Uint8>(64);
+      final writtenPtr = arena<IntPtr>();
+
+      final res = _generateTotpCodeFn(
+        secretPtr,
+        timestampSec,
+        period,
+        digits,
+        algoPtr,
+        outputPtr,
+        64,
+        writtenPtr,
+      );
+
+      if (res != 0) {
+        return TotpHelper.generateTotpCode(
+          secret: secret,
+          timestampSec: timestampSec,
+          period: period,
+          digits: digits,
+          algorithm: algorithm,
+        );
+      }
+
+      final writtenLen = writtenPtr.value;
+      final bytes = outputPtr.asTypedList(writtenLen);
+      return utf8.decode(bytes);
     });
   }
 }

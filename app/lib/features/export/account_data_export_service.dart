@@ -73,6 +73,22 @@ class AccountDataExportService {
     List<Map<String, dynamic>> filteredTeamVaults = [];
 
     try {
+      final token = VaultLockManager.instance.sessionToken ?? userEmail;
+      final pqcRes = await client.get(
+        Uri.parse('$effectiveSharingUrl/key-directory/my-shares'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 2), onTimeout: () => http.Response('{}', 408));
+
+      if (pqcRes.statusCode == 200) {
+        final pqcData = jsonDecode(pqcRes.body);
+        final List<dynamic> shares = pqcData['shares'] ?? [];
+        filteredReceivedShares = shares
+            .map((s) => s as Map<String, dynamic>)
+            .toList();
+      }
+    } catch (_) {}
+
+    try {
       final res = await client.get(
         Uri.parse('$effectiveSharingUrl/shared-vaults'),
         headers: {'Authorization': 'Bearer $userEmail'},

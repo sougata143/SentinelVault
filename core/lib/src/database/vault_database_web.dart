@@ -89,6 +89,14 @@ class SqliteVaultDatabase implements VaultDatabase {
   }
 
   @override
+  List<EncryptedVaultItem> getItemsByVaultId(String vaultId, {bool includeDeleted = false}) {
+    _assertOpen();
+    return _store.values
+        .where((item) => (includeDeleted || !item.isDeleted) && item.vaultId == vaultId)
+        .toList();
+  }
+
+  @override
   void clear() {
     _assertOpen();
     _store.clear();

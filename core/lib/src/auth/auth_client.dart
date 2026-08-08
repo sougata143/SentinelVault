@@ -24,8 +24,12 @@ class AuthClient {
   final VaultCrypto _crypto;
 
   /// Creates a new [AuthClient].
+  ///
+  /// When [baseUrl] is `''` (the default), all requests use same-origin
+  /// relative paths (e.g. `/auth/register`), which the browser resolves
+  /// against the current page origin.
   AuthClient({
-    required this.baseUrl,
+    this.baseUrl = '',
     http.Client? httpClient,
   })  : _httpClient = httpClient ?? http.Client(),
         _crypto = VaultCrypto();

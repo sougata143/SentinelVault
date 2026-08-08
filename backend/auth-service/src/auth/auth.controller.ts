@@ -1,10 +1,31 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Query, Headers, UseGuards, Req, Delete, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { SsoService } from './sso.service';
+import { PatService } from './pat.service';
+import { CreateSsoConfigDto, SsoLoginInitDto, SsoCallbackDto } from './sso-config.dto';
+import { CreatePatDto } from './pat.dto';
 import { JwtAuthGuard, AuthenticatedRequest } from '../common/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly ssoService: SsoService,
+    private readonly patService: PatService,
+  ) {}
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
@@ -192,6 +213,60 @@ export class AuthController {
   ): Promise<{ success: boolean; id: string }> {
     const event = await this.authService.recordAuditEvent(body.userId, body.eventType, body.metadata);
     return { success: true, id: event.id };
+  }
+
+  // ── SSO (OIDC / SAML) Endpoints ─────────────────────────────────────────────
+
+  @Get('sso/config/:domain')
+  public getSsoDomainConfig(@Param('domain') domain: string) {
+    return this.ssoService.getConfigForDomain(domain);
+  }
+
+  @Post('sso/config')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  public createOrUpdateSsoConfig(@Body() dto: CreateSsoConfigDto) {
+    return this.ssoService.createOrUpdateConfig(dto);
+  }
+
+  @Post('sso/login-init')
+  @HttpCode(HttpStatus.OK)
+  public initSsoLogin(@Body() dto: SsoLoginInitDto) {
+    return this.ssoService.initSsoLogin(dto);
+  }
+
+  @Post('sso/callback')
+  @HttpCode(HttpStatus.OK)
+  public handleSsoCallback(@Body() dto: SsoCallbackDto) {
+    return this.ssoService.handleSsoCallback(dto);
+  }
+
+  // ── Personal Access Tokens (PATs) Endpoints ─────────────────────────────────
+
+  @Post('pats')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  public createPat(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreatePatDto,
+  ) {
+    return this.patService.createToken(req.user!.id, dto);
+  }
+
+  @Get('pats')
+  @UseGuards(JwtAuthGuard)
+  public getPats(@Req() req: AuthenticatedRequest) {
+    return this.patService.getUserTokens(req.user!.id);
+  }
+
+  @Post('pats/:id/revoke')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  public revokePat(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.patService.revokeToken(req.user!.id, id);
   }
 }
 

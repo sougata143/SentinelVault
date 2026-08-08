@@ -42,6 +42,9 @@ abstract class VaultDatabase {
   /// (required by the sync layer).
   List<EncryptedVaultItem> getAllItems({bool includeDeleted = false});
 
+  /// Returns vault items belonging strictly to a specific [vaultId].
+  List<EncryptedVaultItem> getItemsByVaultId(String vaultId, {bool includeDeleted = false});
+
   /// Purges all records (used at logout and in tests).
   void clear();
 }

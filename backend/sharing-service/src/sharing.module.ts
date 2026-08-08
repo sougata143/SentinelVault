@@ -9,6 +9,7 @@ import { KeyDirectoryModule } from './key-directory/key-directory.module';
 import { ShareInviteModule } from './share-invite/share-invite.module';
 import { EmergencyModule } from './emergency/emergency.module';
 import { SharedVaultModule } from './shared-vault/shared-vault.module';
+import { ShareLinkModule } from './share-link/share-link.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -27,7 +28,7 @@ import { HealthController } from './health.controller';
     JwtModule.registerAsync({
       global: true,
       useFactory: () => ({
-        secret: process.env.JWT_SECRET,
+        secret: process.env.JWT_SECRET || 'sentinelvault_jwt_secret_key_change_in_production',
         signOptions: { expiresIn: '24h' },
       }),
     }),
@@ -35,6 +36,7 @@ import { HealthController } from './health.controller';
     ShareInviteModule,
     EmergencyModule,
     SharedVaultModule,
+    ShareLinkModule,
   ],
   controllers: [HealthController],
 })

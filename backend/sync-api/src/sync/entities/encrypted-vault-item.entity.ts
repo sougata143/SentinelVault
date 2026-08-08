@@ -22,6 +22,10 @@ export class EncryptedVaultItem {
   userId!: string; // References User.id from auth-service
 
   @Column({ type: 'uuid', nullable: true })
+  @Index() // Index for efficient multi-vault lookups
+  vaultId?: string; // References UserVault.id
+
+  @Column({ type: 'uuid', nullable: true })
   @Index()
   folderId?: string;
 

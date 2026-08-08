@@ -123,10 +123,15 @@ class PqcSharingManager {
     required Uint8List recipientX25519Priv,
     required Uint8List recipientMlkemDk,
   }) async {
-    final ephem = base64Url.decode(wrappedKeyData['ephemeralX25519PublicKey'] as String);
-    final ct = base64Url.decode(wrappedKeyData['mlkemCiphertext'] as String);
-    final nonce = base64Url.decode(wrappedKeyData['aesNonce'] as String);
-    final wrapped = base64Url.decode(wrappedKeyData['wrappedFolderKey'] as String);
+    Uint8List safeDecode(String input) {
+      final clean = input.replaceAll('=', '').replaceAll(' ', '').trim();
+      return base64Url.decode(base64Url.normalize(clean));
+    }
+
+    final ephem = safeDecode(wrappedKeyData['ephemeralX25519PublicKey'] as String);
+    final ct = safeDecode(wrappedKeyData['mlkemCiphertext'] as String);
+    final nonce = safeDecode(wrappedKeyData['aesNonce'] as String);
+    final wrapped = safeDecode(wrappedKeyData['wrappedFolderKey'] as String);
 
     return await _bridge.pqcHybridUnwrap(
       recipientX25519Priv: recipientX25519Priv,

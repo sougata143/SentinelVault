@@ -5,6 +5,7 @@ import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import '../settings/settings_screen.dart';
 import 'sharing/sharing_screen.dart';
+import 'sharing/share_item_dialog.dart';
 import 'totp_code_card.dart';
 
 class ItemDetailPane extends StatefulWidget {
@@ -12,6 +13,7 @@ class ItemDetailPane extends StatefulWidget {
   final List<int>? vaultKey;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
+  final VaultDatabase? db;
 
   const ItemDetailPane({
     super.key,
@@ -19,6 +21,7 @@ class ItemDetailPane extends StatefulWidget {
     this.vaultKey,
     this.onDelete,
     this.onEdit,
+    this.db,
   });
 
   @override
@@ -104,6 +107,20 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         title: Text(item.title, style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.link, color: SentinelTheme.accentCyan),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => ShareItemDialog(
+                  item: item,
+                  sharingBaseUrl: '',
+                  sessionToken: VaultLockManager.instance.sessionToken,
+                ),
+              );
+            },
+            tooltip: 'Share via One-Time Link',
+          ),
+          IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.teal),
             onPressed: () {
               final targetId = item.vaultId.isNotEmpty ? item.vaultId : item.id;
@@ -115,9 +132,11 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                 MaterialPageRoute(
                   builder: (context) => SharingScreen(
                     folderId: targetId,
-                    folderName: item.vaultId.isNotEmpty ? item.vaultId : item.title,
+                    folderName: targetId,
                     currentFolderKey: folderKey,
-                    senderUserId: 'current-user-alice',
+                    senderUserId: 'current-user',
+                    itemToShare: item,
+                    db: widget.db,
                   ),
                 ),
               );

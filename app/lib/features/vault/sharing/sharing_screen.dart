@@ -14,6 +14,8 @@ class SharingScreen extends StatefulWidget {
   final String folderName;
   final List<int> currentFolderKey; // 32-byte Folder Key
   final String senderUserId;
+  final VaultItem? itemToShare;
+  final VaultDatabase? db;
 
   const SharingScreen({
     super.key,
@@ -21,6 +23,8 @@ class SharingScreen extends StatefulWidget {
     required this.folderName,
     required this.currentFolderKey,
     required this.senderUserId,
+    this.itemToShare,
+    this.db,
   });
 
   @override
@@ -35,7 +39,9 @@ class _SharingScreenState extends State<SharingScreen> {
   bool _loading = false;
   List<Map<String, dynamic>> _recipients = []; // { userId, email, fingerprint }
 
-  String get _storageKey => 'sharing_recipients_${widget.folderId}';
+  String get _effectiveFolderId => getFolderUuid(widget.folderId);
+
+  String get _storageKey => 'sharing_recipients_$_effectiveFolderId';
 
   @override
   void initState() {
@@ -46,10 +52,10 @@ class _SharingScreenState extends State<SharingScreen> {
   Future<void> _loadRecipients() async {
     setState(() => _loading = true);
     try {
-      final token = await _storage.read(key: 'session_token') ?? '';
+      final token = VaultLockManager.instance.sessionToken ?? await _storage.read(key: 'session_token') ?? '';
       if (token.isNotEmpty) {
         final res = await http.get(
-          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/${widget.folderId}/recipients'),
+          Uri.parse('${ApiConfig.sharingBaseUrl}/key-directory/wrapped-keys/$_effectiveFolderId/recipients'),
           headers: {'Authorization': 'Bearer $token'},
         );
         if (res.statusCode == 200) {
@@ -150,7 +156,7 @@ class _SharingScreenState extends State<SharingScreen> {
       final recipientUserId = lookupData['userId'] as String;
 
       // Read JWT session token
-      final token = await _storage.read(key: 'session_token') ?? '';
+      final token = VaultLockManager.instance.sessionToken ?? await _storage.read(key: 'session_token') ?? '';
 
       // 2. Fetch target user's public key bundle from key-directory service
       final keyRes = await http.get(
@@ -202,10 +208,12 @@ Uint8List safeBase64Decode(String input) {
       final bridge = getNativeCryptoBridge();
       final senderBundle = await bridge.pqcGenerateKeypairs();
 
+      final activeEmail = await _storage.read(key: 'active_user_email') ?? widget.senderUserId;
+
       final invitePayload = await _sharingManager.createSignedInvitation(
-        folderId: widget.folderId,
+        folderId: _effectiveFolderId,
         recipientUserId: recipientUserId,
-        senderUserId: widget.senderUserId,
+        senderUserId: activeEmail,
         ed25519Priv: senderBundle.ed25519Priv,
         mldsaSeed: senderBundle.mldsaSeed,
         folderKey: Uint8List.fromList(widget.currentFolderKey),
@@ -213,7 +221,7 @@ Uint8List safeBase64Decode(String input) {
         recipientMlkemEk: recipientBundle.mlkemEk,
       );
 
-      final targetFolderId = getFolderUuid(widget.folderName.isNotEmpty ? widget.folderName : widget.folderId);
+      final targetFolderId = _effectiveFolderId;
       final wrappedKeyData = invitePayload['wrappedFolderKey'] as Map<String, dynamic>;
 
       int nextVersion = 1;
@@ -258,6 +266,46 @@ Uint8List safeBase64Decode(String input) {
       }
 
       PqcSharingService.unwrappedFolderKeys[targetFolderId] = Uint8List.fromList(widget.currentFolderKey);
+
+      if (widget.itemToShare != null && widget.db != null) {
+        try {
+          final crypto = VaultCrypto();
+          final existingEncItem = widget.db!.getItem(widget.itemToShare!.id);
+          final currentVersion = existingEncItem?.version ?? 1;
+
+          final updatedItem = VaultItem(
+            id: widget.itemToShare!.id,
+            type: widget.itemToShare!.type,
+            title: widget.itemToShare!.title,
+            tags: widget.itemToShare!.tags,
+            favorite: widget.itemToShare!.favorite,
+            isAvailableInWidget: widget.itemToShare!.isAvailableInWidget,
+            vaultId: targetFolderId,
+            createdAt: widget.itemToShare!.createdAt,
+            updatedAt: DateTime.now().toUtc(),
+            fields: widget.itemToShare!.fields,
+            customFields: widget.itemToShare!.customFields,
+            notes: widget.itemToShare!.notes,
+          );
+
+          final newEncItem = await updatedItem.encrypt(widget.currentFolderKey, crypto);
+          final encItemToSave = EncryptedVaultItem(
+            id: newEncItem.id,
+            encryptedBlob: newEncItem.encryptedBlob,
+            nonce: newEncItem.nonce,
+            version: currentVersion + 1,
+            updatedAt: DateTime.now().toUtc(),
+            isDeleted: false,
+            vaultId: targetFolderId,
+            folderId: targetFolderId,
+          );
+
+          widget.db!.updateItem(encItemToSave);
+          if (VaultSyncManager.isInitialized) {
+            await VaultSyncManager.instance.sync();
+          }
+        } catch (_) {}
+      }
 
       if (!mounted) return;
 

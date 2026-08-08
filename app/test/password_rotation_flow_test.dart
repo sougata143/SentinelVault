@@ -37,6 +37,11 @@ class FakeVaultDatabase implements VaultDatabase {
   List<EncryptedVaultItem> getAllItems({bool includeDeleted = false}) => _items.values.toList();
 
   @override
+  List<EncryptedVaultItem> getItemsByVaultId(String vaultId, {bool includeDeleted = false}) {
+    return _items.values.where((item) => item.vaultId == vaultId).toList();
+  }
+
+  @override
   void clear() => _items.clear();
 }
 
