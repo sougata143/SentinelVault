@@ -63,7 +63,9 @@ class _VaultTabState extends State<VaultTab> {
   }
 
   Future<void> _loadItems() async {
-    await PqcSharingService.loadCachedFolderKeys();
+    try {
+      await PqcSharingService.loadCachedFolderKeys(widget.currentEmail);
+    } catch (_) {}
     final encItems = widget.db.getAllItems();
     final crypto = VaultCrypto();
 
