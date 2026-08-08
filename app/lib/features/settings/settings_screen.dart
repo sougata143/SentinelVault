@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -581,9 +580,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: const Text('Fill credentials natively inside third-party apps & browsers'),
               trailing: const Icon(Icons.open_in_new, color: AppTheme.primaryColor),
               onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 final success = await AndroidAutofillBridge.requestSetAutofillService();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text(
                         success
