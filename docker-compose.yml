@@ -43,7 +43,7 @@ services:
       - ./backend/auth-service:/app
       - auth_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -75,7 +75,7 @@ services:
       - ./backend/sync-api:/app
       - sync_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -107,7 +107,7 @@ services:
       - ./backend/security-analysis-service:/app
       - security_analysis_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
