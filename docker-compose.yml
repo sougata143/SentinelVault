@@ -167,14 +167,7 @@ services:
       - sentinelvault-net
 
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:3001}
-        - SYNC_BASE_URL=${SYNC_BASE_URL:-http://localhost:3002}
-        - SECURITY_BASE_URL=${SECURITY_BASE_URL:-http://localhost:3003}
-        - SHARING_BASE_URL=${SHARING_BASE_URL:-http://localhost:3004}
+    image: sentinelvault-frontend:latest
     container_name: sentinelvault-frontend
     ports:
       - "${FRONTEND_PORT:-8080}:8080"

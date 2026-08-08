@@ -61,7 +61,7 @@ RUN mkdir -p /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
   touch /var/run/nginx.pid && \
   chown sentinel:sentinel /var/run/nginx.pid
 
-COPY ./nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/app/build/web ./
 
 USER sentinel
@@ -69,6 +69,6 @@ EXPOSE 8080
 
 # Consistent shell healthcheck utilizing wget (native on Alpine)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:${FRONTEND_PORT:-8080}/ || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:${FRONTEND_PORT:-8080}/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
