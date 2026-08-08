@@ -9,10 +9,12 @@ import { User } from './entities/user.entity';
 import { WebauthnCredential } from './entities/webauthn-credential.entity';
 import { AuditEventEntity } from './entities/audit-event.entity';
 import { AuditService } from './audit.service';
+import { SessionEntity } from './entities/session.entity';
+import { JwtAuthGuard } from '../common/jwt-auth.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, WebauthnCredential, AuditEventEntity]),
+    TypeOrmModule.forFeature([User, WebauthnCredential, AuditEventEntity, SessionEntity]),
     JwtModule.registerAsync({
       /** JWT_SECRET is already present in the root .env (see RUNNING_LOCALLY.md).
        *  It is shared across all four backend services so each can verify tokens
@@ -24,7 +26,7 @@ import { AuditService } from './audit.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, UserRepository, RedisService, AuditService],
-  exports: [AuthService, UserRepository, JwtModule, RedisService, AuditService],
+  providers: [AuthService, UserRepository, RedisService, AuditService, JwtAuthGuard],
+  exports: [AuthService, UserRepository, JwtModule, RedisService, AuditService, JwtAuthGuard],
 })
 export class AuthModule {}

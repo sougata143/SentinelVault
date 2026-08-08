@@ -105,6 +105,73 @@
       color: #94a3b8;
       font-size: 13px;
     }
+    .mapping-section {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #334155;
+    }
+    .mapping-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .mapping-box {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    .mapping-field {
+      margin-bottom: 8px;
+    }
+    .mapping-field label {
+      display: block;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .mapping-field select, .mapping-field input {
+      width: 100%;
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    .btn-save-mapping {
+      background-color: #3b82f6;
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 11px;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .btn-save-mapping:hover {
+      background-color: #60a5fa;
+    }
+    .btn-clear-mapping {
+      background-color: transparent;
+      color: #ef4444;
+      border: 1px solid #ef4444;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -124,6 +191,26 @@
 
     <div id="unlocked-view" style="display: none;">
       <ul id="credential-list" class="credential-list"></ul>
+
+      <div class="mapping-section">
+        <div id="toggle-mapping-btn" class="mapping-title">
+          <span>⚙ Custom Field Mapping</span>
+          <span id="mapping-arrow">▼</span>
+        </div>
+
+        <div id="mapping-container" class="mapping-box" style="display: none;">
+          <div class="mapping-field">
+            <label for="username-selector-input">Username Field Selector:</label>
+            <input type="text" id="username-selector-input" placeholder="e.g. #custom_user_id or input[name='user']">
+          </div>
+          <div class="mapping-field">
+            <label for="password-selector-input">Password Field Selector:</label>
+            <input type="text" id="password-selector-input" placeholder="e.g. #custom_pass_id or input[name='pass']">
+          </div>
+          <button id="save-mapping-btn" class="btn-save-mapping">Save Domain Override</button>
+          <button id="clear-mapping-btn" class="btn-clear-mapping" style="display: none;">Reset Domain Override</button>
+        </div>
+      </div>
     </div>
   </div>
 

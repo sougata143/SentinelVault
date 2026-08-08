@@ -14,7 +14,7 @@ class EmergencyAccessScreen extends StatefulWidget {
     super.key,
     required this.currentEmail,
     required this.vaultKey,
-    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
+    this.sharingBaseUrl = '',
     this.httpClient,
   });
 
@@ -23,6 +23,8 @@ class EmergencyAccessScreen extends StatefulWidget {
 }
 
 class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
+  String get _effectiveSharingBaseUrl =>
+      widget.sharingBaseUrl.isNotEmpty ? widget.sharingBaseUrl : ApiConfig.sharingBaseUrl;
   final _emailController = TextEditingController();
   int _selectedWaitingPeriodHours = 72; // Default 72 hours (3 days)
   bool _isLoading = true;
@@ -52,7 +54,7 @@ class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
       
       // Fetch contacts designated by owner
       final contactsRes = await client.get(
-        Uri.parse('${widget.sharingBaseUrl}/emergency/contacts/owner?ownerUserId=${widget.currentEmail}'),
+        Uri.parse('$_effectiveSharingBaseUrl/emergency/contacts/owner?ownerUserId=${widget.currentEmail}'),
       );
       if (contactsRes.statusCode == 200) {
         final data = jsonDecode(contactsRes.body);
@@ -61,7 +63,7 @@ class _EmergencyAccessScreenState extends State<EmergencyAccessScreen> {
 
       // Fetch pending requests for owner
       final reqsRes = await client.get(
-        Uri.parse('${widget.sharingBaseUrl}/emergency/requests/pending?ownerUserId=${widget.currentEmail}'),
+        Uri.parse('$_effectiveSharingBaseUrl/emergency/requests/pending?ownerUserId=${widget.currentEmail}'),
       );
       if (reqsRes.statusCode == 200) {
         final data = jsonDecode(reqsRes.body);

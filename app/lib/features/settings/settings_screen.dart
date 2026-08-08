@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import '../export/account_data_export_service.dart';
+import '../../platform/android_autofill_bridge.dart';
 import '../../theme/theme.dart';
 import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
 import '../emergency/emergency_access_screen.dart';
 import 'duress_setup_screen.dart';
+import 'manage_devices_screen.dart';
 
 class AppSettings {
   static int clipboardTimeoutSeconds = 30;
@@ -46,8 +49,8 @@ class SettingsScreen extends StatefulWidget {
     this.onLock,
     this.onLogout,
     this.currentEmail = 'auditor@sentinelvault.io',
-    this.syncBaseUrl = ApiConfig.syncBaseUrl,
-    this.sharingBaseUrl = ApiConfig.sharingBaseUrl,
+    this.syncBaseUrl = '',
+    this.sharingBaseUrl = '',
     this.httpClient,
     this.isWebOverride = kIsWeb,
     this.cryptoOverride,
@@ -63,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// null means "Never"
   late int? _autoLockTimeout;
   late bool _biometricEnabled;
+  late TextEditingController _serverUrlController;
 
   bool _hasRecoveryKey = false;
   bool _isCheckingRecovery = true;
@@ -74,8 +78,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _autoLock = AppSettings.autoLockEnabled;
     _autoLockTimeout = AppSettings.autoLockNever ? null : AppSettings.autoLockTimeoutMinutes;
     _biometricEnabled = AppSettings.biometricEnabled;
+    _serverUrlController = TextEditingController(text: ApiConfig.customServerUrl ?? '');
     _checkRecoveryStatus();
   }
+
+  @override
+  void dispose() {
+    _serverUrlController.dispose();
+    super.dispose();
+  }
+
+  String get _effectiveSyncBaseUrl =>
+      widget.syncBaseUrl.isNotEmpty ? widget.syncBaseUrl : ApiConfig.syncBaseUrl;
+  String get _effectiveSharingBaseUrl =>
+      widget.sharingBaseUrl.isNotEmpty ? widget.sharingBaseUrl : ApiConfig.sharingBaseUrl;
 
   Future<void> _checkRecoveryStatus() async {
     if (!mounted) return;
@@ -84,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       final syncClient = HttpSyncApiClient(
-        baseUrl: widget.syncBaseUrl,
+        baseUrl: _effectiveSyncBaseUrl,
         userId: widget.currentEmail,
         httpClient: widget.httpClient,
       );
@@ -285,6 +301,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showDownloadMyDataDialog() {
+    final passwordController = TextEditingController();
+    String? errorMsg;
+    bool isExporting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surfaceColor,
+          title: const Text('Download My Data (Account Export)', style: TextStyle(color: Colors.white)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This exports a complete structured JSON archive containing:\n'
+                  '• Account Profile & Subscription Tier\n'
+                  '• Vault Items & Passwords\n'
+                  '• Active Device & Session History\n'
+                  '• Active Sharing Relationships\n'
+                  '• Security Audit Log History',
+                  style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningColor.withAlpha(25),
+                    border: Border.all(color: AppTheme.warningColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '⚠️ WARNING: The exported file contains sensitive account data. Store the file in a secure, encrypted location.',
+                    style: TextStyle(color: AppTheme.warningColor, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('export-master-password-input'),
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Re-enter Master Password',
+                    errorText: errorMsg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isExporting ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              key: const Key('confirm-download-my-data-btn'),
+              onPressed: isExporting
+                  ? null
+                  : () async {
+                      if (passwordController.text.isEmpty) {
+                        setDialogState(() => errorMsg = 'Master Password is required');
+                        return;
+                      }
+                      setDialogState(() {
+                        isExporting = true;
+                        errorMsg = null;
+                      });
+
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(dialogCtx);
+
+                      final exportBundle = await AccountDataExportService.generateAccountDataExport(
+                        userEmail: widget.currentEmail,
+                        localVaultItems: const [],
+                        sharingBaseUrl: _effectiveSharingBaseUrl,
+                        httpClient: widget.httpClient,
+                      );
+
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Account export generated successfully (${(exportBundle['vaultItems'] as List).length} items).'),
+                        ),
+                      );
+                    },
+              child: const Text('Generate Export Archive'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -298,6 +409,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Self-Hosted Server Connection Settings Section
+          _buildSectionHeader('Server Connection (Self-Hosting)'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.dns_outlined, color: AppTheme.primaryColor, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Self-Hosted Backend URL',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Point SentinelVault client to your self-hosted backend instance (e.g. https://vault.mycompany.com).',
+                    style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('settings-server-url-input'),
+                    controller: _serverUrlController,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. https://vault.mycompany.com',
+                      labelText: 'Custom Server Base URL',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          key: const Key('save-server-url-btn'),
+                          onPressed: () {
+                            setState(() {
+                              ApiConfig.customServerUrl = _serverUrlController.text.trim();
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  ApiConfig.customServerUrl != null && ApiConfig.customServerUrl!.isNotEmpty
+                                      ? 'Custom server URL updated: ${ApiConfig.customServerUrl}'
+                                      : 'Server URL reset to defaults.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.save, size: 16),
+                          label: const Text('Save Server URL'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        key: const Key('reset-server-url-btn'),
+                        onPressed: () {
+                          setState(() {
+                            ApiConfig.customServerUrl = null;
+                            _serverUrlController.clear();
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Server URL reset to default local/cloud hosts.')),
+                          );
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // Emergency & Inheritance Access Section
           _buildSectionHeader('Emergency & Inheritance'),
           Card(
@@ -317,12 +510,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (_) => EmergencyAccessScreen(
                       currentEmail: widget.currentEmail,
                       vaultKey: VaultLockManager.instance.vaultKey ?? List<int>.filled(32, 0),
-                      sharingBaseUrl: widget.sharingBaseUrl,
+                      sharingBaseUrl: _effectiveSharingBaseUrl,
                       httpClient: widget.httpClient,
                     ),
                   ),
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // System-Wide Autofill Section
+          _buildSectionHeader('System-Wide Autofill Framework'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              key: const Key('android-autofill-settings-tile'),
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.primaryColor,
+                child: Icon(Icons.phonelink_setup_outlined, color: Colors.white),
+              ),
+              title: const Text('System-Wide Android Autofill'),
+              subtitle: const Text('Fill credentials natively inside third-party apps & browsers'),
+              trailing: const Icon(Icons.open_in_new, color: AppTheme.primaryColor),
+              onTap: () {
+                AndroidAutofillBridge.requestSetAutofillService();
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Data Portability & Account Export Section
+          _buildSectionHeader('Data Portability & Privacy'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              key: const Key('download-my-data-tile'),
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.primaryColor,
+                child: Icon(Icons.download_for_offline_outlined, color: Colors.white),
+              ),
+              title: const Text('Download My Data (Account Export)'),
+              subtitle: const Text('Export complete structured archive of profile, items, sessions, and audit logs'),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+              onTap: _showDownloadMyDataDialog,
             ),
           ),
           const SizedBox(height: 20),
@@ -546,7 +779,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       MaterialPageRoute(
                         builder: (_) => ShamirRecoverySetupScreen(
                           currentEmail: widget.currentEmail,
-                          syncBaseUrl: widget.syncBaseUrl,
+                          syncBaseUrl: _effectiveSyncBaseUrl,
                           httpClient: widget.httpClient ?? http.Client(),
                         ),
                       ),
@@ -584,6 +817,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Column(
               children: [
+                ListTile(
+                  key: const Key('settings-manage-devices-tile'),
+                  leading: const Icon(Icons.devices, color: AppTheme.primaryColor),
+                  title: const Text('Manage Devices & Sessions'),
+                  subtitle: const Text('View active logins and revoke remote device sessions'),
+                  trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ManageDevicesScreen(
+                          authBaseUrl: ApiConfig.authBaseUrl,
+                          httpClient: widget.httpClient,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(color: Colors.white10, height: 1),
                 ListTile(
                   key: const Key('settings-lock-tile'),
                   leading: const Icon(Icons.lock_outline, color: Colors.orange),

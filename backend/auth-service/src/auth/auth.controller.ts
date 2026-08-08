@@ -1,5 +1,6 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Query, Headers, UseGuards, Req, Delete, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard, AuthenticatedRequest } from '../common/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -9,8 +10,9 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   public async register(
     @Body() body: { username: string; salt: string; verifier: string },
+    @Headers('user-agent') userAgent?: string,
   ): Promise<{ success: boolean; token: string }> {
-    return await this.authService.register(body.username, body.salt, body.verifier);
+    return await this.authService.register(body.username, body.salt, body.verifier, userAgent);
   }
 
   @Get('users/lookup')
@@ -43,8 +45,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public async loginStep2(
     @Body() body: { challengeId: string; M1: string },
+    @Headers('user-agent') userAgent?: string,
   ): Promise<{ serverEvidence: string; token?: string; mfaRequired?: boolean; mfaToken?: string; allowedMethods?: string[] }> {
-    return await this.authService.loginStep2(body.challengeId, body.M1);
+    return await this.authService.loginStep2(body.challengeId, body.M1, userAgent);
   }
 
   // ── TOTP Endpoints ──────────────────────────────────────────────────────
@@ -69,8 +72,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public async verifyTotp(
     @Body() body: { mfaToken: string; code: string },
+    @Headers('user-agent') userAgent?: string,
   ): Promise<{ token: string }> {
-    return await this.authService.verifyTotp(body.mfaToken, body.code);
+    return await this.authService.verifyTotp(body.mfaToken, body.code, userAgent);
   }
 
   // ── WebAuthn Endpoints ──────────────────────────────────────────────────
@@ -103,8 +107,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public async verifyWebAuthnLogin(
     @Body() body: { mfaToken: string; response: any },
+    @Headers('user-agent') userAgent?: string,
   ): Promise<{ token: string }> {
-    return await this.authService.verifyWebAuthnLogin(body.mfaToken, body.response);
+    return await this.authService.verifyWebAuthnLogin(body.mfaToken, body.response, userAgent);
   }
 
   // ── Primary Passkey Endpoints ──────────────────────────────────────────
@@ -137,8 +142,33 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public async verifyPasskeyLogin(
     @Body() body: { challenge: string; response: any },
+    @Headers('user-agent') userAgent?: string,
   ): Promise<{ token: string }> {
-    return await this.authService.verifyPasskeyLogin(body.challenge, body.response);
+    return await this.authService.verifyPasskeyLogin(body.challenge, body.response, userAgent);
+  }
+
+  // ── Session Management Endpoints ──────────────────────────────────────────
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  public async getSessions(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<any[]> {
+    return await this.authService.getUserSessions(req.user!.id, req.user!.jti);
+  }
+
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  public async revokeSession(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') sessionIdToRevoke: string,
+  ): Promise<{ success: boolean }> {
+    return await this.authService.revokeSession(
+      req.user!.id,
+      req.user!.jti,
+      sessionIdToRevoke,
+    );
   }
 
   // ── Audit Log Endpoints ──────────────────────────────────────────────────
@@ -164,3 +194,4 @@ export class AuthController {
     return { success: true, id: event.id };
   }
 }
+

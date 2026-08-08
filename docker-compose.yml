@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -11,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel_admin} -d ${POSTGRES_DB:-sentinelvault}" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-sentinel_admin} -d $${POSTGRES_DB:-sentinelvault}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -43,9 +45,7 @@ services:
       - ./backend/auth-service:/app
       - auth_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then
-               npm install && touch node_modules/.install_stamp && rm -rf dist;
-             fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -77,9 +77,7 @@ services:
       - ./backend/sync-api:/app
       - sync_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then
-               npm install && touch node_modules/.install_stamp && rm -rf dist;
-             fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -111,9 +109,7 @@ services:
       - ./backend/security-analysis-service:/app
       - security_analysis_node_modules:/app/node_modules
     command: >-
-      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then
-               npm install && touch node_modules/.install_stamp && rm -rf dist;
-             fi && npm run start:dev"
+      sh -c "if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -145,19 +141,8 @@ services:
       - ./backend/sharing-service:/app
       - sharing_node_modules:/app/node_modules
       - sharing_npm_cache:/root/.npm
-    # sharing-service pulls in PQC crypto packages (X25519 + ML-KEM-768,
-    # Ed25519 + ML-DSA-65 per the key-directory/sharing design) that may ship
-    # native or WASM postinstall build steps. node:20-alpine has no build
-    # toolchain by default, which can surface as an EACCES on npm's cache/build
-    # dir rather than a clear "command not found." Installing the toolchain and
-    # pinning HOME/npm cache to a writable, persistent location addresses the
-    # most common cause. If EACCES persists, capture the exact failing path
-    # from the error and we'll target it directly.
     command: >-
-      sh -c "apk add --no-cache python3 make g++ >/dev/null &&
-             if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then
-               npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist;
-             fi && npm run start:dev"
+      sh -c "apk add --no-cache python3 make g++ >/dev/null && if [ ! -f node_modules/.install_stamp ] || [ package.json -nt node_modules/.install_stamp ]; then npm install --legacy-peer-deps && touch node_modules/.install_stamp && rm -rf dist; fi && npm run start:dev"
     env_file:
       - .env
     environment:
@@ -180,6 +165,31 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - sentinelvault-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:3001}
+        - SYNC_BASE_URL=${SYNC_BASE_URL:-http://localhost:3002}
+        - SECURITY_BASE_URL=${SECURITY_BASE_URL:-http://localhost:3003}
+        - SHARING_BASE_URL=${SHARING_BASE_URL:-http://localhost:3004}
+    container_name: sentinelvault-frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      sync-api:
+        condition: service_healthy
+      security-analysis-service:
+        condition: service_healthy
+      sharing-service:
+        condition: service_healthy
     networks:
       - sentinelvault-net
 

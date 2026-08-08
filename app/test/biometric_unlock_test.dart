@@ -101,10 +101,13 @@ void main() {
       expect(switchWidget.value, false);
 
       // Toggle switch ON
-      await tester.ensureVisible(switchFinder);
-      await tester.tap(switchFinder);
-      await tester.pump();
-      await tester.idle();
+      await tester.dragUntilVisible(
+        switchFinder,
+        find.byType(ListView),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(switchFinder, warnIfMissed: false);
       await tester.pumpAndSettle();
 
       // Verify setting state and VaultLockManager cache
