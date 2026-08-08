@@ -27,7 +27,6 @@ class _SharedVaultsScreenState extends State<SharedVaultsScreen> {
 
   bool _isLoading = true;
   List<SharedVault> _vaults = [];
-  String? _errorMessage;
 
   @override
   void initState() {
@@ -38,7 +37,6 @@ class _SharedVaultsScreenState extends State<SharedVaultsScreen> {
   Future<void> _fetchSharedVaults() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -129,7 +127,7 @@ class _SharedVaultsScreenState extends State<SharedVaultsScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<SharedVaultRole>(
-                value: selectedRole,
+                initialValue: selectedRole,
                 dropdownColor: AppTheme.surfaceColor,
                 decoration: const InputDecoration(labelText: 'Member Role'),
                 items: SharedVaultRole.values
@@ -288,6 +286,7 @@ class _SharedVaultsScreenState extends State<SharedVaultsScreen> {
                   headers: {'Authorization': 'Bearer ${widget.currentEmail}'},
                 );
               } catch (_) {}
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Member $memberUserId removed. Shared Vault Key rotated to v${vault.keyVersion + 1}.')),
               );

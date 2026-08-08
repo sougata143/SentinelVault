@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import '../export/account_data_export_service.dart';
 import '../../platform/android_autofill_bridge.dart';
 import '../../theme/theme.dart';
 import '../auth/biometric_vault_manager.dart';
@@ -300,6 +301,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showDownloadMyDataDialog() {
+    final passwordController = TextEditingController();
+    String? errorMsg;
+    bool isExporting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surfaceColor,
+          title: const Text('Download My Data (Account Export)', style: TextStyle(color: Colors.white)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This exports a complete structured JSON archive containing:\n'
+                  '• Account Profile & Subscription Tier\n'
+                  '• Vault Items & Passwords\n'
+                  '• Active Device & Session History\n'
+                  '• Active Sharing Relationships\n'
+                  '• Security Audit Log History',
+                  style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningColor.withAlpha(25),
+                    border: Border.all(color: AppTheme.warningColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '⚠️ WARNING: The exported file contains sensitive account data. Store the file in a secure, encrypted location.',
+                    style: TextStyle(color: AppTheme.warningColor, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('export-master-password-input'),
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Re-enter Master Password',
+                    errorText: errorMsg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isExporting ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              key: const Key('confirm-download-my-data-btn'),
+              onPressed: isExporting
+                  ? null
+                  : () async {
+                      if (passwordController.text.isEmpty) {
+                        setDialogState(() => errorMsg = 'Master Password is required');
+                        return;
+                      }
+                      setDialogState(() {
+                        isExporting = true;
+                        errorMsg = null;
+                      });
+
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(dialogCtx);
+
+                      final exportBundle = await AccountDataExportService.generateAccountDataExport(
+                        userEmail: widget.currentEmail,
+                        localVaultItems: const [],
+                        sharingBaseUrl: _effectiveSharingBaseUrl,
+                        httpClient: widget.httpClient,
+                      );
+
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Account export generated successfully (${(exportBundle['vaultItems'] as List).length} items).'),
+                        ),
+                      );
+                    },
+              child: const Text('Generate Export Archive'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -441,6 +537,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () {
                 AndroidAutofillBridge.requestSetAutofillService();
               },
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Data Portability & Account Export Section
+          _buildSectionHeader('Data Portability & Privacy'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              key: const Key('download-my-data-tile'),
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.primaryColor,
+                child: Icon(Icons.download_for_offline_outlined, color: Colors.white),
+              ),
+              title: const Text('Download My Data (Account Export)'),
+              subtitle: const Text('Export complete structured archive of profile, items, sessions, and audit logs'),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.primaryColor),
+              onTap: _showDownloadMyDataDialog,
             ),
           ),
           const SizedBox(height: 20),

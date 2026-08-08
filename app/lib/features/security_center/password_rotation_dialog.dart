@@ -27,10 +27,10 @@ class PasswordRotationDialog extends StatefulWidget {
 class _PasswordRotationDialogState extends State<PasswordRotationDialog> {
   late String _generatedPassword;
   int _length = 20;
-  bool _includeUppercase = true;
-  bool _includeLowercase = true;
-  bool _includeNumbers = true;
-  bool _includeSymbols = true;
+  final bool _includeUppercase = true;
+  final bool _includeLowercase = true;
+  final bool _includeNumbers = true;
+  final bool _includeSymbols = true;
 
   bool _siteChangedConfirmed = false;
   bool _isSaving = false;
