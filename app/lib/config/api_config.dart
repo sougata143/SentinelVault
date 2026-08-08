@@ -34,6 +34,6 @@ abstract class ApiConfig {
       return base;
     }
 
-    return '$base:$port';
+    return '$base$pathSegment';
   }
 }

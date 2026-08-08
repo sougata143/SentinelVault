@@ -15,6 +15,58 @@ SentinelVault is a hybrid, offline-first, zero-knowledge password manager and se
 
 ---
 
+## 🚀 Unified Build & Container Deployment
+
+SentinelVault features an automated build suite (`build-all.bat` / `build-all.sh`) and unified Docker Compose orchestration (`docker-compose.yml`) that compiles the native Rust crypto core to WebAssembly, packages the static Flutter Web client into an optimized Nginx container, and runs all 4 NestJS backend microservices alongside PostgreSQL and Redis.
+
+### Quick Start (Local Docker Compose)
+
+#### Option 1: Automated Script + Docker Compose (Recommended)
+
+1. **Run the Unified Build Script**:
+   - **Windows**:
+     ```cmd
+     build-all.bat
+     ```
+   - **Linux / macOS**:
+     ```bash
+     chmod +x build-all.sh
+     ./build-all.sh
+     ```
+   *This compiles `native/crypto_core` to `wasm32-unknown-unknown`, bundles Web assets, and containerizes the 5 service images (`sentinelvault-frontend`, `sentinelvault-auth`, `sentinelvault-sync`, `sentinelvault-security-analysis`, `sentinelvault-sharing`).*
+
+2. **Start the Stack**:
+   ```bash
+   docker compose up -d
+   ```
+
+3. **Access Services**:
+   - **Web Client Application**: [http://localhost:8080](http://localhost:8080) (Nginx serving Flutter Web SPA + WASM crypto core)
+   - **Auth Service**: `http://localhost:3001` (Nginx proxies `http://localhost:8080/auth/`)
+   - **Sync Service**: `http://localhost:3002` (Nginx proxies `http://localhost:8080/sync/`)
+   - **Security Analysis Service**: `http://localhost:3003` (Nginx proxies `http://localhost:8080/security/`)
+   - **Sharing Service**: `http://localhost:3004` (Nginx proxies `http://localhost:8080/sharing/`)
+
+#### Option 2: Direct Build & Run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+### Network Architecture & Reverse Proxying
+
+The Nginx container (`sentinelvault-frontend` on port `8080`) handles both static client serving and API reverse-proxying to avoid browser CORS restrictions and allow unified single-port hosting:
+
+- `/` -> Static Flutter Web Assets (`/usr/share/nginx/html`)
+- `/auth/` -> `http://auth-service:3001/auth/`
+- `/sync/` -> `http://sync-api:3002/sync/`
+- `/security/` -> `http://security-analysis-service:3003/security/`
+- `/sharing/` -> `http://sharing-service:3004/sharing/`
+
+---
+
 ## 🏗️ System Architecture
 
 ```

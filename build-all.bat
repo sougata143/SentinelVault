@@ -49,7 +49,7 @@ docker build ^
   --build-arg SYNC_BASE_URL=http://localhost:3002 ^
   -t sentinelvault-frontend:latest ^
   -t sentinelvault-frontend:3.12.2 ^
-  -f Dockerfile-v7 .
+  -f Dockerfile .
 if %ERRORLEVEL% neq 0 goto :failed
 echo %GREEN%^o^/ Flutter Web Frontend containerized successfully.%NC%
 
