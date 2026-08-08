@@ -77,7 +77,7 @@ class _ShareLinksManagerScreenState extends State<ShareLinksManagerScreen> {
 
     try {
       final client = widget.httpClient ?? http.Client();
-      final uri = Uri.parse('$_effectiveSharingBaseUrl/sharing/share-links/my-links/all');
+      final uri = Uri.parse('$_effectiveSharingBaseUrl/share-links/my-links/all');
 
       final response = await client.get(
         uri,
@@ -109,7 +109,7 @@ class _ShareLinksManagerScreenState extends State<ShareLinksManagerScreen> {
   Future<void> _revokeLink(String shareId) async {
     try {
       final client = widget.httpClient ?? http.Client();
-      final uri = Uri.parse('$_effectiveSharingBaseUrl/sharing/share-links/$shareId/revoke');
+      final uri = Uri.parse('$_effectiveSharingBaseUrl/share-links/$shareId/revoke');
 
       final response = await client.post(
         uri,

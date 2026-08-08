@@ -47,7 +47,7 @@ class _RecipientShareViewScreenState extends State<RecipientShareViewScreen> {
 
     try {
       final client = widget.httpClient ?? http.Client();
-      final uri = Uri.parse('$_effectiveSharingBaseUrl/sharing/share-links/${widget.shareId}');
+      final uri = Uri.parse('$_effectiveSharingBaseUrl/share-links/${widget.shareId}');
 
       // Unauthenticated GET request to fetch ciphertext payload
       final response = await client.get(uri);

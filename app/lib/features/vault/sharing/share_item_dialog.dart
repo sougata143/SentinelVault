@@ -53,7 +53,7 @@ class _ShareItemDialogState extends State<ShareItemDialog> {
 
       // 2. Post ONLY ciphertext & metadata to server
       final client = widget.httpClient ?? http.Client();
-      final uri = Uri.parse('$_effectiveSharingBaseUrl/sharing/share-links');
+      final uri = Uri.parse('$_effectiveSharingBaseUrl/share-links');
 
       final response = await client.post(
         uri,
