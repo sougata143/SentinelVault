@@ -49,6 +49,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       AUTH_PORT: ${AUTH_PORT:-3001}
     ports:
       - "${AUTH_PORT:-3001}:${AUTH_PORT:-3001}"
@@ -81,6 +82,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SYNC_PORT: ${SYNC_PORT:-3002}
     ports:
       - "${SYNC_PORT:-3002}:${SYNC_PORT:-3002}"
@@ -113,6 +115,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SECURITY_ANALYSIS_PORT: ${SECURITY_ANALYSIS_PORT:-3003}
     ports:
       - "${SECURITY_ANALYSIS_PORT:-3003}:${SECURITY_ANALYSIS_PORT:-3003}"
@@ -148,6 +151,7 @@ services:
       npm_config_cache: /root/.npm
       DATABASE_URL: postgres://${POSTGRES_USER:-sentinel_admin}:${POSTGRES_PASSWORD:-sentinel_password_change_me}@postgres:5432/${POSTGRES_DB:-sentinelvault}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-sentinelvault_jwt_secret_key_change_in_production}
       SHARING_PORT: ${SHARING_PORT:-3004}
     ports:
       - "${SHARING_PORT:-3004}:${SHARING_PORT:-3004}"

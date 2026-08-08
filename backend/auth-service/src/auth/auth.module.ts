@@ -31,7 +31,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
        *  It is shared across all four backend services so each can verify tokens
        *  issued here without an extra secret-distribution step. */
       useFactory: () => ({
-        secret: process.env.JWT_SECRET,
+        secret: process.env.JWT_SECRET || 'sentinelvault_jwt_secret_key_change_in_production',
         signOptions: { expiresIn: '24h' },
       }),
     }),

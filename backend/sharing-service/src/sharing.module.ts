@@ -28,7 +28,7 @@ import { HealthController } from './health.controller';
     JwtModule.registerAsync({
       global: true,
       useFactory: () => ({
-        secret: process.env.JWT_SECRET,
+        secret: process.env.JWT_SECRET || 'sentinelvault_jwt_secret_key_change_in_production',
         signOptions: { expiresIn: '24h' },
       }),
     }),
