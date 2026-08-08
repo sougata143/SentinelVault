@@ -1,0 +1,205 @@
+version: "3.8"
+
+services:
+  # --- Network Edge: Reverse Proxy & SSL Termination ---
+  traefik:
+    image: traefik:v3.0
+    container_name: sentinelvault-gateway
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt_certs:/letsencrypt
+    restart: always
+    networks:
+      - sentinelvault-net
+
+  # --- Flutter Web Frontend ---
+  frontend:
+    image: sentinelvault-frontend:latest
+    container_name: sentinelvault-ui
+    build:
+      context: .
+      dockerfile: Dockerfile-v2
+      args:
+        - AUTH_BASE_URL=https://auth.${DOMAIN_NAME}
+        - SYNC_BASE_URL=https://sync.${DOMAIN_NAME}
+        - SECURITY_BASE_URL=https://security.${DOMAIN_NAME}
+        - SHARING_BASE_URL=https://sharing.${DOMAIN_NAME}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
+    restart: always
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    networks:
+      - sentinelvault-net
+
+  # --- Microservice: Authentication & Passkeys ---
+  auth-service:
+    image: sentinelvault-auth:latest
+    container_name: sentinelvault-auth
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      AUTH_PORT: 3001
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`auth.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.routers.auth.tls.certresolver=myresolver"
+      - "traefik.http.services.auth.loadbalancer.server.port=3001"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinelvault-net
+
+  # --- Microservice: Sync API (Zero-Knowledge Store) ---
+  sync-api:
+    image: sentinelvault-sync:latest
+    container_name: sentinelvault-sync
+    build:
+      context: ./backend/sync-api
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      SYNC_PORT: 3002
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sync.rule=Host(`sync.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.sync.entrypoints=websecure"
+      - "traefik.http.routers.sync.tls.certresolver=myresolver"
+      - "traefik.http.services.sync.loadbalancer.server.port=3002"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinelvault-net
+
+  # --- Microservice: Security Analysis (Gemini Integration) ---
+  security-analysis-service:
+    image: sentinelvault-security-analysis:latest
+    container_name: sentinelvault-security-analysis
+    build:
+      context: ./backend/security-analysis-service
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      SECURITY_ANALYSIS_PORT: 3003
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.security.rule=Host(`security.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.security.entrypoints=websecure"
+      - "traefik.http.routers.security.tls.certresolver=myresolver"
+      - "traefik.http.services.security.loadbalancer.server.port=3003"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinelvault-net
+
+  # --- Microservice: PQC Sharing Engine & Key Directory ---
+  sharing-service:
+    image: sentinelvault-sharing:latest
+    container_name: sentinelvault-sharing
+    build:
+      context: ./backend/sharing-service
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      SHARING_PORT: 3004
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sharing.rule=Host(`sharing.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.sharing.entrypoints=websecure"
+      - "traefik.http.routers.sharing.tls.certresolver=myresolver"
+      - "traefik.http.services.sharing.loadbalancer.server.port=3004"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinelvault-net
+
+  # --- Database State Tier ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinelvault-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelvault}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sentinel_admin -d sentinelvault" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    networks:
+      - sentinelvault-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinelvault-cache
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    networks:
+      - sentinelvault-net
+
+networks:
+  sentinelvault-net:
+    driver: bridge
+
+volumes:
+  letsencrypt_certs:
+  postgres_prod_data:
+  redis_prod_data:
