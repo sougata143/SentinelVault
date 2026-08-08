@@ -43,6 +43,19 @@
                 android:name="android.service.credentials.credential_provider"
                 android:resource="@xml/credential_provider" />
         </service>
+
+        <!-- SentinelVault System-Wide Android Autofill Service -->
+        <service
+            android:name=".SentinelAutofillService"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service_config" />
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

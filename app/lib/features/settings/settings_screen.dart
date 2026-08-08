@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:core/core.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import '../../platform/android_autofill_bridge.dart';
 import '../../theme/theme.dart';
 import '../auth/biometric_vault_manager.dart';
 import '../auth/shamir_recovery_setup_screen.dart';
@@ -418,6 +419,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // System-Wide Autofill Section
+          _buildSectionHeader('System-Wide Autofill Framework'),
+          Card(
+            color: AppTheme.surfaceColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              key: const Key('android-autofill-settings-tile'),
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.primaryColor,
+                child: Icon(Icons.phonelink_setup_outlined, color: Colors.white),
+              ),
+              title: const Text('System-Wide Android Autofill'),
+              subtitle: const Text('Fill credentials natively inside third-party apps & browsers'),
+              trailing: const Icon(Icons.open_in_new, color: AppTheme.primaryColor),
+              onTap: () {
+                AndroidAutofillBridge.requestSetAutofillService();
               },
             ),
           ),
