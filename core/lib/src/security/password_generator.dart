@@ -2,9 +2,16 @@ import 'dart:math';
 
 /// Utility for generating cryptographically secure, high-entropy passwords.
 class PasswordGenerator {
+  /// Uppercase character set used in password generation.
   static const String uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  /// Lowercase character set used in password generation.
   static const String lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
+
+  /// Numeric character set used in password generation.
   static const String numberChars = '0123456789';
+
+  /// Symbol character set used in password generation.
   static const String symbolChars = '!@#\$%^&*()_+-=[]{}|;:,.<>?';
 
   /// Generates a random password of specified [length] matching character rules.
