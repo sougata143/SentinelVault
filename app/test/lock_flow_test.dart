@@ -99,7 +99,11 @@ void main() {
 
       // Scroll to "Lock Vault Now" tile and tap it
       final lockTile = find.byKey(const Key('settings-lock-tile'));
-      await tester.scrollUntilVisible(lockTile, 100.0);
+      await tester.dragUntilVisible(
+        lockTile,
+        find.byType(ListView),
+        const Offset(0, -300),
+      );
       await tester.pumpAndSettle();
       expect(lockTile, findsOneWidget);
       await tester.tap(lockTile);
@@ -139,7 +143,11 @@ void main() {
 
       // Scroll to "Log Out" tile and tap it
       final logoutTile = find.byKey(const Key('settings-logout-tile'));
-      await tester.scrollUntilVisible(logoutTile, 100.0);
+      await tester.dragUntilVisible(
+        logoutTile,
+        find.byType(ListView),
+        const Offset(0, -300),
+      );
       await tester.pumpAndSettle();
       expect(logoutTile, findsOneWidget);
       await tester.tap(logoutTile);

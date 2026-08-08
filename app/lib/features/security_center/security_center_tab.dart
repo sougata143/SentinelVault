@@ -55,83 +55,74 @@ class _SecurityCenterTabState extends State<SecurityCenterTab> {
     final encryptedItems = widget.db.getAllItems();
     final crypto = VaultCrypto();
 
+    final List<Future<VaultItem?>> futures = encryptedItems.map((enc) async {
+      try {
+        return await VaultItem.decrypt(enc, widget.vaultKey, crypto);
+      } catch (_) {
+        return null;
+      }
+    }).toList();
+
+    final results = await Future.wait(futures);
+    final decryptedList = results.whereType<VaultItem>().toList();
+
     int total = 0;
     int weak = 0;
     int strong = 0;
     int reused = 0;
 
     final passwordCounts = <String, int>{};
-    final analyzedPasswords = <String>[];
+    final itemAnalysisList = <Map<String, dynamic>>[];
     final emailsInVault = <String>{};
 
-    // 1. Decrypt and analyze passwords client-side only
-    for (final enc in encryptedItems) {
-      try {
-        final item = await VaultItem.decrypt(enc, widget.vaultKey, crypto);
-        String passwordValue = '';
-        String username = '';
-        String title = item.title;
+    for (final item in decryptedList) {
+      String passwordValue = '';
+      String username = '';
+      String title = item.title;
 
-        if (item.fields is LoginFields) {
-          final lf = item.fields as LoginFields;
-          passwordValue = lf.password.plaintext ?? '';
-          username = lf.username;
-          if (username.contains('@')) {
-            emailsInVault.add(username.trim().toLowerCase());
-          }
-        } else if (item.fields is PasswordFields) {
-          final pf = item.fields as PasswordFields;
-          passwordValue = pf.password.plaintext ?? '';
+      if (item.fields is LoginFields) {
+        final lf = item.fields as LoginFields;
+        passwordValue = lf.password.plaintext ?? '';
+        username = lf.username;
+        if (username.contains('@')) {
+          emailsInVault.add(username.trim().toLowerCase());
         }
+      } else if (item.fields is PasswordFields) {
+        final pf = item.fields as PasswordFields;
+        passwordValue = pf.password.plaintext ?? '';
+      }
 
-        if (passwordValue.isNotEmpty) {
-          total++;
-          analyzedPasswords.add(passwordValue);
-          passwordCounts[passwordValue] = (passwordCounts[passwordValue] ?? 0) + 1;
-
-          final strength = PasswordAnalyzer.analyze(passwordValue, userInputs: [username, title]);
-          if (strength.score <= 2) {
-            weak++;
-          } else if (strength.score >= 3) {
-            strong++;
-          }
-        }
-      } catch (_) {
-        // Skip decryption errors gracefully
+      if (passwordValue.isNotEmpty) {
+        total++;
+        passwordCounts[passwordValue] = (passwordCounts[passwordValue] ?? 0) + 1;
+        itemAnalysisList.add({
+          'password': passwordValue,
+          'username': username,
+          'title': title,
+        });
       }
     }
 
-    // Calculate reused passwords count
-    for (final pwd in analyzedPasswords) {
-      if ((passwordCounts[pwd] ?? 0) > 1) {
+    int strongUnique = 0;
+    for (final info in itemAnalysisList) {
+      final pwd = info['password'] as String;
+      final user = info['username'] as String;
+      final ttl = info['title'] as String;
+      final count = passwordCounts[pwd] ?? 0;
+
+      if (count > 1) {
         reused++;
       }
-    }
 
-    // Calculate health score: unique + strong passwords / total passwords
-    int strongUnique = 0;
-    for (final enc in encryptedItems) {
-      try {
-        final item = await VaultItem.decrypt(enc, widget.vaultKey, crypto);
-        String passwordValue = '';
-        String username = '';
-        String title = item.title;
-
-        if (item.fields is LoginFields) {
-          passwordValue = (item.fields as LoginFields).password.plaintext ?? '';
-          username = (item.fields as LoginFields).username;
-        } else if (item.fields is PasswordFields) {
-          passwordValue = (item.fields as PasswordFields).password.plaintext ?? '';
+      final strength = PasswordAnalyzer.analyze(pwd, userInputs: [user, ttl]);
+      if (strength.score <= 2) {
+        weak++;
+      } else if (strength.score >= 3) {
+        strong++;
+        if (count == 1) {
+          strongUnique++;
         }
-
-        if (passwordValue.isNotEmpty) {
-          final strength = PasswordAnalyzer.analyze(passwordValue, userInputs: [username, title]);
-          final isUnique = (passwordCounts[passwordValue] ?? 0) == 1;
-          if (strength.score >= 3 && isUnique) {
-            strongUnique++;
-          }
-        }
-      } catch (_) {}
+      }
     }
 
     final score = total == 0 ? 100 : ((strongUnique / total) * 100).round();

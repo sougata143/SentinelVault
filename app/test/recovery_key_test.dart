@@ -278,10 +278,16 @@ void main() {
 
         // Setup Emergency Kit tile
         final tileFinder = find.byKey(const Key('settings-setup-emergency-kit-tile'));
+        await tester.dragUntilVisible(
+          tileFinder,
+          find.byType(ListView),
+          const Offset(0, -300),
+        );
+        await tester.pumpAndSettle();
         expect(tileFinder, findsOneWidget);
 
         await tester.tap(tileFinder);
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         expect(find.byType(AlertDialog), findsOneWidget);
         expect(find.byKey(const Key('generated-recovery-key-text')), findsOneWidget);
