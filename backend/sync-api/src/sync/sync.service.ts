@@ -172,12 +172,30 @@ export class SyncService {
 
     const whereConditions: Array<Record<string, any>> = [];
 
+    // Query wrapped_key_recipients table for folders shared with this user
+    let sharedFolderIds: string[] = [];
+    try {
+      const sharedRows = await this.vaultItemRepository.manager.query(
+        `SELECT DISTINCT folder_id FROM wrapped_key_recipients WHERE (LOWER(recipient_user_id) = $1 OR LOWER(recipient_user_id) = $2) AND revoked_at IS NULL`,
+        [normalizedUserId, userUuid],
+      );
+      if (Array.isArray(sharedRows)) {
+        sharedFolderIds = sharedRows.map((r: any) => r.folder_id).filter(Boolean);
+      }
+    } catch (_) {}
+
     if (vaultId) {
       whereConditions.push({ userId: normalizedUserId, vaultId });
       whereConditions.push({ userId: userUuid, vaultId });
+      if (sharedFolderIds.includes(vaultId)) {
+        whereConditions.push({ folderId: vaultId });
+      }
     } else {
       whereConditions.push({ userId: normalizedUserId });
       whereConditions.push({ userId: userUuid });
+      if (sharedFolderIds.length > 0) {
+        whereConditions.push({ folderId: In(sharedFolderIds) });
+      }
     }
 
     const items = await this.vaultItemRepository.find({

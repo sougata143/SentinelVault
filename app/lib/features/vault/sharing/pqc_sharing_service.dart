@@ -17,12 +17,14 @@ class PqcSharingService {
 
   /// Restores cached unwrapped folder keys from secure storage into memory.
   static Future<void> loadCachedFolderKeys([String? email]) async {
-    try {
-      final activeEmail = email ?? await _storage.read(key: 'active_user_email') ?? '';
-      if (activeEmail.isEmpty) return;
+    final activeEmail = (email != null && email.trim().isNotEmpty)
+        ? email.trim()
+        : await _storage.read(key: 'active_user_email').timeout(const Duration(milliseconds: 50), onTimeout: () => null) ?? '';
+    if (activeEmail.trim().isEmpty) return;
 
+    try {
       final keyPrefix = '${_prefix(activeEmail)}folder_key_';
-      final allKeys = await _storage.readAll();
+      final allKeys = await _storage.readAll().timeout(const Duration(milliseconds: 50), onTimeout: () => {});
       for (final entry in allKeys.entries) {
         if (entry.key.startsWith(keyPrefix)) {
           final folderId = entry.key.substring(keyPrefix.length);

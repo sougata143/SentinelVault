@@ -134,7 +134,7 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
                     folderId: targetId,
                     folderName: targetId,
                     currentFolderKey: folderKey,
-                    senderUserId: VaultLockManager.instance.sessionToken ?? 'current-user',
+                    senderUserId: 'current-user',
                     itemToShare: item,
                     db: widget.db,
                   ),

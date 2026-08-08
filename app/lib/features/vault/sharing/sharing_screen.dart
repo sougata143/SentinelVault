@@ -208,10 +208,12 @@ Uint8List safeBase64Decode(String input) {
       final bridge = getNativeCryptoBridge();
       final senderBundle = await bridge.pqcGenerateKeypairs();
 
+      final activeEmail = await _storage.read(key: 'active_user_email') ?? widget.senderUserId;
+
       final invitePayload = await _sharingManager.createSignedInvitation(
         folderId: _effectiveFolderId,
         recipientUserId: recipientUserId,
-        senderUserId: widget.senderUserId,
+        senderUserId: activeEmail,
         ed25519Priv: senderBundle.ed25519Priv,
         mldsaSeed: senderBundle.mldsaSeed,
         folderKey: Uint8List.fromList(widget.currentFolderKey),
@@ -294,6 +296,7 @@ Uint8List safeBase64Decode(String input) {
             version: currentVersion + 1,
             updatedAt: DateTime.now().toUtc(),
             isDeleted: false,
+            vaultId: targetFolderId,
             folderId: targetFolderId,
           );
 

@@ -61,6 +61,7 @@ void main() {
         );
 
         // Let _loadItems() and setState finish
+        await tester.pump(const Duration(milliseconds: 300));
         await tester.pumpAndSettle();
 
         // Verify all 5 items initially rendered
