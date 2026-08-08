@@ -384,7 +384,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       try {
                         final vaultKey = VaultLockManager.instance.vaultKey;
                         if (widget.db != null && vaultKey != null && vaultKey.isNotEmpty) {
-                          localItems = await widget.db!.getAllVaultItems(vaultKey);
+                          final encItems = widget.db!.getAllItems();
+                          final crypto = VaultCrypto();
+                          final futures = encItems.map((item) async {
+                            if (item.isDeleted) return null;
+                            try {
+                              return await VaultItem.decrypt(item, vaultKey, crypto);
+                            } catch (_) {
+                              return null;
+                            }
+                          });
+                          final results = await Future.wait(futures);
+                          localItems = results.whereType<VaultItem>().toList();
                         }
                       } catch (_) {}
 
