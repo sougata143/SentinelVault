@@ -63,30 +63,27 @@ class _VaultTabState extends State<VaultTab> {
 
   Future<void> _loadItems() async {
     final encItems = widget.db.getAllItems();
-    final List<VaultItem> decrypted = [];
+    final crypto = VaultCrypto();
 
-    for (final item in encItems) {
-      if (item.isDeleted && _selectedCategory != 'trash') continue;
+    final List<Future<VaultItem?>> futures = encItems.map((item) async {
+      if (item.isDeleted && _selectedCategory != 'trash') return null;
 
       // 1. Try decrypting with user's own vault key
       try {
-        final dec = await VaultItem.decrypt(item, widget.vaultKey, VaultCrypto());
-        decrypted.add(dec);
-        continue;
+        return await VaultItem.decrypt(item, widget.vaultKey, crypto);
       } catch (_) {}
 
       // 2. Try decrypting with unwrapped shared folder keys
-      bool folderDecrypted = false;
       for (final entry in PqcSharingService.unwrappedFolderKeys.entries) {
         try {
-          final dec = await VaultItem.decrypt(item, entry.value, VaultCrypto());
-          decrypted.add(dec);
-          folderDecrypted = true;
-          break;
+          return await VaultItem.decrypt(item, entry.value, crypto);
         } catch (_) {}
       }
-      if (folderDecrypted) continue;
-    }
+      return null;
+    }).toList();
+
+    final results = await Future.wait(futures);
+    final List<VaultItem> decrypted = results.whereType<VaultItem>().toList();
 
     if (mounted) {
       setState(() {
@@ -103,13 +100,6 @@ class _VaultTabState extends State<VaultTab> {
         }
       });
     }
-
-    try {
-      await PqcSharingService.syncSharedFoldersWithMe();
-      if (VaultSyncManager.isInitialized) {
-        await VaultSyncManager.instance.sync();
-      }
-    } catch (_) {}
   }
 
   void _toggleSelectionMode() {

@@ -35,6 +35,12 @@ class MockAuthClient implements AuthClient {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> getSessions(String jwtToken) async => [];
+
+  @override
+  Future<bool> revokeSession(String jwtToken, String sessionId) async => true;
+
+  @override
   List<int> hexToBytes(String hex) => [];
 }
 

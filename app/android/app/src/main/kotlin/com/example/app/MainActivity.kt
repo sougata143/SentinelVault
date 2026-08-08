@@ -58,9 +58,42 @@ class MainActivity : FlutterFragmentActivity() {
                     val sharedPrefs = getSharedPreferences("SecureStoragePrefs", Context.MODE_PRIVATE)
                     sharedPrefs.edit().putBoolean("mock_enrollment_changed", false).apply()
                     result.success(null)
-                else -> {
-                    result.notImplemented()
                 }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.app/autofill").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isAutofillServiceEnabled" -> {
+                    if (Build.VERSION_CODES.O <= Build.VERSION.SDK_INT) {
+                        val autofillManager = getSystemService(android.view.autofill.AutofillManager::class.java)
+                        result.success(autofillManager?.hasEnabledAutofillServices() == true)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "requestSetAutofillService" -> {
+                    if (Build.VERSION_CODES.O <= Build.VERSION.SDK_INT) {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+                        intent.data = android.net.Uri.parse("package:$packageName")
+                        startActivity(intent)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "syncVaultCredentialsForAutofill" -> {
+                    val credentialsJson = call.argument<String>("credentialsJson")
+                    if (credentialsJson != null) {
+                        val prefs = getSharedPreferences("sentinel_autofill_vault_cache", Context.MODE_PRIVATE)
+                        prefs.edit().putString("cached_vault_items", credentialsJson).apply()
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "credentialsJson was null", null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
 

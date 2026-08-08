@@ -43,6 +43,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Get a key's value.
+   */
+  async get(key: string): Promise<string | null> {
+    return this.client.get(key);
+  }
+
+  /**
    * Set a key with optional TTL (in seconds).
    */
   async set(key: string, value: string, mode?: 'EX', ttlSeconds?: number): Promise<'OK' | null> {

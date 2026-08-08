@@ -13,9 +13,12 @@ import {
   VerifyAuthenticationResponseOpts,
 } from '@simplewebauthn/server';
 import { Repository, QueryFailedError } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { AuditService } from './audit.service';
+import { SessionEntity } from './entities/session.entity';
+import { parseDeviceLabel } from './utils/user-agent-parser';
 
 interface LoginChallenge {
   username: string;
@@ -67,8 +70,103 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly auditService: AuditService,
+    @InjectRepository(SessionEntity)
+    private readonly sessionRepo: Repository<SessionEntity>,
   ) {
     this.serverSecret = crypto.randomBytes(32);
+  }
+
+  /**
+   * Creates and persists a new user session upon successful authentication.
+   */
+  public async createSession(
+    userId: string,
+    username: string,
+    loginMethod: string,
+    userAgent?: string,
+  ): Promise<{ session: SessionEntity; token: string }> {
+    const deviceLabel = parseDeviceLabel(userAgent);
+    const session = this.sessionRepo.create({
+      userId,
+      deviceLabel,
+      loginMethod,
+      isRevoked: false,
+    });
+    const savedSession = await this.sessionRepo.save(session);
+
+    const token = this.jwtService.sign(
+      { sub: userId, username, jti: savedSession.id },
+      { expiresIn: '24h' },
+    );
+
+    savedSession.tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    await this.sessionRepo.save(savedSession);
+
+    await this.auditService.logEvent({
+      userId,
+      eventType: 'session_created',
+      userAgent,
+      metadata: { sessionId: savedSession.id, deviceLabel, loginMethod },
+    });
+
+    return { session: savedSession, token };
+  }
+
+  /**
+   * Retrieves active non-revoked sessions for a given user.
+   */
+  public async getUserSessions(
+    userId: string,
+    currentJti?: string,
+  ): Promise<Array<{ id: string; deviceLabel: string; loginMethod: string; createdAt: Date; lastActiveAt: Date; isCurrent: boolean }>> {
+    const sessions = await this.sessionRepo.find({
+      where: { userId, isRevoked: false },
+      order: { lastActiveAt: 'DESC' },
+    });
+
+    return sessions.map((s) => ({
+      id: s.id,
+      deviceLabel: s.deviceLabel,
+      loginMethod: s.loginMethod,
+      createdAt: s.createdAt,
+      lastActiveAt: s.lastActiveAt,
+      isCurrent: s.id === currentJti,
+    }));
+  }
+
+  /**
+   * Revokes a specific session for a user.
+   */
+  public async revokeSession(
+    userId: string,
+    currentJti: string | undefined,
+    sessionIdToRevoke: string,
+  ): Promise<{ success: boolean }> {
+    if (currentJti && sessionIdToRevoke === currentJti) {
+      throw new HttpException('Cannot revoke current session. Use standard logout flow.', HttpStatus.BAD_REQUEST);
+    }
+
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionIdToRevoke, userId },
+    });
+
+    if (!session) {
+      throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
+    }
+
+    session.isRevoked = true;
+    await this.sessionRepo.save(session);
+
+    // Push jti to Redis denylist with 24 hour TTL
+    await this.redisService.set(`revoked:jti:${sessionIdToRevoke}`, '1', 'EX', 86400);
+
+    await this.auditService.logEvent({
+      userId,
+      eventType: 'session_revoked',
+      metadata: { sessionId: sessionIdToRevoke, deviceLabel: session.deviceLabel },
+    });
+
+    return { success: true };
   }
 
   public async lookupUserByEmail(email: string): Promise<{ id: string; username: string } | null> {
@@ -86,7 +184,7 @@ export class AuthService {
   /**
    * Registers a new user.
    */
-  public async register(username: string, saltHex: string, verifierHex: string): Promise<{ success: boolean; token: string }> {
+  public async register(username: string, saltHex: string, verifierHex: string, userAgent?: string): Promise<{ success: boolean; token: string }> {
     const hrStart = process.hrtime.bigint();
     const isoStart = new Date().toISOString();
     // console.log(`[DIAG_REGISTER_START] ISO=${isoStart} HR=${hrStart} username=${username} saltFp=${fp(saltHex)} verifierFp=${fp(verifierHex)}`);
@@ -130,10 +228,7 @@ export class AuthService {
     const elapsedMs = Number(hrEnd - hrStart) / 1e6;
     // console.log(`[DIAG_REGISTER_COMPLETE] ISO=${new Date().toISOString()} HR=${hrEnd} ELAPSED_MS=${elapsedMs.toFixed(3)} registeredUser=${saved.username} id=${saved.id} saltFp=${fp(saved.salt)} verifierFp=${fp(saved.verifier)}`);
 
-    const token = this.jwtService.sign(
-      { sub: saved.id, username: saved.username },
-      { expiresIn: '24h' },
-    );
+    const { token } = await this.createSession(saved.id, saved.username, 'registration', userAgent);
 
     return { success: true, token };
   }
@@ -218,7 +313,7 @@ export class AuthService {
    * Verifies client proof (M1) and handles account lockout state increments.
    * If MFA is enabled, returns an MFA redirect instead of the final token.
    */
-  public async loginStep2(challengeId: string, m1Hex: string): Promise<any> {
+  public async loginStep2(challengeId: string, m1Hex: string, userAgent?: string): Promise<any> {
     const hrStart = process.hrtime.bigint();
     const isoStart = new Date().toISOString();
     // console.log(`[DIAG_STEP2_START] ISO=${isoStart} HR=${hrStart} challengeIdFp=${fp(challengeId)} m1Fp=${fp(m1Hex)}`);
@@ -320,10 +415,7 @@ export class AuthService {
     }
 
     // No MFA enabled: issue a signed JWT as the final session token
-    const token = this.jwtService.sign(
-      { sub: user.id!, username: user.username },
-      { expiresIn: '24h' },
-    );
+    const { token } = await this.createSession(user.id!, user.username, 'srp-6a', userAgent);
 
     return {
       serverEvidence: verification.serverEvidence!.toString('hex'),
@@ -363,7 +455,7 @@ export class AuthService {
     return { success: true };
   }
 
-  public async verifyTotp(mfaToken: string, code: string): Promise<{ token: string }> {
+  public async verifyTotp(mfaToken: string, code: string, userAgent?: string): Promise<{ token: string }> {
     const session = this.mfaSessions.get(mfaToken);
     if (!session || session.createdAt < Date.now() - 5 * 60 * 1000) {
       throw new HttpException('Invalid or expired MFA session', HttpStatus.UNAUTHORIZED);
@@ -381,10 +473,7 @@ export class AuthService {
 
     // MFA succeeded: clear session and issue a signed JWT
     this.mfaSessions.delete(mfaToken);
-    const token = this.jwtService.sign(
-      { sub: user.id!, username: user.username },
-      { expiresIn: '24h' },
-    );
+    const { token } = await this.createSession(user.id!, user.username, 'mfa_totp', userAgent);
     return { token };
   }
 
@@ -483,7 +572,7 @@ export class AuthService {
     return options;
   }
 
-  public async verifyWebAuthnLogin(mfaToken: string, response: any): Promise<{ token: string }> {
+  public async verifyWebAuthnLogin(mfaToken: string, response: any, userAgent?: string): Promise<{ token: string }> {
     const session = this.mfaSessions.get(mfaToken);
     if (!session || session.createdAt < Date.now() - 5 * 60 * 1000) {
       throw new HttpException('Invalid or expired MFA session', HttpStatus.UNAUTHORIZED);
@@ -532,10 +621,7 @@ export class AuthService {
 
     // MFA succeeded: clear session and issue a signed JWT
     this.mfaSessions.delete(mfaToken);
-    const token = this.jwtService.sign(
-      { sub: user.id!, username: user.username },
-      { expiresIn: '24h' },
-    );
+    const { token } = await this.createSession(user.id!, user.username, 'mfa_webauthn', userAgent);
     return { token };
   }
 
@@ -581,7 +667,7 @@ export class AuthService {
     return options;
   }
 
-  public async verifyPasskeyLogin(challenge: string, response: any): Promise<{ token: string }> {
+  public async verifyPasskeyLogin(challenge: string, response: any, userAgent?: string): Promise<{ token: string }> {
     if (!challenge) {
       throw new HttpException('Missing challenge parameter', HttpStatus.BAD_REQUEST);
     }
@@ -630,10 +716,7 @@ export class AuthService {
     cred.counter = verification.authenticationInfo.newCounter;
     await this.userRepository.save(user);
 
-    const token = this.jwtService.sign(
-      { sub: user.id!, username: user.username },
-      { expiresIn: '24h' },
-    );
+    const { token } = await this.createSession(user.id!, user.username, 'passkey', userAgent);
     return { token };
   }
 

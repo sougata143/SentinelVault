@@ -33,10 +33,22 @@ void main() {
         request.response.close();
       });
 
-      hostProcess = await Process.start(
-        'python3',
-        ['-u', 'src/native-messaging/host.py'], // -u for unbuffered binary stdout/stdin
-      );
+      String pythonCmd = 'python3';
+      if (Platform.isWindows) {
+        pythonCmd = 'python';
+      }
+
+      try {
+        hostProcess = await Process.start(
+          pythonCmd,
+          ['-u', 'src/native-messaging/host.py'],
+        );
+      } catch (_) {
+        hostProcess = await Process.start(
+          'python3',
+          ['-u', 'src/native-messaging/host.py'],
+        );
+      }
 
       broadcastStdout = hostProcess!.stdout.asBroadcastStream();
 

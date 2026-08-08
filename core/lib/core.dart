@@ -10,6 +10,7 @@ export 'src/crypto/srp.dart';
 export 'src/database/vault_database.dart';
 export 'src/models/models.dart';
 export 'src/security/password_strength.dart';
+export 'src/security/password_generator.dart';
 export 'src/security/url_scanner.dart';
 export 'src/security/email_scanner.dart';
 export 'src/security/breach_monitor.dart';
@@ -41,6 +42,7 @@ export 'src/vault/dual_vault_manager.dart';
 export 'src/crypto/pqc_sharing.dart';
 export 'src/crypto/native_crypto_bridge.dart' show PqcKeyBundle, PqcWrappedKey, PqcSignatureBundle;
 export 'src/crypto/native_crypto_bridge_selector.dart' show ensureWasmReady;
+export 'src/models/shared_vault.dart';
 
 
 

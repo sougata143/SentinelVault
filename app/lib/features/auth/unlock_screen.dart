@@ -26,7 +26,7 @@ class UnlockScreen extends StatefulWidget {
     super.key,
     required this.email,
     this.authClient,
-    this.syncBaseUrl = ApiConfig.syncBaseUrl,
+    this.syncBaseUrl = '',
     this.httpClient,
     this.cryptoOverride,
   });
@@ -36,6 +36,9 @@ class UnlockScreen extends StatefulWidget {
 }
 
 class _UnlockScreenState extends State<UnlockScreen> {
+  String get _effectiveSyncBaseUrl =>
+      widget.syncBaseUrl.isNotEmpty ? widget.syncBaseUrl : ApiConfig.syncBaseUrl;
+
   final _formKey = GlobalKey<FormState>();
   final _masterPasswordController = TextEditingController();
   
@@ -93,7 +96,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
     try {
       final syncClient = HttpSyncApiClient(
-        baseUrl: widget.syncBaseUrl,
+        baseUrl: _effectiveSyncBaseUrl,
         userId: widget.email,
         httpClient: widget.httpClient,
       );
@@ -304,18 +307,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
           httpClient: widget.httpClient,
         ),
       );
-      // Ensure PQC key bundle exists and is published to Key Directory
-      try {
-        await PqcSharingService.ensureKeysPublished(widget.email);
-      } catch (_) {}
-      // Sync any PQC folders shared with this user (unwraps shared folder keys)
-      try {
-        await PqcSharingService.syncSharedFoldersWithMe();
-      } catch (_) {}
-      // Perform initial remote sync pull (fetches shared folder items)
-      try {
-        await VaultSyncManager.instance.sync();
-      } catch (_) {}
+      // Perform background sync & PQC key publishing asynchronously for instant UI launch
+      Future.microtask(() async {
+        try {
+          await PqcSharingService.ensureKeysPublished(widget.email);
+          await PqcSharingService.syncSharedFoldersWithMe();
+          await VaultSyncManager.instance.sync();
+        } catch (_) {}
+      });
 
       navigated = true;
       if (mounted) {

@@ -20,8 +20,8 @@ class RouteGuard extends StatefulWidget {
   const RouteGuard({
     super.key,
     this.httpClient,
-    this.syncBaseUrl = ApiConfig.syncBaseUrl,
-    this.authBaseUrl = ApiConfig.authBaseUrl,
+    this.syncBaseUrl = '',
+    this.authBaseUrl = '',
   });
 
   @override
@@ -29,6 +29,11 @@ class RouteGuard extends StatefulWidget {
 }
 
 class _RouteGuardState extends State<RouteGuard> {
+  String get _effectiveSyncBaseUrl =>
+      widget.syncBaseUrl.isNotEmpty ? widget.syncBaseUrl : ApiConfig.syncBaseUrl;
+  String get _effectiveAuthBaseUrl =>
+      widget.authBaseUrl.isNotEmpty ? widget.authBaseUrl : ApiConfig.authBaseUrl;
+
   bool _isLoading = true;
   bool _isLoggedIn = false;
   bool _isLocked = true;
@@ -76,8 +81,8 @@ class _RouteGuardState extends State<RouteGuard> {
       // In production, this should be stored in session or fetched from user profile
       return UnlockScreen(
         email: 'user@example.com', // TODO: Get from session/user profile
-        authClient: AuthClient(baseUrl: widget.authBaseUrl),
-        syncBaseUrl: widget.syncBaseUrl,
+        authClient: AuthClient(baseUrl: _effectiveAuthBaseUrl),
+        syncBaseUrl: _effectiveSyncBaseUrl,
         httpClient: widget.httpClient ?? http.Client(),
       );
     }

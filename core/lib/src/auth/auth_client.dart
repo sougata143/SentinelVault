@@ -178,6 +178,45 @@ class AuthClient {
     }
   }
 
+  /// Fetches active user sessions.
+  Future<List<Map<String, dynamic>>> getSessions(String jwtToken) async {
+    final url = Uri.parse('$baseUrl/auth/sessions');
+    final response = await _httpClient.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $jwtToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch sessions: ${response.statusCode}');
+    }
+
+    final list = json.decode(response.body) as List<dynamic>;
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  /// Revokes a specific session by ID.
+  Future<bool> revokeSession(String jwtToken, String sessionId) async {
+    final url = Uri.parse('$baseUrl/auth/sessions/$sessionId');
+    final response = await _httpClient.delete(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $jwtToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      final msg = body['message'] as String? ?? 'Failed to revoke session';
+      throw Exception(msg);
+    }
+
+    return true;
+  }
+
   /// Converts a hexadecimal string to a list of bytes.
   List<int> hexToBytes(String hex) {
     if (hex.length % 2 != 0) {
