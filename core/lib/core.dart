@@ -42,6 +42,7 @@ export 'src/vault/dual_vault_manager.dart';
 export 'src/crypto/pqc_sharing.dart';
 export 'src/crypto/native_crypto_bridge.dart' show PqcKeyBundle, PqcWrappedKey, PqcSignatureBundle;
 export 'src/crypto/native_crypto_bridge_selector.dart' show ensureWasmReady;
+export 'src/models/shared_vault.dart';
 
 
 

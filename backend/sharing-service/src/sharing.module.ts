@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { KeyDirectoryModule } from './key-directory/key-directory.module';
 import { ShareInviteModule } from './share-invite/share-invite.module';
 import { EmergencyModule } from './emergency/emergency.module';
+import { SharedVaultModule } from './shared-vault/shared-vault.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     KeyDirectoryModule,
     ShareInviteModule,
     EmergencyModule,
+    SharedVaultModule,
   ],
   controllers: [HealthController],
 })
