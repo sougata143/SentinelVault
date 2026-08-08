@@ -47,6 +47,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(ApiConfig.customServerUrl, isNull);
-    expect(ApiConfig.authBaseUrl, contains('3001'));
+    // After reset, defaults return '' (origin-relative same-origin paths)
+    expect(ApiConfig.authBaseUrl, equals(''));
   });
 }

@@ -14,8 +14,11 @@ class HttpSyncApiClient implements SyncApiClient {
   final http.Client _httpClient;
 
   /// Creates a new [HttpSyncApiClient].
+  ///
+  /// When [baseUrl] is `''` (the default), all requests use same-origin
+  /// relative paths (e.g. `/sync/pull`).
   HttpSyncApiClient({
-    required this.baseUrl,
+    this.baseUrl = '',
     required this.userId,
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();

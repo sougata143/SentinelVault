@@ -43,10 +43,8 @@ echo %GREEN%^o^/ Native Crypto Core WASM build complete.%NC%
 
 :: Step 2: Build Flutter Web Frontend Image using Dockerfile-v7
 echo.
-echo %BLUE%[Step 2/3] Packaging Flutter Web Frontend Container (using Dockerfile-v7)...%NC%
+echo %BLUE%[Step 2/3] Packaging Flutter Web Frontend Container...%NC%
 docker build ^
-  --build-arg AUTH_BASE_URL=http://localhost:3001 ^
-  --build-arg SYNC_BASE_URL=http://localhost:3002 ^
   -t sentinelvault-frontend:latest ^
   -t sentinelvault-frontend:3.12.2 ^
   -f Dockerfile .

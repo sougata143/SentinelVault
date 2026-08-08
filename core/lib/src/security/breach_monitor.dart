@@ -218,7 +218,10 @@ class BackendBreachMonitor {
   final http.Client _client;
 
   /// Creates a new [BackendBreachMonitor] client.
-  BackendBreachMonitor({this.backendUrl = 'http://localhost:3003', http.Client? client})
+  ///
+  /// When [backendUrl] is `''` (the default), requests use same-origin
+  /// relative paths (e.g. `/breach-monitor/opt-in`).
+  BackendBreachMonitor({this.backendUrl = '', http.Client? client})
       : _client = client ?? http.Client();
 
   /// Enrolls the given [email] and [emailHash] into the dark-web breach monitoring service.

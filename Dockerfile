@@ -11,12 +11,6 @@ RUN rustup target add wasm32-unknown-unknown
 FROM ghcr.io/cirruslabs/flutter:stable AS build
 WORKDIR /app
 
-# Exposing build arguments to pass production base URLs at compile time
-ARG AUTH_BASE_URL=http://localhost:3001
-ARG SYNC_BASE_URL=http://localhost:3002
-ARG SECURITY_BASE_URL=http://localhost:3003
-ARG SHARING_BASE_URL=http://localhost:3004
-
 # Transfer Cargo and Rustup dependencies from the rust environment
 COPY --from=rust-env /usr/local/cargo /usr/local/cargo
 COPY --from=rust-env /usr/local/rustup /usr/local/rustup
@@ -37,13 +31,11 @@ COPY ./core ./core
 COPY ./app ./app
 
 # Resolve Flutter packages and bundle production-ready Web assets
+# No --dart-define needed: ApiConfig defaults to '' (same-origin relative paths)
+# and nginx proxies /auth/, /sync/, etc. to the correct upstream containers.
 WORKDIR /app/app
 RUN flutter pub get
-RUN flutter build web --release \
-  --dart-define=AUTH_BASE_URL=$AUTH_BASE_URL \
-  --dart-define=SYNC_BASE_URL=$SYNC_BASE_URL \
-  --dart-define=SECURITY_BASE_URL=$SECURITY_BASE_URL \
-  --dart-define=SHARING_BASE_URL=$SHARING_BASE_URL
+RUN flutter build web --release
 
 ### ---- Production ----
 # Serves the compiled static frontend client via Nginx matching backend security configurations
