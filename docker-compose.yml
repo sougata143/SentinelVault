@@ -56,8 +56,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${AUTH_PORT:-3001}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,8 +88,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SYNC_PORT:-3002}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,8 +120,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SECURITY_ANALYSIS_PORT:-3003}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -155,8 +155,8 @@ services:
       test: [ "CMD-SHELL", "wget --spider -q http://localhost:${SHARING_PORT:-3004}/health || exit 1" ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
