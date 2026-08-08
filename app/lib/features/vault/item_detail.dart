@@ -13,6 +13,7 @@ class ItemDetailPane extends StatefulWidget {
   final List<int>? vaultKey;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
+  final VaultDatabase? db;
 
   const ItemDetailPane({
     super.key,
@@ -20,6 +21,7 @@ class ItemDetailPane extends StatefulWidget {
     this.vaultKey,
     this.onDelete,
     this.onEdit,
+    this.db,
   });
 
   @override
