@@ -1,19 +1,27 @@
 import '../platform/secure_storage.dart';
+import '../platform/duress_wipe_hook.dart';
 
-/// Manages the state of the local vault lock, in-memory cryptographic keys,
+/// Manages the state of local vault locks, in-memory cryptographic keys per vault,
 /// and active backend authentication session.
 ///
 /// Security Invariants:
 /// 1. The Account Password and Master Password are completely separate.
-/// 2. The Master Password (and keys derived from it) never leaves the device.
-/// 3. In-memory keys (masterKey, vaultKey) are wiped immediately upon lock or logout.
+/// 2. The Master Passwords (and keys derived from them) never leave the device.
+/// 3. Each vault key is kept in memory independently and wiped immediately upon lock or logout.
 class VaultLockManager {
   /// The global singleton instance of the vault lock manager.
   static final VaultLockManager instance = VaultLockManager._internal();
 
+  /// Optional listener triggered when the vault lock state changes (lock/logout/unlock).
+  void Function(bool isLocked)? onLockStateChanged;
+
   String? _sessionToken;
-  List<int>? _masterKey;
-  List<int>? _vaultKey;
+  /// Currently selected active vault ID.
+  String? activeVaultId;
+
+  // Key storage mapped by vaultId -> key bytes
+  final Map<String, List<int>> _activeMasterKeys = {};
+  final Map<String, List<int>> _activeVaultKeys = {};
 
   /// Indicates whether the user has toggled biometric quick-unlock in their settings.
   bool isBiometricEnabled = false;
@@ -26,14 +34,20 @@ class VaultLockManager {
   /// The active backend session JWT token, or null if logged out.
   String? get sessionToken => _sessionToken;
 
-  /// The derived master key used for SRP authentication, or null if locked.
-  List<int>? get masterKey => _masterKey;
+  /// Active vault's master key, or null if active vault is locked.
+  List<int>? get masterKey => activeVaultId != null ? _activeMasterKeys[activeVaultId!] : null;
 
-  /// The vault encryption/decryption key, or null if locked.
-  List<int>? get vaultKey => _vaultKey;
+  /// Active vault's vault key, or null if active vault is locked.
+  List<int>? get vaultKey => activeVaultId != null ? _activeVaultKeys[activeVaultId!] : null;
 
-  /// Returns true if the vault is currently locked (i.e. vault key is not in memory).
-  bool get isLocked => _vaultKey == null;
+  /// Returns true if the active vault is currently locked.
+  bool get isLocked => vaultKey == null;
+
+  /// Returns true if a specific [vaultId] is unlocked.
+  bool isVaultUnlocked(String vaultId) => _activeVaultKeys.containsKey(vaultId);
+
+  /// Retrieves the 32-byte Vault Key for a specific [vaultId], or null if locked.
+  List<int>? getVaultKeyForId(String vaultId) => _activeVaultKeys[vaultId];
 
   /// Returns true if the user is authenticated with the backend (has an active session token).
   bool get isLoggedIn => _sessionToken != null;
@@ -52,59 +66,84 @@ class VaultLockManager {
     SecureStorage.instance.writeSessionToken(token);
   }
 
-  /// Unlocks the vault by loading the derived [masterKey] and [vaultKey] into memory.
-  ///
-  /// Set [isDuress] to true if unlocked via the decoy password.
+  /// Unlocks a single default/active vault by loading [masterKey] and [vaultKey] into memory.
   void unlock(List<int> masterKey, List<int> vaultKey, {bool isDuress = false}) {
-    _masterKey = List<int>.from(masterKey);
-    _vaultKey = List<int>.from(vaultKey);
+    const defaultId = 'default';
+    unlockVault(defaultId, masterKey, vaultKey, isDuress: isDuress);
+  }
+
+  /// Unlocks a specific [vaultId] by storing its derived [masterKey] and [vaultKey] in memory.
+  void unlockVault(String vaultId, List<int> masterKey, List<int> vaultKey, {bool isDuress = false}) {
+    _activeMasterKeys[vaultId] = List<int>.from(masterKey);
+    _activeVaultKeys[vaultId] = List<int>.from(vaultKey);
+    activeVaultId = vaultId;
     _isDuressMode = isDuress;
+    if (isDuress) {
+      triggerDuressWipeHook();
+    }
+    onLockStateChanged?.call(false);
   }
 
-  /// Unlocks the vault directly using the recovery key's derived [vaultKey] (bypasses Master Password derivation).
-  void unlockWithRecoveryKey(List<int> vaultKey) {
-    _masterKey = null;
-    _vaultKey = List<int>.from(vaultKey);
+  /// Unlocks a vault directly using recovery key bytes.
+  void unlockWithRecoveryKey(List<int> vaultKey, {String vaultId = 'default'}) {
+    _activeVaultKeys[vaultId] = List<int>.from(vaultKey);
+    activeVaultId = vaultId;
+    onLockStateChanged?.call(false);
   }
 
-  /// Locks the vault.
-  /// Clears the Master Key and Vault Key from memory, but keeps the account session valid.
+  /// Locks a specific [vaultId] by zero-filling and purging its in-memory keys.
+  void lockVault(String vaultId) {
+    if (_activeMasterKeys.containsKey(vaultId)) {
+      final key = _activeMasterKeys[vaultId]!;
+      for (var i = 0; i < key.length; i++) {
+        key[i] = 0;
+      }
+      _activeMasterKeys.remove(vaultId);
+    }
+    if (_activeVaultKeys.containsKey(vaultId)) {
+      final key = _activeVaultKeys[vaultId]!;
+      for (var i = 0; i < key.length; i++) {
+        key[i] = 0;
+      }
+      _activeVaultKeys.remove(vaultId);
+    }
+    if (activeVaultId == vaultId) {
+      activeVaultId = _activeVaultKeys.keys.firstOrNull;
+    }
+    onLockStateChanged?.call(_activeVaultKeys.isEmpty);
+  }
+
+  /// Locks all open vaults and clears all keys from memory.
   void lock() {
-    if (_masterKey != null) {
-      for (var i = 0; i < _masterKey!.length; i++) {
-        _masterKey![i] = 0;
-      }
-      _masterKey = null;
-    }
-    if (_vaultKey != null) {
-      for (var i = 0; i < _vaultKey!.length; i++) {
-        _vaultKey![i] = 0;
-      }
-      _vaultKey = null;
-    }
-    _isDuressMode = false;
+    lockAll();
   }
 
-  /// Logs out the user.
-  /// Clears the session token, biometric settings, and performs key clearance.
+  /// Clears all unlocked vault keys from memory.
+  void lockAll() {
+    for (final key in _activeMasterKeys.values) {
+      for (var i = 0; i < key.length; i++) {
+        key[i] = 0;
+      }
+    }
+    for (final key in _activeVaultKeys.values) {
+      for (var i = 0; i < key.length; i++) {
+        key[i] = 0;
+      }
+    }
+    _activeMasterKeys.clear();
+    _activeVaultKeys.clear();
+    activeVaultId = null;
+    _isDuressMode = false;
+    onLockStateChanged?.call(true);
+  }
+
+  /// Logs out the user completely.
   void logout() {
     _sessionToken = null;
     SecureStorage.instance.deleteSessionToken();
     isBiometricEnabled = false;
     _clearBiometricCache();
-    _isDuressMode = false;
-    if (_masterKey != null) {
-      for (var i = 0; i < _masterKey!.length; i++) {
-        _masterKey![i] = 0;
-      }
-      _masterKey = null;
-    }
-    if (_vaultKey != null) {
-      for (var i = 0; i < _vaultKey!.length; i++) {
-        _vaultKey![i] = 0;
-      }
-      _vaultKey = null;
-    }
+    lockAll();
   }
 
   /// Caches the keys wrapped by a biometric-gated hardware key.
@@ -134,8 +173,7 @@ class VaultLockManager {
     try {
       final keys = await SecureStorage.instance.readBiometricWrappedVaultKey();
       if (keys != null) {
-        _masterKey = keys['masterKey'];
-        _vaultKey = keys['vaultKey'];
+        unlock(keys['masterKey']!, keys['vaultKey']!);
         return true;
       }
     } catch (e) {
@@ -152,9 +190,6 @@ class VaultLockManager {
   void _clearBiometricCache() {
     _hasBiometricCache = false;
     SecureStorage.instance.deleteBiometricWrappedVaultKey()
-        // The failure is already logged + rethrown inside deleteBiometricWrappedVaultKey.
-        // Catch here so the unawaited fire-and-forget call cannot surface as an
-        // unhandled async exception and crash the app.
         // ignore: avoid_catches_without_on_clauses
         .catchError((_) {});
   }

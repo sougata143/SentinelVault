@@ -47,6 +47,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   final _folderController = TextEditingController();
   final _notesController = TextEditingController();
   bool _favorite = false;
+  bool _isAvailableInWidget = false;
   final List<CustomField> _customFields = [];
 
   // Type Specific Controllers
@@ -174,6 +175,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     _folderController.text = item.vaultId;
     _notesController.text = item.notes.plaintext ?? '';
     _favorite = item.favorite;
+    _isAvailableInWidget = item.isAvailableInWidget;
     _customFields.addAll(item.customFields);
 
     final fields = item.fields;
@@ -493,6 +495,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
       title: _titleController.text,
       tags: tags,
       favorite: _favorite,
+      isAvailableInWidget: _isAvailableInWidget,
       vaultId: targetVaultId,
       createdAt: widget.item?.createdAt ?? DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
@@ -915,6 +918,20 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     tooltip: 'Scan QR Code (Mock)',
                   ),
                 ],
+              ),
+            ],
+          ),
+          _buildSectionCard(
+            title: 'Home Screen Widget Access',
+            titleIcon: Icons.widgets_outlined,
+            children: [
+              SwitchListTile(
+                key: const Key('widget-availability-switch'),
+                title: const Text('Available in Home Widget'),
+                subtitle: const Text('Allows live TOTP codes to appear on your device home screen when vault is unlocked.'),
+                value: _isAvailableInWidget,
+                activeColor: AppTheme.primaryColor,
+                onChanged: (val) => setState(() => _isAvailableInWidget = val),
               ),
             ],
           ),
@@ -1379,6 +1396,20 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          _buildSectionCard(
+            title: 'Home Screen Widget Access',
+            titleIcon: Icons.widgets_outlined,
+            children: [
+              SwitchListTile(
+                key: const Key('totp-widget-availability-switch'),
+                title: const Text('Available in Home Widget'),
+                subtitle: const Text('Allows live TOTP codes to appear on your device home screen when vault is unlocked.'),
+                value: _isAvailableInWidget,
+                activeColor: AppTheme.primaryColor,
+                onChanged: (val) => setState(() => _isAvailableInWidget = val),
               ),
             ],
           ),

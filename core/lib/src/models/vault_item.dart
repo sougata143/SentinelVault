@@ -1422,6 +1422,9 @@ class VaultItem {
   /// Indicates if this item is marked as a favorite/starred.
   final bool favorite;
 
+  /// Indicates if this item's TOTP code is available in the home screen widget.
+  final bool isAvailableInWidget;
+
   /// The identifier of the vault this item belongs to.
   final String vaultId;
 
@@ -1447,6 +1450,7 @@ class VaultItem {
     required this.title,
     required this.tags,
     required this.favorite,
+    this.isAvailableInWidget = false,
     required this.vaultId,
     required this.createdAt,
     required this.updatedAt,
@@ -1468,6 +1472,7 @@ class VaultItem {
         'title': title,
         'tags': tags,
         'favorite': favorite,
+        'available_in_widget': isAvailableInWidget,
         'vault_id': vaultId,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -1533,6 +1538,7 @@ class VaultItem {
       title: json['title'] as String? ?? '',
       tags: List<String>.from(json['tags'] as List? ?? []),
       favorite: json['favorite'] as bool? ?? false,
+      isAvailableInWidget: json['available_in_widget'] as bool? ?? json['isAvailableInWidget'] as bool? ?? false,
       vaultId: json['vault_id'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -1566,6 +1572,7 @@ class VaultItem {
       title: title,
       tags: tags,
       favorite: favorite,
+      isAvailableInWidget: isAvailableInWidget,
       vaultId: vaultId,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -1623,6 +1630,7 @@ class VaultItem {
         title: title,
         tags: const [],
         favorite: false,
+        isAvailableInWidget: false,
         vaultId: '',
         createdAt: encryptedItem.updatedAt,
         updatedAt: encryptedItem.updatedAt,
@@ -1665,6 +1673,7 @@ class VaultItem {
       title: item.title,
       tags: item.tags,
       favorite: item.favorite,
+      isAvailableInWidget: item.isAvailableInWidget,
       vaultId: item.vaultId,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
@@ -1672,5 +1681,27 @@ class VaultItem {
       customFields: decryptedCustomFields,
       notes: decryptedNotes,
     );
+  }
+
+  /// Returns true if this vault item contains a decrypted TOTP / OTP secret key.
+  bool get hasTotpSecret {
+    if (fields is TotpFields) {
+      final f = fields as TotpFields;
+      return f.secret.plaintext != null && f.secret.plaintext!.isNotEmpty;
+    } else if (fields is LoginFields) {
+      final f = fields as LoginFields;
+      return f.otpSecret.plaintext != null && f.otpSecret.plaintext!.isNotEmpty;
+    }
+    return false;
+  }
+
+  /// Returns the raw TOTP secret key string if present, or null.
+  String? get totpSecret {
+    if (fields is TotpFields) {
+      return (fields as TotpFields).secret.plaintext;
+    } else if (fields is LoginFields) {
+      return (fields as LoginFields).otpSecret.plaintext;
+    }
+    return null;
   }
 }

@@ -5,6 +5,7 @@ import 'package:core/core.dart';
 import '../../theme/theme.dart';
 import '../settings/settings_screen.dart';
 import 'sharing/sharing_screen.dart';
+import 'sharing/share_item_dialog.dart';
 import 'totp_code_card.dart';
 
 class ItemDetailPane extends StatefulWidget {
@@ -103,6 +104,20 @@ class _ItemDetailPaneState extends State<ItemDetailPane> {
         backgroundColor: Colors.transparent,
         title: Text(item.title, style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.link, color: SentinelTheme.accentCyan),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => ShareItemDialog(
+                  item: item,
+                  sharingBaseUrl: '',
+                  sessionToken: VaultLockManager.instance.sessionToken,
+                ),
+              );
+            },
+            tooltip: 'Share via One-Time Link',
+          ),
           IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.teal),
             onPressed: () {

@@ -36,8 +36,6 @@ class SqliteVaultDatabase implements VaultDatabase {
 
     _db = _isInMemory ? sqlite3.openInMemory() : sqlite3.open(_dbPath);
 
-    // Set encryption key for SQLCipher-compatible stores.
-    // If running against standard SQLite (e.g. standard tests), this is a no-op.
     if (encryptionKey.isNotEmpty) {
       final keyHex =
           encryptionKey.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
@@ -62,19 +60,23 @@ class SqliteVaultDatabase implements VaultDatabase {
         version INTEGER NOT NULL,
         updated_at TEXT NOT NULL,
         is_deleted INTEGER NOT NULL DEFAULT 0,
+        vault_id TEXT,
         folder_id TEXT
       )
     ''');
     try {
       db.execute('ALTER TABLE vault_items ADD COLUMN folder_id TEXT');
     } catch (_) {}
+    try {
+      db.execute('ALTER TABLE vault_items ADD COLUMN vault_id TEXT');
+    } catch (_) {}
   }
 
   @override
   void insertItem(EncryptedVaultItem item) {
     final stmt = db.prepare('''
-      INSERT INTO vault_items (id, encrypted_blob, nonce, version, updated_at, is_deleted, folder_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO vault_items (id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''');
     try {
       stmt.execute([
@@ -84,6 +86,7 @@ class SqliteVaultDatabase implements VaultDatabase {
         item.version,
         item.updatedAt.toIso8601String(),
         item.isDeleted ? 1 : 0,
+        item.vaultId,
         item.folderId,
       ]);
     } finally {
@@ -95,7 +98,7 @@ class SqliteVaultDatabase implements VaultDatabase {
   void updateItem(EncryptedVaultItem item) {
     final stmt = db.prepare('''
       UPDATE vault_items
-      SET encrypted_blob = ?, nonce = ?, version = ?, updated_at = ?, is_deleted = ?, folder_id = ?
+      SET encrypted_blob = ?, nonce = ?, version = ?, updated_at = ?, is_deleted = ?, vault_id = ?, folder_id = ?
       WHERE id = ?
     ''');
     try {
@@ -105,6 +108,7 @@ class SqliteVaultDatabase implements VaultDatabase {
         item.version,
         item.updatedAt.toIso8601String(),
         item.isDeleted ? 1 : 0,
+        item.vaultId,
         item.folderId,
         item.id,
       ]);
@@ -125,6 +129,7 @@ class SqliteVaultDatabase implements VaultDatabase {
         version: item.version + 1,
         updatedAt: DateTime.now().toUtc(),
         isDeleted: true,
+        vaultId: item.vaultId,
         folderId: item.folderId,
       ),
     );
@@ -143,7 +148,7 @@ class SqliteVaultDatabase implements VaultDatabase {
   @override
   EncryptedVaultItem? getItem(String id) {
     final stmt = db.prepare(
-      'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, folder_id '
+      'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id '
       'FROM vault_items WHERE id = ?',
     );
     try {
@@ -157,6 +162,7 @@ class SqliteVaultDatabase implements VaultDatabase {
         version: row['version'] as int,
         updatedAt: DateTime.parse(row['updated_at'] as String),
         isDeleted: (row['is_deleted'] as int) == 1,
+        vaultId: row['vault_id'] as String?,
         folderId: row['folder_id'] as String?,
       );
     } finally {
@@ -167,8 +173,8 @@ class SqliteVaultDatabase implements VaultDatabase {
   @override
   List<EncryptedVaultItem> getAllItems({bool includeDeleted = false}) {
     final query = includeDeleted
-        ? 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, folder_id FROM vault_items'
-        : 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, folder_id '
+        ? 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id FROM vault_items'
+        : 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id '
             'FROM vault_items WHERE is_deleted = 0';
     return db.select(query).map((row) {
       return EncryptedVaultItem(
@@ -178,9 +184,36 @@ class SqliteVaultDatabase implements VaultDatabase {
         version: row['version'] as int,
         updatedAt: DateTime.parse(row['updated_at'] as String),
         isDeleted: (row['is_deleted'] as int) == 1,
+        vaultId: row['vault_id'] as String?,
         folderId: row['folder_id'] as String?,
       );
     }).toList();
+  }
+
+  @override
+  List<EncryptedVaultItem> getItemsByVaultId(String vaultId, {bool includeDeleted = false}) {
+    final stmt = db.prepare(
+      includeDeleted
+          ? 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id FROM vault_items WHERE vault_id = ?'
+          : 'SELECT id, encrypted_blob, nonce, version, updated_at, is_deleted, vault_id, folder_id FROM vault_items WHERE vault_id = ? AND is_deleted = 0',
+    );
+    try {
+      final results = stmt.select([vaultId]);
+      return results.map((row) {
+        return EncryptedVaultItem(
+          id: row['id'] as String,
+          encryptedBlob: row['encrypted_blob'] as String,
+          nonce: row['nonce'] as String,
+          version: row['version'] as int,
+          updatedAt: DateTime.parse(row['updated_at'] as String),
+          isDeleted: (row['is_deleted'] as int) == 1,
+          vaultId: row['vault_id'] as String?,
+          folderId: row['folder_id'] as String?,
+        );
+      }).toList();
+    } finally {
+      stmt.dispose();
+    }
   }
 
   @override

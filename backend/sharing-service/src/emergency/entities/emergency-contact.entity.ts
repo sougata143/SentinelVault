@@ -22,6 +22,10 @@ export class EmergencyContactEntity {
   @Column({ default: 'active' })
   status!: 'active' | 'revoked';
 
+  @Column({ name: 'vault_id', type: 'uuid', nullable: true })
+  @Index()
+  vaultId?: string;
+
   @Column({ name: 'wrapped_vault_key', type: 'text', nullable: true })
   wrappedVaultKey?: string;
 

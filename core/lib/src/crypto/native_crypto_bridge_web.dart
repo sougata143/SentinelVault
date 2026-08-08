@@ -4,8 +4,19 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart' show SecretBoxAuthenticationError;
 
 import 'native_crypto_bridge.dart';
+import 'totp_helper.dart';
 
 // --- JS Bindings ---
+
+/// WebAssembly binding for generating TOTP codes.
+@JS('wasm_generate_totp')
+external JSString wasmGenerateTotp(
+  JSString secret,
+  JSNumber timestampSec,
+  JSNumber period,
+  JSNumber digits,
+  JSString algorithm,
+);
 
 /// WebAssembly binding for master key derivation via Argon2id.
 @JS()
@@ -497,6 +508,43 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
       return res.toDart;
     } catch (e) {
       throw Exception('Wasm pqcVerifyInvitation failed: $e');
+    }
+  }
+
+  @override
+  Future<String> generateTotpCode({
+    required String secret,
+    required int timestampSec,
+    int period = 30,
+    int digits = 6,
+    String algorithm = 'SHA1',
+  }) async {
+    if (!_ready) {
+      return TotpHelper.generateTotpCode(
+        secret: secret,
+        timestampSec: timestampSec,
+        period: period,
+        digits: digits,
+        algorithm: algorithm,
+      );
+    }
+    try {
+      final res = wasmGenerateTotp(
+        secret.toJS,
+        timestampSec.toJS,
+        period.toJS,
+        digits.toJS,
+        algorithm.toJS,
+      );
+      return res.toDart;
+    } catch (_) {
+      return TotpHelper.generateTotpCode(
+        secret: secret,
+        timestampSec: timestampSec,
+        period: period,
+        digits: digits,
+        algorithm: algorithm,
+      );
     }
   }
 }

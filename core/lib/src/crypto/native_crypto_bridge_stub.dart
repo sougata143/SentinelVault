@@ -106,4 +106,13 @@ class NativeCryptoBridgeImpl implements NativeCryptoBridge {
     required Uint8List mldsaVk,
     required PqcSignatureBundle signatures,
   }) => throw UnimplementedError();
+
+  @override
+  Future<String> generateTotpCode({
+    required String secret,
+    required int timestampSec,
+    int period = 30,
+    int digits = 6,
+    String algorithm = 'SHA1',
+  }) => throw UnimplementedError();
 }

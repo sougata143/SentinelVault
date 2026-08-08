@@ -5,6 +5,7 @@ import 'theme/theme.dart';
 import 'features/auth/flutter_secure_storage_impl.dart';
 import 'features/auth/route_guard.dart';
 import 'features/native_messaging/local_messaging_server.dart';
+import 'features/widget/widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,14 @@ void main() async {
   
   // Load session from secure storage
   await VaultLockManager.instance.loadSession();
+
+  // Initialize Home Widget service and lock purging hook
+  await WidgetService.instance.init();
+  VaultLockManager.instance.onLockStateChanged = (isLocked) {
+    if (isLocked) {
+      WidgetService.instance.purgeWidgetData();
+    }
+  };
 
   runApp(const MyApp());
 }
